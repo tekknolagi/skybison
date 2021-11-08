@@ -21,42 +21,62 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: Configure CMake
-      # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
-      # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{matrix.BUILD_TYPE}} -DCMAKE_TOOLCHAIN_FILE=util/linux.cmake
+      # - name: Configure CMake
+      #   # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
+      #   # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
+      #   run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{matrix.BUILD_TYPE}} -DCMAKE_TOOLCHAIN_FILE=util/linux.cmake
 
-    - name: Build
+      # - name: Build
+      #   working-directory: ${{github.workspace}}/build
+      #   run: |
+      #     make -j4
+      #     make cpython
+      #     make -j4 cpython-tests
+
+      # - name: Run C++ tests with Skybison
+      #   working-directory: ${{github.workspace}}/build
+      #   run: ${{github.workspace}}/third-party/gtest-parallel/gtest-parallel ./bin/python-tests
+
+      # - name: Run C++ tests with Skybison (C++ interpreter)
+      #   working-directory: ${{github.workspace}}/build
+      #   run: PYRO_CPP_INTERPRETER=1 ${{github.workspace}}/third-party/gtest-parallel/gtest-parallel ./bin/python-tests
+
+      # - name: Run C++ tests with CPython
+      #   working-directory: ${{github.workspace}}/build
+      #   run: ${{github.workspace}}/third-party/gtest-parallel/gtest-parallel ./bin/cpython-tests
+
+      # - name: Run Python tests with Skybison
+      #   working-directory: ${{github.workspace}}
+      #   run: ./util/python_tests_pyro.sh
+
+      # - name: Run Python tests with Skybison (C++ interpreter)
+      #   working-directory: ${{github.workspace}}
+      #   run: PYRO_CPP_INTERPRETER=1 ./util/python_tests_pyro.sh
+
+      # - name: Run Python tests with CPython
+      #   working-directory: ${{github.workspace}}
+      #   run: ./util/python_tests_cpython.sh
+
+      # - name: Run benchmarks
+      #   working-directory: ${{github.workspace}}/build
+      #   run: ./bin/python-tests --benchmark_filter='.*' | tee benchmark.txt
+    - name: Make build dir
+      run: mkdir -p build
+
+    - name: Make some file
       working-directory: ${{github.workspace}}/build
-      run: |
-        make -j4
-        make cpython
-        make -j4 cpython-tests
+      run: echo 'this is my benchmark result' > benchmark.txt
 
-    - name: Run C++ tests with Skybison
+    - name: Comment on Pull Requesat
       working-directory: ${{github.workspace}}/build
-      run: ${{github.workspace}}/third-party/gtest-parallel/gtest-parallel ./bin/python-tests
-
-    - name: Run C++ tests with Skybison (C++ interpreter)
-      working-directory: ${{github.workspace}}/build
-      run: PYRO_CPP_INTERPRETER=1 ${{github.workspace}}/third-party/gtest-parallel/gtest-parallel ./bin/python-tests
-
-    - name: Run C++ tests with CPython
-      working-directory: ${{github.workspace}}/build
-      run: ${{github.workspace}}/third-party/gtest-parallel/gtest-parallel ./bin/cpython-tests
-
-    - name: Run Python tests with Skybison
-      working-directory: ${{github.workspace}}
-      run: ./util/python_tests_pyro.sh
-
-    - name: Run Python tests with Skybison (C++ interpreter)
-      working-directory: ${{github.workspace}}
-      run: PYRO_CPP_INTERPRETER=1 ./util/python_tests_pyro.sh
-
-    - name: Run Python tests with CPython
-      working-directory: ${{github.workspace}}
-      run: ./util/python_tests_cpython.sh
-
-    - name: Run benchmarks
-      working-directory: ${{github.workspace}}/build
-      run: ./bin/python-tests --benchmark_filter='.*'
+      uses: actions/github-script@v5
+        with:
+          script: |
+            import fs from 'fs'
+            const benchmark_results = fs.readFileSync('benchmark.txt', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '```\n' + benchmark_results + '\n```',
+            })
