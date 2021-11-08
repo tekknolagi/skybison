@@ -68,12 +68,11 @@ jobs:
       run: echo 'this is my benchmark result' > benchmark.txt
 
     - name: Comment on Pull Request
-      working-directory: ${{github.workspace}}/build
       uses: actions/github-script@v5
       with:
         script: |
           import fs from 'fs'
-          const benchmark_results = fs.readFileSync('benchmark.txt', 'utf8');
+          const benchmark_results = fs.readFileSync('build/benchmark.txt', 'utf8');
           github.rest.issues.createComment({
             issue_number: context.issue.number,
             owner: context.repo.owner,
