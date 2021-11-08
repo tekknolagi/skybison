@@ -747,6 +747,23 @@ std::ostream& operator<<(std::ostream& os, Thread* thread) {
   return os;
 }
 
+std::ostream& operator<<(std::ostream& os, BasicBlock* block) {
+  os << "bb" << block->id() << ":\n";
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os, CFG* cfg) {
+  for (word i = 0; i < cfg->numBlocks(); i++) {
+    os << cfg->blockAt(i);
+  }
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os, Register* reg) {
+  os << "v" << reg->id();
+  return os;
+}
+
 USED void dump(RawObject object) { dumpExtended(std::cerr, object); }
 
 USED void dump(const Object& object) { dumpExtended(std::cerr, *object); }
@@ -758,6 +775,12 @@ USED void dumpPendingException(Thread* thread) { std::cerr << thread; }
 USED void dumpSingleFrame(Frame* frame) {
   dumpSingleFrame(Thread::current(), std::cerr, frame, nullptr);
 }
+
+USED void dump(BasicBlock* value) { std::cerr << value; }
+
+USED void dump(CFG* value) { std::cerr << value; }
+
+USED void dump(Register* value) { std::cerr << value; }
 
 void dumpTraceback() {
   Thread* thread = Thread::current();

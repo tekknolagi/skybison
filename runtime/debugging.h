@@ -3,6 +3,7 @@
 
 #include <iosfwd>
 
+#include "cfg.h"
 #include "handles.h"
 #include "objects.h"
 
@@ -53,6 +54,10 @@ std::ostream& operator<<(std::ostream& os, const Handle<T>& value) {
 std::ostream& operator<<(std::ostream& os, Frame* frame);
 std::ostream& operator<<(std::ostream& os, Thread* thread);
 
+std::ostream& operator<<(std::ostream& os, BasicBlock* value);
+std::ostream& operator<<(std::ostream& os, CFG* value);
+std::ostream& operator<<(std::ostream& os, Register* value);
+
 void dump(RawObject object);
 void dump(const Object& object);
 void dump(Frame* frame);
@@ -60,6 +65,10 @@ void dumpPendingException(Thread* thread);
 void dumpSingleFrame(Frame* frame);
 void dumpTraceback();
 void dump(PyObject* obj);
+
+void dump(BasicBlock* value);
+void dump(CFG* value);
+void dump(Register* value);
 
 void initializeDebugging();
 

@@ -866,5 +866,35 @@ pending exception traceback: None
 )");
 }
 
+TEST_F(DebuggingTests, FormatBlock) {
+  BasicBlock block(123);
+  std::stringstream ss;
+  ss << &block;
+  EXPECT_EQ(ss.str(), "bb123:\n");
+}
+
+TEST_F(DebuggingTests, FormatCFG) {
+  ASSERT_FALSE(runFromCStr(runtime_, R"(
+def func():
+  pass
+  )")
+                   .isError());
+  HandleScope scope(thread_);
+  Function func(&scope, mainModuleAt(runtime_, "func"));
+  CFG cfg(&scope, thread_, func);
+  cfg.allocateBlock();
+  cfg.allocateBlock();
+  std::stringstream ss;
+  ss << &cfg;
+  EXPECT_EQ(ss.str(), "bb0:\nbb1:\n");
+}
+
+TEST_F(DebuggingTests, FormatRegister) {
+  Register reg(123);
+  std::stringstream ss;
+  ss << &reg;
+  EXPECT_EQ(ss.str(), "v123");
+}
+
 }  // namespace testing
 }  // namespace py
