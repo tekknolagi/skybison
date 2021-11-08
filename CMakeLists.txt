@@ -556,6 +556,7 @@ add_library(
   runtime/slice-builtins.h
   runtime/space.cpp
   runtime/space.h
+  runtime/stack.h
   runtime/str-builtins.cpp
   runtime/str-builtins.h
   runtime/str-intern.cpp
