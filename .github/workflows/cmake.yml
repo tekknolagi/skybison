@@ -71,8 +71,8 @@ jobs:
       uses: actions/github-script@v5
       with:
         script: |
-          import fs from 'fs'
-          const benchmark_results = fs.readFileSync('build/benchmark.txt', 'utf8');
+          const { promises: fs } = require('fs');
+          const benchmark_results = await fs.readFileSync('build/benchmark.txt', 'utf8');
           github.rest.issues.createComment({
             issue_number: context.issue.number,
             owner: context.repo.owner,
