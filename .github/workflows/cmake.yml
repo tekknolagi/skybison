@@ -69,13 +69,14 @@ jobs:
 
     - name: Comment on Pull Request
       uses: actions/github-script@v5
-      with:
-        script: |
-          const { promises: fs } = require('fs');
-          const benchmark_results = await fs.readFile('build/benchmark.txt', 'utf8');
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: '```\n' + benchmark_results + '\n```',
-          })
+    - if: matrix.BUILD_TYPE == 'RelWithDebInfo':
+        with:
+          script: |
+            const { promises: fs } = require('fs');
+            const benchmark_results = await fs.readFile('build/benchmark.txt', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '```\n' + benchmark_results + '```',
+            })
