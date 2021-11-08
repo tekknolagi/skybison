@@ -70,13 +70,13 @@ jobs:
     - name: Comment on Pull Request
       working-directory: ${{github.workspace}}/build
       uses: actions/github-script@v5
-        with:
-          script: |
-            import fs from 'fs'
-            const benchmark_results = fs.readFileSync('benchmark.txt', 'utf8');
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '```\n' + benchmark_results + '\n```',
-            })
+      with:
+        script: |
+          import fs from 'fs'
+          const benchmark_results = fs.readFileSync('benchmark.txt', 'utf8');
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: '```\n' + benchmark_results + '\n```',
+          })
