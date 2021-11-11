@@ -120,6 +120,7 @@ class BytecodeInstructionBlock {
 
 class BlockMap {
  public:
+  BlockMap() {}
   void addBlock(word start_idx, word end_idx, BasicBlock* block,
                 const BytecodeView& bytecode) {
     word start_offset = start_idx * kCodeUnitSize;

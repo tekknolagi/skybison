@@ -105,7 +105,8 @@ class FrameState {
   Vector<Register*> locals_;
 
   DISALLOW_HEAP_ALLOCATION();
-  DISALLOW_COPY_AND_ASSIGN(TranslationContext);
+  // TODO(max): Move semantics?
+  // DISALLOW_COPY_AND_ASSIGN(FrameState);
 };
 
 class TranslationContext {
@@ -120,10 +121,11 @@ class TranslationContext {
   FrameState frame_;
 
   DISALLOW_HEAP_ALLOCATION();
-  DISALLOW_COPY_AND_ASSIGN(TranslationContext);
+  // TODO(max): Move semantics?
+  // DISALLOW_COPY_AND_ASSIGN(TranslationContext);
 };
 
-void translate(IRFunc* func, const TranslationContext& entry_tc) {
+static void translate(IRFunc* irfunc, const TranslationContext& entry_tc) {
   std::deque<TranslationContext> queue({entry_tc});
   std::set<BasicBlock*> processed;
   std::set<BasicBlock*> loop_headers;
@@ -136,7 +138,12 @@ void translate(IRFunc* func, const TranslationContext& entry_tc) {
     processed.emplace(tc.block());
     // TODO(max): Loop over bytecode
   }
-  (void)func;
+  (void)irfunc;
+  std::abort();
+}
+
+static RawObject lowerToBytecode(IRFunc* irfunc) {
+  (void)irfunc;
   std::abort();
 }
 
@@ -157,9 +164,9 @@ RawObject optimizeBytecode(Thread* thread, const Function& function) {
   }
   entry_tc.setBlock(first_block);
   translate(&irfunc, entry_tc);
-
-  std::abort();
-  return Error ::error();
+  // TODO(max): Remove trampoline blocks
+  // TODO(max): Remove unreachable blocks
+  return lowerToBytecode(&irfunc);
 }
 
 }  // namespace py
