@@ -874,14 +874,7 @@ TEST_F(DebuggingTests, FormatBlock) {
 }
 
 TEST_F(DebuggingTests, FormatCFG) {
-  ASSERT_FALSE(runFromCStr(runtime_, R"(
-def func():
-  pass
-  )")
-                   .isError());
-  HandleScope scope(thread_);
-  Function func(&scope, mainModuleAt(runtime_, "func"));
-  CFG cfg(&scope, thread_, func);
+  CFG cfg;
   cfg.allocateBlock();
   cfg.allocateBlock();
   std::stringstream ss;

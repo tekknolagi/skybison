@@ -10,9 +10,7 @@ namespace testing {
 using CFGTest = RuntimeFixture;
 
 TEST_F(CFGTest, AllocateBlockAddsBlock) {
-  HandleScope scope(thread_);
-  Function func(&scope, newEmptyFunction());
-  CFG cfg(&scope, thread_, func);
+  CFG cfg;
   EXPECT_EQ(cfg.numBlocks(), 0);
   BasicBlock* bb0 = cfg.allocateBlock();
   EXPECT_EQ(cfg.numBlocks(), 1);
