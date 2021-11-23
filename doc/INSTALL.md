@@ -63,6 +63,14 @@ To run tests with address sanitizer (ASAN), add
 
 *before* the platform. Like `cmake -DSKYBISON_ASAN=1 ...`
 
+To run tests with undefined sanitizer (UBSAN), add
+
+```
+-DSKYBISON_UBSAN=1
+```
+
+*before* the platform. Like `cmake -DSKYBISON_UBSAN=1 ...`
+
 Since you will likely have several `build-XYZ` folders hanging around, and it's
 useful for those not to show up in `git status`, they should be ignored by
 default in `.gitignore`.

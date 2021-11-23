@@ -12,6 +12,7 @@ jobs:
       matrix:
         # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
         BUILD_TYPE: [DebugOpt, RelWithDebInfo]
+        SANITIZER: ["", -DSKYBISON_ASAN=1, -DSKYBISON_UBSAN=1]
     # The CMake configure and build commands are platform agnostic and should work equally
     # well on Windows or Mac.  You can convert this to a matrix build if you need
     # cross-platform coverage.
@@ -24,7 +25,11 @@ jobs:
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
       # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{matrix.BUILD_TYPE}} -DCMAKE_TOOLCHAIN_FILE=util/linux.cmake
+      run: |
+        cmake -B ${{github.workspace}}/build \
+              -DCMAKE_BUILD_TYPE=${{matrix.BUILD_TYPE}} \
+              ${{matrix.SANITIZER}} \
+              -DCMAKE_TOOLCHAIN_FILE=util/linux.cmake
 
     - name: Build
       working-directory: ${{github.workspace}}/build
@@ -42,6 +47,7 @@ jobs:
       run: PYRO_CPP_INTERPRETER=1 ${{github.workspace}}/third-party/gtest-parallel/gtest-parallel ./bin/python-tests
 
     - name: Run C++ tests with CPython
+      if: ${{ matrix.SANITIZER == '' }}
       working-directory: ${{github.workspace}}/build
       run: ${{github.workspace}}/third-party/gtest-parallel/gtest-parallel ./bin/cpython-tests
 
@@ -54,6 +60,7 @@ jobs:
       run: PYRO_CPP_INTERPRETER=1 PYRO_BUILD_DIR="build" ./util/python_tests_pyro.sh
 
     - name: Run Python tests with CPython
+      if: ${{ matrix.SANITIZER == '' }}
       working-directory: ${{github.workspace}}
       run: PYRO_BUILD_DIR="build" ./util/python_tests_cpython.sh
 
@@ -63,7 +70,7 @@ jobs:
 
     # Consider using https://github.com/marketplace/actions/continuous-benchmark
     - name: Comment on Pull Request
-      if: ${{ github.event_name == 'pull_request' && matrix.BUILD_TYPE == 'RelWithDebInfo' }}
+      if: ${{ github.event_name == 'pull_request' && matrix.BUILD_TYPE == 'RelWithDebInfo' && matrix.SANITIZER == '' }}
       uses: actions/github-script@v5
       with:
         script: |
