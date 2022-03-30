@@ -334,6 +334,44 @@ struct BytecodeOp {
   Bytecode bc;
   int32_t arg;
   uint16_t cache;
+
+  bool isBranch() const {
+    switch (bc) {
+      case FOR_ITER:
+      case JUMP_ABSOLUTE:
+      case JUMP_FORWARD:
+      case JUMP_IF_FALSE_OR_POP:
+      case JUMP_IF_TRUE_OR_POP:
+      case POP_JUMP_IF_FALSE:
+      case POP_JUMP_IF_TRUE:
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  bool isRelativeBranch() const {
+    return bc == FOR_ITER || bc == JUMP_FORWARD;
+  }
+
+  bool isUnconditionalBranch() const {
+    DCHECK(isBranch(), "must be branch");
+    return bc == FOR_ITER || bc == JUMP_ABSOLUTE || bc == JUMP_FORWARD;
+  }
+
+  bool isConditionalBranch() const {
+    DCHECK(isBranch(), "must be branch");
+    return !isUnconditionalBranch();
+  }
+
+  word jumpTargetIdx(word next_instr_idx) const {
+    DCHECK(isBranch(), "must be branch");
+    if (isRelativeBranch()) {
+      return next_instr_idx + arg/kCompilerCodeUnitSize;
+    } else {
+      return arg/kCompilerCodeUnitSize;
+    }
+  }
 };
 
 BytecodeOp nextBytecodeOp(const MutableBytes& bytecode, word* index);

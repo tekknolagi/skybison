@@ -1,6 +1,14 @@
 // Copyright (c) Facebook, Inc. and its affiliates. (http://www.facebook.com)
 #include "bytecode.h"
 
+#include <iostream>
+#include <map>
+#include <set>
+#include <sstream>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+
 #include "ic.h"
 #include "runtime.h"
 
@@ -274,6 +282,207 @@ RawObject expandBytecode(Thread* thread, const Bytes& bytecode) {
 
 static const word kMaxCaches = 65536;
 
+class BytecodeSlice {
+ public:
+  BytecodeSlice(Thread* thread, RawObject bytecode, word start, word end)
+      : thread_(thread), bytecode_(bytecode), start_(start), end_(end) {}
+
+  BytecodeOp at(word idx) const {
+    DCHECK(idx >= start(), "idx must be >= start");
+    DCHECK(idx < end(), "idx must be < end");
+    HandleScope scope(thread_);
+    MutableBytes bytecode(&scope, bytecode_);
+    return BytecodeOp{rewrittenBytecodeOpAt(bytecode, idx),
+                      rewrittenBytecodeArgAt(bytecode, idx), /*cache=*/0};
+  }
+
+  word start() const { return start_; }
+
+  word end() const { return end_; }
+
+  word numInstrsTotal() const {
+    return Bytes::cast(bytecode()).length() / kCodeUnitSize;
+  }
+
+  word numInstrs() const { return end() - start(); }
+
+  BytecodeOp last() const { return at(end() - 1); }
+
+  RawObject bytecode() const { return bytecode_; }
+
+ private:
+  Thread* thread_{nullptr};
+  // Not yet rewritten.
+  RawObject bytecode_{NoneType::object()};
+  word start_{0};
+  word end_{0};
+};
+
+class Block {
+ public:
+  Block(word id, BytecodeSlice slice) : id_(id), slice_(slice) {}
+
+  word id() const { return id_; }
+
+  void addPred(Block* block) { preds_.insert(block); }
+
+  void addSucc(Block* block) { succs_.insert(block); }
+
+  BytecodeSlice bytecode() const { return slice_; }
+
+  std::string toString() const { return "bb" + std::to_string(id()); }
+
+  const std::set<Block*>* preds() const { return &preds_; }
+
+  const std::set<Block*>* succs() const { return &succs_; }
+
+ private:
+  std::set<Block*> preds_;
+  std::set<Block*> succs_;
+  word id_{0};
+  BytecodeSlice slice_;
+};
+
+// Look up an item in the given map. Always abort if key doesn't exist.
+template <typename K, typename V>
+V& map_get_strict(std::map<K, V>& map, const K& key) {
+  auto it = map.find(key);
+  CHECK(it != map.end(), "Key not found in map");
+  return it->second;
+}
+
+template <typename K, typename V>
+V& map_get_strict(std::unordered_map<K, V>& map, const K& key) {
+  auto it = map.find(key);
+  CHECK(it != map.end(), "Key not found in map");
+  return it->second;
+}
+
+class BlockMap {
+ public:
+  void addBlock(word idx, Block* block) { start_idx_to_block[idx] = block; }
+
+  Block* blockAtIdx(word idx) {
+    return map_get_strict(start_idx_to_block, idx);
+  }
+
+  Block* first() { return blockAtIdx(0); }
+
+  using iterator = typename std::map<word, Block*>::iterator;
+  iterator begin() { return start_idx_to_block.begin(); };
+  iterator end() { return start_idx_to_block.end(); };
+
+  std::string toString() {
+    std::stringstream result;
+    for (const auto& it : *this) {
+      Block* block = it.second;
+      result << block->toString();
+      if (block->preds()->size() > 0) {
+        result << " (preds";
+        for (Block* pred : *block->preds()) {
+          result << " " << pred->toString();
+        }
+        result << ")";
+      }
+      result << "\n";
+      BytecodeSlice slice = block->bytecode();
+      for (word i = slice.start(); i < slice.end(); i++) {
+        BytecodeOp op = slice.at(i);
+        result << "  " << kBytecodeNames[op.bc] << " " << op.arg << std::endl;
+      }
+      if (block->succs()->size() > 0) {
+        result << "  (succs";
+        for (Block* succ : *block->succs()) {
+          result << " " << succ->toString();
+        }
+        result << ")\n";
+      }
+    }
+    return result.str();
+  }
+
+ private:
+  std::map<word, Block*> start_idx_to_block;
+};
+
+static const std::unordered_set<Bytecode> kUnsupportedOpcodes = {
+    CALL_FINALLY,
+    END_FINALLY,
+    RAISE_VARARGS,
+    SETUP_FINALLY,
+};
+
+static bool isUnsupportedOpcode(Bytecode bc) {
+  return kUnsupportedOpcodes.find(bc) != kUnsupportedOpcodes.end();
+}
+
+static BlockMap* createBlocks(Thread* thread, BytecodeSlice instrs) {
+  std::set<word> block_starts;
+  block_starts.insert(0);
+  word num_instrs = instrs.numInstrs();
+  // Gather block starts
+  for (word i = instrs.start(); i < instrs.end(); i++) {
+    BytecodeOp instr = instrs.at(i);
+    word next_instr_idx = i + 1;
+    if (instr.isBranch()) {
+      block_starts.insert(next_instr_idx);
+      block_starts.insert(instr.jumpTargetIdx(next_instr_idx));
+    } else if (instr.bc == RETURN_VALUE) {
+      if (next_instr_idx < num_instrs) {
+        block_starts.insert(next_instr_idx);
+      }
+    } else if (isUnsupportedOpcode(instr.bc)) {
+      return nullptr;
+    }
+  }
+  // Make blocks
+  std::vector<word> block_starts_ordered;
+  std::copy(block_starts.begin(), block_starts.end(),
+            std::back_inserter(block_starts_ordered));
+  // Hopefully is already sorted...
+  uword num_blocks = block_starts.size();
+  BlockMap* block_map = new BlockMap();
+  for (uword i = 0; i < block_starts_ordered.size(); i++) {
+    uword start_idx = block_starts_ordered[i];
+    uword end_idx =
+        i + 1 < num_blocks ? block_starts_ordered[i + 1] : num_instrs;
+    BytecodeSlice slice(thread, instrs.bytecode(), start_idx, end_idx);
+    Block* block = new Block(i, slice);
+    block_map->addBlock(start_idx, block);
+  }
+  return block_map;
+}
+
+static void linkBlocks(Block* pred, Block* succ) {
+  pred->addSucc(succ);
+  succ->addPred(pred);
+}
+
+static void computePredsAndSuccs(BlockMap* block_map) {
+  for (auto& it : *block_map) {
+    Block* block = it.second;
+    BytecodeSlice bytecode = block->bytecode();
+    BytecodeOp last = bytecode.last();
+    // TODO(max): Investigate if this is equivalent to last.idx (if that
+    // existed)
+    word next_instr_idx = bytecode.end();
+    word num_instrs = bytecode.numInstrsTotal();
+    if (last.isBranch()) {
+      linkBlocks(block,
+                 block_map->blockAtIdx(last.jumpTargetIdx(next_instr_idx)));
+      if (last.isConditionalBranch()) {
+        linkBlocks(block, block_map->blockAtIdx(next_instr_idx));
+      }
+    } else if (last.bc == RETURN_VALUE) {
+      if (next_instr_idx < num_instrs) {
+        linkBlocks(block, block_map->blockAtIdx(next_instr_idx));
+      }
+    } else {
+      linkBlocks(block, block_map->blockAtIdx(next_instr_idx));
+    }
+  }
+}
+
 void rewriteBytecode(Thread* thread, const Function& function) {
   HandleScope scope(thread);
   Runtime* runtime = thread->runtime();
@@ -294,6 +503,18 @@ void rewriteBytecode(Thread* thread, const Function& function) {
     return;
   }
   MutableBytes bytecode(&scope, function.rewrittenBytecode());
+  BytecodeSlice bytecode_slice(thread, *bytecode, 0,
+                               bytecode.length() / kCodeUnitSize);
+  BlockMap* block_map = createBlocks(thread, bytecode_slice);
+  if (block_map != nullptr) {
+    std::cerr << "--- block_map for " << Str::cast(function.qualname()).toCStr()
+              << "---\n";
+    std::cerr << block_map->toString();
+    computePredsAndSuccs(block_map);
+    std::cerr << "--- updated block_map for "
+              << Str::cast(function.qualname()).toCStr() << "---\n";
+    std::cerr << block_map->toString();
+  }
   word num_opcodes = rewrittenBytecodeLength(bytecode);
   bool use_load_fast_reverse_unchecked = true;
   // Scan bytecode to figure out how many caches we need and if we can use
