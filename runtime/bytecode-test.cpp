@@ -775,8 +775,9 @@ TEST_F(BytecodeTest,
                               /*firstlineno=*/0, lnotab));
 
   Module module(&scope, findMainModule(runtime_));
-  Function function(&scope, runtime_->newFunctionWithCode(thread_, empty_string,
-                                                          code, module));
+  Str qualname(&scope, runtime_->newStrFromCStr("TEST"));
+  Function function(
+      &scope, runtime_->newFunctionWithCode(thread_, qualname, code, module));
   // newFunctionWithCode() calls rewriteBytecode().
 
   byte expected[] = {
@@ -791,7 +792,7 @@ TEST_F(BytecodeTest,
 
 TEST_F(
     BytecodeTest,
-    RewriteBytecodeRewritesLoadFastToLoadFastReverseWhenDeleteFastIsPresent) {
+    RewriteBytecodeRewritesLoadFastToLoadFastReverseUncheckedWhenDeleteFastIsPresent) {
   HandleScope scope(thread_);
   Object arg0(&scope, Runtime::internStrFromCStr(thread_, "arg0"));
   Object var0(&scope, Runtime::internStrFromCStr(thread_, "var0"));
@@ -827,10 +828,34 @@ TEST_F(
   // newFunctionWithCode() calls rewriteBytecode().
 
   byte expected[] = {
-      LOAD_FAST_REVERSE,  2, 0, 0, LOAD_FAST_REVERSE,  3, 0, 0,
-      LOAD_FAST_REVERSE,  4, 0, 0, STORE_FAST_REVERSE, 2, 0, 0,
-      STORE_FAST_REVERSE, 3, 0, 0, STORE_FAST_REVERSE, 4, 0, 0,
-      DELETE_FAST,        0, 0, 0,
+      LOAD_FAST_REVERSE,
+      2,
+      0,
+      0,
+      LOAD_FAST_REVERSE,
+      3,
+      0,
+      0,
+      LOAD_FAST_REVERSE_UNCHECKED,
+      4,
+      0,
+      0,
+      STORE_FAST_REVERSE,
+      2,
+      0,
+      0,
+      STORE_FAST_REVERSE,
+      3,
+      0,
+      0,
+      STORE_FAST_REVERSE,
+      4,
+      0,
+      0,
+      DELETE_FAST,
+      0,
+      0,
+      0,
   };
   Object rewritten_bytecode(&scope, function.rewrittenBytecode());
   EXPECT_TRUE(isMutableBytesEqualsBytes(rewritten_bytecode, expected));
