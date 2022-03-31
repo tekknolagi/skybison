@@ -408,7 +408,6 @@ class BlockMap {
 static const std::unordered_set<Bytecode> kUnsupportedOpcodes = {
     CALL_FINALLY,
     END_FINALLY,
-    RAISE_VARARGS,
     SETUP_FINALLY,
 };
 
@@ -428,9 +427,16 @@ static BlockMap* createBlocks(Thread* thread, BytecodeSlice instrs) {
       block_starts.insert(next_instr_idx);
       block_starts.insert(instr.jumpTargetIdx(next_instr_idx));
     } else if (instr.bc == RETURN_VALUE) {
+      // This extra logic is only for RETURN_VALUE. RETURN_VALUE is a
+      // terminator, but it can also be the last instruction in a code object,
+      // so the next instruction after it might not exist. I don't think any
+      // other opcode is allowed to be the last opcode --- even RAISE_VARARGS.
+      // This assumes well-formed bytecode.
       if (next_instr_idx < num_instrs) {
         block_starts.insert(next_instr_idx);
       }
+    } else if (instr.bc == RAISE_VARARGS) {
+      block_starts.insert(next_instr_idx);
     } else if (isUnsupportedOpcode(instr.bc)) {
       return nullptr;
     }
@@ -472,8 +478,8 @@ static void computePredsAndSuccs(BlockMap* block_map) {
       if (last.isConditionalBranch()) {
         linkBlocks(block, block_map->blockAtIdx(next_instr_idx));
       }
-    } else if (last.bc == RETURN_VALUE) {
-      // No successors for return
+    } else if (last.bc == RETURN_VALUE || last.bc == RAISE_VARARGS) {
+      // No successors for return or raise
     } else {
       linkBlocks(block, block_map->blockAtIdx(next_instr_idx));
     }
