@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <map>
+#include <queue>
 #include <set>
 #include <sstream>
 #include <unordered_map>
@@ -97,8 +98,7 @@ struct RewrittenOp {
   bool needs_inline_cache;
 };
 
-static RewrittenOp rewriteOperation(const Function& function, BytecodeOp op,
-                                    bool use_load_fast_reverse_unchecked) {
+static RewrittenOp rewriteOperation(const Function& function, BytecodeOp op) {
   auto cached_binop = [](Interpreter::BinaryOp bin_op) {
     return RewrittenOp{BINARY_OP_ANAMORPHIC, static_cast<int32_t>(bin_op),
                        true};
@@ -186,28 +186,6 @@ static RewrittenOp rewriteOperation(const Function& function, BytecodeOp op,
       return cached_inplace(Interpreter::BinaryOp::XOR);
     case LOAD_ATTR:
       return RewrittenOp{LOAD_ATTR_ANAMORPHIC, op.arg, true};
-    case LOAD_FAST: {
-      CHECK(op.arg < Code::cast(function.code()).nlocals(),
-            "unexpected local number");
-      word total_locals = function.totalLocals();
-      // Check if the original opcode uses an extended arg
-      if (op.arg > kMaxByte) {
-        break;
-      }
-      int32_t reverse_arg = total_locals - op.arg - 1;
-      // Check that the new value fits in a byte
-      if (reverse_arg > kMaxByte) {
-        break;
-      }
-      // TODO(T66255738): Use a more complete static analysis to capture all
-      // bound local variables other than just arguments.
-      return RewrittenOp{
-          // Arguments are always bound.
-          (op.arg < function.totalArgs() && use_load_fast_reverse_unchecked)
-              ? LOAD_FAST_REVERSE_UNCHECKED
-              : LOAD_FAST_REVERSE,
-          reverse_arg, false};
-    }
     case LOAD_METHOD:
       return RewrittenOp{LOAD_METHOD_ANAMORPHIC, op.arg, true};
     case STORE_ATTR:
@@ -366,7 +344,7 @@ class BlockMap {
     return map_get_strict(start_idx_to_block, idx);
   }
 
-  Block* first() { return blockAtIdx(0); }
+  Block* firstBlock() { return blockAtIdx(0); }
 
   using iterator = typename std::map<word, Block*>::iterator;
   iterator begin() { return start_idx_to_block.begin(); };
@@ -486,6 +464,133 @@ static void computePredsAndSuccs(BlockMap* block_map) {
   }
 }
 
+// Modifies left
+static void setIntersectInPlace(std::set<int>* left,
+                                const std::set<int>* right) {
+  std::set<int>::iterator left_it = left->begin();
+  std::set<int>::iterator right_it = right->begin();
+  while ((left_it != left->end()) && (right_it != right->end())) {
+    if (*left_it < *right_it) {
+      left->erase(left_it++);
+    } else if (*right_it < *left_it) {
+      ++right_it;
+    } else {  // *left_it == *right_it
+      ++left_it;
+      ++right_it;
+    }
+  }
+  // Anything left in left from here on did not appear in right,
+  // so we remove it.
+  left->erase(left_it, left->end());
+}
+
+static void rewriteLoadFast(const Function& function, const Code& code,
+                            const MutableBytes& rewritten_bytecode,
+                            BlockMap* block_map) {
+  Block* first_block = block_map->firstBlock();
+  std::queue<Block*> queue({first_block});
+  std::set<Block*> processed;
+
+  std::map<Block*, std::set<int>> live_in;
+  std::map<Block*, std::set<int>> live_out;
+  std::map<int, std::set<int>> live_at_idx;
+
+  {
+    std::set<int> params;
+    for (word i = 0; i < code.argcount(); i++) {
+      params.insert(i);
+    }
+    live_in[first_block] = params;
+  }
+
+  while (queue.size() > 0) {
+    Block* block = queue.front();
+    queue.pop();
+    if (processed.find(block) != processed.end()) {
+      continue;
+    }
+    processed.insert(block);
+
+    std::set<int> currently_alive;
+    if (block->preds()->size() == 1) {
+      DCHECK(processed.find(*block->preds()->begin()) != processed.end(),
+             "must have processed preds");
+      currently_alive = map_get_strict(live_out, *block->preds()->begin());
+    } else if (block->preds()->size() > 1) {
+      auto it = block->preds()->begin();
+      DCHECK(processed.find(*it) != processed.end(),
+             "must have processed preds");
+      std::set<int> result = map_get_strict(live_out, *it);
+      it++;
+      while (it != block->preds()->end()) {
+        Block* pred = *it;
+        DCHECK(processed.find(pred) != processed.end(),
+               "must have processed preds");
+        std::set<int>& pred_live_out = map_get_strict(live_out, pred);
+        setIntersectInPlace(&result, &pred_live_out);
+        it++;
+      }
+      currently_alive = result;
+    }
+    live_in[block] = currently_alive;
+    BytecodeSlice bytecode = block->bytecode();
+    for (word i = bytecode.start(); i < bytecode.end(); i++) {
+      BytecodeOp instr = bytecode.at(i);
+      live_at_idx[i] = currently_alive;
+      if (instr.bc == STORE_FAST) {
+        currently_alive.insert(instr.arg);
+      } else if (instr.bc == DELETE_FAST) {
+        currently_alive.erase(instr.arg);
+      }
+    }
+    live_out[block] = currently_alive;
+
+    for (Block* succ : *block->succs()) {
+      queue.push(succ);
+    }
+  }
+
+  // Clear the queue
+  queue = std::queue<Block*>({first_block});
+  processed.clear();
+
+  while (queue.size() > 0) {
+    Block* block = queue.front();
+    queue.pop();
+    if (processed.find(block) != processed.end()) {
+      continue;
+    }
+    processed.insert(block);
+
+    BytecodeSlice bytecode = block->bytecode();
+    for (word i = bytecode.start(); i < bytecode.end(); i++) {
+      BytecodeOp instr = bytecode.at(i);
+      if (instr.bc == LOAD_FAST) {
+        CHECK(instr.arg < code.nlocals(), "unexpected local number");
+        word total_locals = function.totalLocals();
+        // Check if the original opcode uses an extended arg
+        if (instr.arg > kMaxByte) {
+          continue;
+        }
+        int32_t reverse_arg = total_locals - instr.arg - 1;
+        // Check that the new value fits in a byte
+        if (reverse_arg > kMaxByte) {
+          continue;
+        }
+        bool definitely_assigned =
+            live_at_idx[i].find(instr.arg) == live_at_idx[i].end();
+        Bytecode new_bc = definitely_assigned ? LOAD_FAST_REVERSE_UNCHECKED
+                                              : LOAD_FAST_REVERSE;
+        rewrittenBytecodeOpAtPut(rewritten_bytecode, i, new_bc);
+      }
+    }
+
+    for (Block* succ : *block->succs()) {
+      queue.push(succ);
+    }
+  }
+}  // namespace py
+
 void rewriteBytecode(Thread* thread, const Function& function) {
   HandleScope scope(thread);
   Runtime* runtime = thread->runtime();
@@ -518,22 +623,21 @@ void rewriteBytecode(Thread* thread, const Function& function) {
       std::cerr << "--- updated block_map for "
                 << Str::cast(function.qualname()).toCStr() << "---\n";
       std::cerr << block_map->toString();
+      Code code(&scope, function.code());
+      rewriteLoadFast(function, code, bytecode, block_map);
+      std::cerr << "--- rewritten block_map for "
+                << Str::cast(function.qualname()).toCStr() << "---\n";
+      std::cerr << block_map->toString();
     } else {
       std::cerr << "Unsupported opcode\n";
     }
   }
   word num_opcodes = rewrittenBytecodeLength(bytecode);
-  bool use_load_fast_reverse_unchecked = true;
-  // Scan bytecode to figure out how many caches we need and if we can use
-  // LOAD_FAST_REVERSE_UNCHECKED.
+  // Scan bytecode to figure out how many caches we need
   word num_caches = num_global_caches;
   for (word i = 0; i < num_opcodes;) {
     BytecodeOp op = nextBytecodeOp(bytecode, &i);
-    if (op.bc == DELETE_FAST) {
-      use_load_fast_reverse_unchecked = false;
-      continue;
-    }
-    RewrittenOp rewritten = rewriteOperation(function, op, false);
+    RewrittenOp rewritten = rewriteOperation(function, op);
     if (rewritten.needs_inline_cache) {
       num_caches++;
     }
@@ -553,8 +657,7 @@ void rewriteBytecode(Thread* thread, const Function& function) {
   for (word i = 0; i < num_opcodes;) {
     BytecodeOp op = nextBytecodeOp(bytecode, &i);
     word previous_index = i - 1;
-    RewrittenOp rewritten =
-        rewriteOperation(function, op, use_load_fast_reverse_unchecked);
+    RewrittenOp rewritten = rewriteOperation(function, op);
     if (rewritten.bc == UNUSED_BYTECODE_0) continue;
     if (rewritten.needs_inline_cache) {
       rewrittenBytecodeOpAtPut(bytecode, previous_index, rewritten.bc);
