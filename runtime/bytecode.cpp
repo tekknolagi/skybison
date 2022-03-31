@@ -466,7 +466,6 @@ static void computePredsAndSuccs(BlockMap* block_map) {
     // TODO(max): Investigate if this is equivalent to last.idx (if that
     // existed)
     word next_instr_idx = bytecode.end();
-    word num_instrs = bytecode.numInstrsTotal();
     if (last.isBranch()) {
       linkBlocks(block,
                  block_map->blockAtIdx(last.jumpTargetIdx(next_instr_idx)));
@@ -474,9 +473,7 @@ static void computePredsAndSuccs(BlockMap* block_map) {
         linkBlocks(block, block_map->blockAtIdx(next_instr_idx));
       }
     } else if (last.bc == RETURN_VALUE) {
-      if (next_instr_idx < num_instrs) {
-        linkBlocks(block, block_map->blockAtIdx(next_instr_idx));
-      }
+      // No successors for return
     } else {
       linkBlocks(block, block_map->blockAtIdx(next_instr_idx));
     }
@@ -505,15 +502,19 @@ void rewriteBytecode(Thread* thread, const Function& function) {
   MutableBytes bytecode(&scope, function.rewrittenBytecode());
   BytecodeSlice bytecode_slice(thread, *bytecode, 0,
                                bytecode.length() / kCodeUnitSize);
-  BlockMap* block_map = createBlocks(thread, bytecode_slice);
-  if (block_map != nullptr) {
-    std::cerr << "--- block_map for " << Str::cast(function.qualname()).toCStr()
-              << "---\n";
-    std::cerr << block_map->toString();
-    computePredsAndSuccs(block_map);
-    std::cerr << "--- updated block_map for "
-              << Str::cast(function.qualname()).toCStr() << "---\n";
-    std::cerr << block_map->toString();
+  if (Str::cast(function.qualname()).equalsCStr("fallthrough")) {
+    BlockMap* block_map = createBlocks(thread, bytecode_slice);
+    if (block_map != nullptr) {
+      std::cerr << "--- block_map for "
+                << Str::cast(function.qualname()).toCStr() << "---\n";
+      std::cerr << block_map->toString();
+      computePredsAndSuccs(block_map);
+      std::cerr << "--- updated block_map for "
+                << Str::cast(function.qualname()).toCStr() << "---\n";
+      std::cerr << block_map->toString();
+    } else {
+      std::cerr << "Unsupported opcode\n";
+    }
   }
   word num_opcodes = rewrittenBytecodeLength(bytecode);
   bool use_load_fast_reverse_unchecked = true;
