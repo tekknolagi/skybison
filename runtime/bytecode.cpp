@@ -331,6 +331,15 @@ V& map_get_strict(std::map<K, V>& map, const K& key) {
 }
 
 template <typename K, typename V>
+const V& map_get_default(std::map<K, V>& map, const K& key, const V& default_) {
+  auto it = map.find(key);
+  if (it == map.end()) {
+    return default_;
+  }
+  return it->second;
+}
+
+template <typename K, typename V>
 V& map_get_strict(std::unordered_map<K, V>& map, const K& key) {
   auto it = map.find(key);
   CHECK(it != map.end(), "Key not found in map");
@@ -514,23 +523,33 @@ static void rewriteLoadFast(const Function& function, const Code& code,
     std::set<int> currently_alive;
     if (block->preds()->size() == 1) {
       auto it = block->preds()->begin();
-      DCHECK(processed.find(*it) != processed.end(),
-             "must have processed preds (didn't get %s)",
-             (*it)->toString().c_str());
-      currently_alive = map_get_strict(live_out, *block->preds()->begin());
+      // TODO(emacs): Figure out what to do here. Sometimes (like in loops),
+      // preds do not get processed first.
+      // DCHECK(processed.find(*it) != processed.end(),
+      //        "must have processed preds (didn't get %s)",
+      //        (*it)->toString().c_str());
+      // currently_alive = map_get_strict(live_out, *it);
+      currently_alive = map_get_default(live_out, *it, std::set<int>());
     } else if (block->preds()->size() > 1) {
       auto it = block->preds()->begin();
-      DCHECK(processed.find(*it) != processed.end(),
-             "must have processed preds (didn't get %s)",
-             (*it)->toString().c_str());
-      std::set<int> result = map_get_strict(live_out, *it);
+      // TODO(emacs): Figure out what to do here. Sometimes (like in loops),
+      // preds do not get processed first.
+      // DCHECK(processed.find(*it) != processed.end(),
+      //        "must have processed preds (didn't get %s)",
+      //        (*it)->toString().c_str());
+      // std::set<int> result = map_get_strict(live_out, *it);
+      std::set<int> result = map_get_default(live_out, *it, std::set<int>());
       it++;
       while (it != block->preds()->end()) {
         Block* pred = *it;
-        DCHECK(processed.find(pred) != processed.end(),
-               "must have processed preds (didn't get %s)",
-               pred->toString().c_str());
-        std::set<int>& pred_live_out = map_get_strict(live_out, pred);
+        // TODO(emacs): Figure out what to do here. Sometimes (like in loops),
+        // preds do not get processed first.
+        // DCHECK(processed.find(pred) != processed.end(),
+        //        "must have processed preds (didn't get %s)",
+        //        pred->toString().c_str());
+        // std::set<int> pred_live_out = map_get_strict(live_out, pred);
+        std::set<int> pred_live_out =
+            map_get_default(live_out, pred, std::set<int>());
         setIntersectInPlace(&result, &pred_live_out);
         it++;
       }
@@ -595,6 +614,7 @@ static void rewriteLoadFast(const Function& function, const Code& code,
         Bytecode new_bc = definitely_assigned ? LOAD_FAST_REVERSE_UNCHECKED
                                               : LOAD_FAST_REVERSE;
         rewrittenBytecodeOpAtPut(rewritten_bytecode, i, new_bc);
+        rewrittenBytecodeArgAtPut(rewritten_bytecode, i, reverse_arg);
       }
     }
 
