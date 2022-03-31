@@ -232,10 +232,11 @@ static RewrittenOp rewriteOperation(const Function& function, BytecodeOp op) {
     case FOR_ITER_ANAMORPHIC:
     case INPLACE_OP_ANAMORPHIC:
     case LOAD_ATTR_ANAMORPHIC:
-    case LOAD_FAST_REVERSE:
     case LOAD_METHOD_ANAMORPHIC:
     case STORE_ATTR_ANAMORPHIC:
     case STORE_FAST_REVERSE:
+      // Don't check LOAD_FAST_REVERSE because we have a separate, more
+      // complicated rewrite step.
       UNREACHABLE("should not have cached opcode in input");
     default:
       break;
@@ -503,11 +504,10 @@ static void rewriteLoadFast(const Function& function, const Code& code,
     live_in[first_block] = params;
   }
 
-  while (queue.size() > 0) {
-    Block* block = queue.front();
-    queue.pop();
+  auto process_one_block = [&processed, &queue, &live_in, &live_out,
+                            &live_at_idx](Block* block) {
     if (processed.find(block) != processed.end()) {
-      continue;
+      return;
     }
     processed.insert(block);
 
@@ -548,6 +548,15 @@ static void rewriteLoadFast(const Function& function, const Code& code,
     for (Block* succ : *block->succs()) {
       queue.push(succ);
     }
+  };
+
+  while (queue.size() > 0) {
+    Block* block = queue.front();
+    queue.pop();
+    for (Block* pred : *block->preds()) {
+      process_one_block(pred);
+    }
+    process_one_block(block);
   }
 
   // Clear the queue
@@ -613,24 +622,22 @@ void rewriteBytecode(Thread* thread, const Function& function) {
   MutableBytes bytecode(&scope, function.rewrittenBytecode());
   BytecodeSlice bytecode_slice(thread, *bytecode, 0,
                                bytecode.length() / kCodeUnitSize);
-  if (Str::cast(function.qualname()).equalsCStr("fallthrough")) {
-    BlockMap* block_map = createBlocks(thread, bytecode_slice);
-    if (block_map != nullptr) {
-      std::cerr << "--- block_map for "
-                << Str::cast(function.qualname()).toCStr() << "---\n";
-      std::cerr << block_map->toString();
-      computePredsAndSuccs(block_map);
-      std::cerr << "--- updated block_map for "
-                << Str::cast(function.qualname()).toCStr() << "---\n";
-      std::cerr << block_map->toString();
-      Code code(&scope, function.code());
-      rewriteLoadFast(function, code, bytecode, block_map);
-      std::cerr << "--- rewritten block_map for "
-                << Str::cast(function.qualname()).toCStr() << "---\n";
-      std::cerr << block_map->toString();
-    } else {
-      std::cerr << "Unsupported opcode\n";
-    }
+  BlockMap* block_map = createBlocks(thread, bytecode_slice);
+  if (block_map != nullptr) {
+    std::cerr << "--- block_map for " << Str::cast(function.qualname()).toCStr()
+              << "---\n";
+    std::cerr << block_map->toString();
+    computePredsAndSuccs(block_map);
+    std::cerr << "--- updated block_map for "
+              << Str::cast(function.qualname()).toCStr() << "---\n";
+    std::cerr << block_map->toString();
+    Code code(&scope, function.code());
+    rewriteLoadFast(function, code, bytecode, block_map);
+    std::cerr << "--- rewritten block_map for "
+              << Str::cast(function.qualname()).toCStr() << "---\n";
+    std::cerr << block_map->toString();
+  } else {
+    std::cerr << "Unsupported opcode\n";
   }
   word num_opcodes = rewrittenBytecodeLength(bytecode);
   // Scan bytecode to figure out how many caches we need
