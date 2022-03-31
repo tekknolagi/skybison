@@ -513,19 +513,23 @@ static void rewriteLoadFast(const Function& function, const Code& code,
 
     std::set<int> currently_alive;
     if (block->preds()->size() == 1) {
-      DCHECK(processed.find(*block->preds()->begin()) != processed.end(),
-             "must have processed preds");
+      auto it = block->preds()->begin();
+      DCHECK(processed.find(*it) != processed.end(),
+             "must have processed preds (didn't get %s)",
+             (*it)->toString().c_str());
       currently_alive = map_get_strict(live_out, *block->preds()->begin());
     } else if (block->preds()->size() > 1) {
       auto it = block->preds()->begin();
       DCHECK(processed.find(*it) != processed.end(),
-             "must have processed preds");
+             "must have processed preds (didn't get %s)",
+             (*it)->toString().c_str());
       std::set<int> result = map_get_strict(live_out, *it);
       it++;
       while (it != block->preds()->end()) {
         Block* pred = *it;
         DCHECK(processed.find(pred) != processed.end(),
-               "must have processed preds");
+               "must have processed preds (didn't get %s)",
+               pred->toString().c_str());
         std::set<int>& pred_live_out = map_get_strict(live_out, pred);
         setIntersectInPlace(&result, &pred_live_out);
         it++;
