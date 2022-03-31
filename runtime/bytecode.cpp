@@ -506,10 +506,10 @@ static void rewriteLoadFast(const Function& function, const Code& code,
 
   auto process_one_block = [&processed, &queue, &live_in, &live_out,
                             &live_at_idx](Block* block) {
-    if (processed.find(block) != processed.end()) {
+    if (!processed.insert(block).second) {
+      // Already existed
       return;
     }
-    processed.insert(block);
 
     std::set<int> currently_alive;
     if (block->preds()->size() == 1) {
