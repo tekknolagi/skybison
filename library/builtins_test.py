@@ -8199,6 +8199,40 @@ class MemoryviewTests(unittest.TestCase):
         short_view[1::2] = memoryview(b"zz").cast("h")
         self.assertEqual(view, b"00zz00")
 
+    def test_setitem_with_start_non_zero(self):
+        view0 = memoryview(bytearray(b"0000"))
+        view1 = view0[2:]
+        view1[:2] = b"zz"
+        self.assertEqual(view0, b"00zz")
+
+    def test_setitem_with_start_non_zero_and_step_greater_than_one(self):
+        view0 = memoryview(bytearray(b"000000"))
+        view1 = view0[2:]
+        view1[:2:2] = b"z"
+        self.assertEqual(view0, b"00z000")
+
+    # TODO(emacs): Add test like
+    # test_setitem_with_start_non_zero_and_step_greater_than_one but with
+    # itemsize > 1
+
+    def test_setitem_with_start_non_zero_memoryview_rhs_smallbytes(self):
+        # We copy smallbytes a little differently; it involves making a
+        # temporary buffer and copying into it. Test it separately.
+        view0 = memoryview(bytearray(b"0000"))
+        view1 = view0[2:]
+        view1[:2] = memoryview(b"aabbcc")[2:4]
+        self.assertEqual(view0, b"00bb")
+
+    # TODO(emacs): Add test like
+    # test_setitem_with_start_non_zero_memoryview_rhs_smallbytes but with
+    # itemsize > 1
+
+    def test_setitem_with_start_non_zero_memoryview_rhs_largebytes(self):
+        view0 = memoryview(bytearray(b"0000"))
+        view1 = view0[2:]
+        view1[:2] = memoryview(b"aabbccdd")[2:4]
+        self.assertEqual(view0, b"00bb")
+
     def test_tolist_with_non_memoryview_raises_type_error(self):
         self.assertRaisesRegex(
             TypeError,

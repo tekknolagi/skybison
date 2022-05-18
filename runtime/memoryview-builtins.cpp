@@ -442,7 +442,7 @@ RawObject memoryviewSetslice(Thread* thread, const MemoryView& view, word start,
   HandleScope scope(thread);
   Runtime* runtime = thread->runtime();
   word stride = intUnderlying(Tuple::cast(view.strides()).at(0)).asWord();
-  if (view.start() != 0 || stride != 1) {
+  if (stride != 1) {
     UNIMPLEMENTED("Set item with slicing called on a sliced memoryview");
   }
 
@@ -476,14 +476,15 @@ RawObject memoryviewSetslice(Thread* thread, const MemoryView& view, word start,
     uword value_address;
     Object value_buffer(&scope, value.buffer());
     if (value_buffer.isLargeBytes()) {
-      value_address = LargeBytes::cast(*value_buffer).address();
+      value_address = LargeBytes::cast(*value_buffer).address() + value.start()*item_size;
     } else if (value_buffer.isInt()) {
-      value_address = Int::cast(*value_buffer).asInt<uword>().value;
+      value_address =
+          Int::cast(*value_buffer).asInt<uword>().value + value.start()*item_size;
     } else {
       DCHECK(value_buffer.isSmallBytes(),
              "memoryview.__setitem__ with non bytes/memory");
       Bytes bytes(&scope, *value_buffer);
-      bytes.copyTo(small_bytes_buf, value.length());
+      bytes.copyToStartAt(small_bytes_buf, slice_len, value.start() * item_size);
       value_address = reinterpret_cast<uword>(small_bytes_buf);
     }
     uword address;
@@ -494,9 +495,11 @@ RawObject memoryviewSetslice(Thread* thread, const MemoryView& view, word start,
              "memoryview.__setitem__ with non bytes/memory");
       address = reinterpret_cast<uword>(Pointer::cast(*buffer).cptr());
     }
+    address += view.start() * item_size;
     if (step == 1 && item_size == 1) {
       std::memcpy(reinterpret_cast<void*>(address + start),
                   reinterpret_cast<void*>(value_address), slice_len);
+      // TODO(emacs): should there be an early return here?
     }
     start *= item_size;
     step *= item_size;
@@ -519,12 +522,13 @@ RawObject memoryviewSetslice(Thread* thread, const MemoryView& view, word start,
     DCHECK(buffer.isPointer(), "memoryview.__setitem__ with non bytes/memory");
     address = static_cast<byte*>(Pointer::cast(*buffer).cptr());
   }
+  // fprintf(stderr, "start %ld stop %ld step %ld view.start %ld\n", start, stop, step, view.start());
   if (step == 1) {
-    value_bytes.copyTo(address + start, slice_len);
+    value_bytes.copyTo(address + start + view.start(), slice_len);
     return NoneType::object();
   }
   for (word i = 0; start < stop; i++, start += step) {
-    address[start] = value_bytes.byteAt(i);
+    address[start+view.start()] = value_bytes.byteAt(i);
   }
   return NoneType::object();
 }
