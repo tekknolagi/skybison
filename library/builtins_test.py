@@ -8222,6 +8222,35 @@ class MemoryviewTests(unittest.TestCase):
         view = memoryview(src)
         self.assertEqual(view.tolist(), [])
 
+    def test_tobytes_with_non_memoryview_raises_type_error(self):
+        self.assertRaisesRegex(
+            TypeError,
+            "'tobytes' .* 'memoryview' object.* a 'NoneType'",
+            memoryview.tobytes,
+            None,
+        )
+
+    def test_tobytes_returns_bytes_of_elements(self):
+        src = b"hello"
+        view = memoryview(src)
+        result = view.tobytes()
+        self.assertIs(type(result), bytes)
+        self.assertEqual(result, b"hello")
+
+    def test_tobytes_withitemsize_greater_than_one(self):
+        src = b"abcd"
+        view = memoryview(src).cast("i")
+        result = view.tobytes()
+        self.assertIs(type(result), bytes)
+        self.assertEqual(result, b"abcd")
+
+    def test_tobytes_with_empty_memoryview_returns_empty_bytes(self):
+        src = b""
+        view = memoryview(src)
+        result = view.tobytes()
+        self.assertIs(type(result), bytes)
+        self.assertEqual(result, b"")
+
 
 class MethodTests(unittest.TestCase):
     def test_dunder_new_with_non_callable_func_raises_type_error(self):
