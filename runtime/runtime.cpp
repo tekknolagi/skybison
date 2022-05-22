@@ -2169,6 +2169,9 @@ RawObject Runtime::lookupNameInModule(Thread* thread, SymbolId module_name,
   DCHECK(!module_obj.isNoneType(),
          "The given module '%s' doesn't exist in modules dict",
          Symbols::predefinedSymbolAt(module_name));
+  DCHECK(!module_obj.isError(),
+         "The given module '%s' doesn't exist in modules dict",
+         Symbols::predefinedSymbolAt(module_name));
   Module module(&scope, *module_obj);
   return moduleAtById(thread, module, name);
 }
