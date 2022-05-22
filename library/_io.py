@@ -969,7 +969,16 @@ class BufferedReader(_BufferedIOMixin, bootstrap=True):
         return _BufferedIOMixin.tell(self) - self._buffer_num_bytes + self._read_pos
 
     def _readinto(self, buf, read1):
-        _unimplemented()
+        if not isinstance(buf, memoryview):
+            buf = memoryview(buf)
+        buf = buf.cast("B")
+        if read1:
+            data = self.read1(len(buf))
+        else:
+            data = self.read(len(buf))
+        nread = len(data)
+        buf[:nread] = data
+        return nread
 
     def __init__(self, raw, buffer_size=DEFAULT_BUFFER_SIZE):
         if not raw.readable():
