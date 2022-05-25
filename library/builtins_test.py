@@ -8184,6 +8184,20 @@ class MemoryviewTests(unittest.TestCase):
         short_view[1::2] = memoryview(b"zz").cast("h")
         self.assertEqual(view, b"00zz00")
 
+    def test_tobytes_with_non_memoryview_raises_type_error(self):
+        with self.assertRaisesRegex(
+            TypeError, "'tobytes'.*'memoryview' object.* a 'int'"
+        ):
+            memoryview.tobytes(42)
+
+    def test_tobytes_returns_bytes(self):
+        self.assertEqual(memoryview(b"").tobytes(), b"")
+        self.assertEqual(memoryview(b"short").tobytes(), b"short")
+        self.assertEqual(memoryview(b"hello world").tobytes(), b"hello world")
+        v0 = memoryview(b"hello")
+        self.assertEqual(v0[0:3].tobytes(), b"hel")
+        self.assertEqual(v0[:4].cast("i").tobytes(), b"hell")
+
     def test_tolist_with_non_memoryview_raises_type_error(self):
         self.assertRaisesRegex(
             TypeError,
