@@ -1,0 +1,68 @@
+diff --git a/library/builtins.py b/library/builtins.py
+--- a/library/builtins.py
++++ b/library/builtins.py
+@@ -5468,7 +5468,7 @@ class memoryview(bootstrap=True):
+         pass
+ 
+     def tobytes(self):
+-        _unimplemented()
++        _builtin()
+ 
+     def tolist(self):
+         _memoryview_guard(self)
+diff --git a/library/builtins_test.py b/library/builtins_test.py
+--- a/library/builtins_test.py
++++ b/library/builtins_test.py
+@@ -8179,6 +8179,20 @@ class MemoryviewTests(unittest.TestCase)
+         short_view[1::2] = memoryview(b"zz").cast("h")
+         self.assertEqual(view, b"00zz00")
+ 
++    def test_tobytes_with_non_memoryview_raises_type_error(self):
++        with self.assertRaisesRegex(
++            TypeError, "'tobytes'.*'memoryview' object.* a 'int'"
++        ):
++            memoryview.tobytes(42)
++
++    def test_tobytes_returns_bytes(self):
++        self.assertEqual(memoryview(b"").tobytes(), b"")
++        self.assertEqual(memoryview(b"short").tobytes(), b"short")
++        self.assertEqual(memoryview(b"hello world").tobytes(), b"hello world")
++        v0 = memoryview(b"hello")
++        self.assertEqual(v0[0:3].tobytes(), b"hel")
++        self.assertEqual(v0[:4].cast("i").tobytes(), b"hell")
++
+     def test_tolist_with_non_memoryview_raises_type_error(self):
+         self.assertRaisesRegex(
+             TypeError,
+diff --git a/runtime/memoryview-builtins.cpp b/runtime/memoryview-builtins.cpp
+--- a/runtime/memoryview-builtins.cpp
++++ b/runtime/memoryview-builtins.cpp
+@@ -648,4 +648,28 @@ RawObject METH(memoryview, __new__)(Thre
+       thread, object, bytes, Bytes::cast(*bytes).length(), ReadOnly::ReadOnly);
+ }
+ 
++RawObject METH(memoryview, tobytes)(Thread* thread, Arguments args) {
++  HandleScope scope(thread);
++  Object self_obj(&scope, args.get(0));
++  if (!self_obj.isMemoryView()) {
++    return thread->raiseRequiresType(self_obj, ID(memoryview));
++  }
++  MemoryView self(&scope, *self_obj);
++  word length = self.length();
++  Runtime* runtime = thread->runtime();
++  Object buffer(&scope, self.buffer());
++
++  if (runtime->isInstanceOfBytes(*buffer)) {
++    MutableBytes result(&scope, runtime->newMutableBytesUninitialized(length));
++    Bytes bytes(&scope, *buffer);
++    result.replaceFromWithBytes(0, *bytes, length);
++    return result.becomeImmutable();
++  }
++
++  DCHECK(buffer.isPointer(), "memoryview.__getitem__ with non bytes/memory");
++  void* cptr = Pointer::cast(*buffer).cptr();
++  DCHECK(length <= Pointer::cast(*buffer).length(), "invalid length");
++  return runtime->newBytesWithAll(View<byte>(static_cast<byte*>(cptr), length));
++}
++
+ }  // namespace py

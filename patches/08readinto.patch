@@ -1,0 +1,13 @@
+diff --git a/library/_io.py b/library/_io.py
+--- a/library/_io.py
++++ b/library/_io.py
+@@ -967,9 +967,6 @@ class BufferedReader(_BufferedIOMixin, b
+     def tell(self):
+         return _BufferedIOMixin.tell(self) - self._buffer_num_bytes + self._read_pos
+ 
+-    def _readinto(self, buf, read1):
+-        _unimplemented()
+-
+     def __init__(self, raw, buffer_size=DEFAULT_BUFFER_SIZE):
+         if not raw.readable():
+             raise UnsupportedOperation("File or stream is not readable.")

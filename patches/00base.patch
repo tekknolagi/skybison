@@ -1,0 +1,22 @@
+diff --git a/library/sys.py b/library/sys.py
+--- a/library/sys.py
++++ b/library/sys.py
+@@ -103,6 +103,8 @@ def _init(
+ ):
+     global executable
+     executable = _executable
++    global _base_executable
++    _base_executable = _executable
+ 
+     global prefix
+     prefix = _join(_dirname(executable), "..")
+@@ -137,6 +139,9 @@ def _init(
+ __stdout__ = open(_stdout_fd, "w", buffering=True, closefd=False, encoding="utf-8")
+ 
+ 
++_base_executable = None  # will be set by _init
++
++
+ _framework = ""
+ 
+ 

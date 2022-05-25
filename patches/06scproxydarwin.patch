@@ -1,0 +1,66 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -392,6 +392,13 @@ if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Dar
+   set(
+     EXTENSION_OS_SOURCES
+     ext/Python/pystrcmp-posix.cpp)
++  set(
++    EXTENSION_MODULES_OS_SOURCES
++    ${CPYTHON_DIR}/Modules/_scproxy.c)
++  set(
++    EXTENSION_MODULES_OS_LIBRARIES
++    "-framework SystemConfiguration"
++    "-framework CoreFoundation")
+ elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+   set(
+     RUNTIME_OS_SOURCES
+@@ -815,7 +822,8 @@ add_library(
+   capi/cpython-internal/pystrhex.h
+   capi/cpython-internal/symtable.h
+   capi/cpython-internal/token.h
+-  capi/cpython-internal/ucnhash.h)
++  capi/cpython-internal/ucnhash.h
++  ${EXTENSION_MODULES_OS_SOURCES})
+ target_include_directories(
+   extension-modules
+   PUBLIC
+@@ -860,7 +868,8 @@ target_link_libraries(
+   ${READLINE_LIBRARIES}
+   ${SQLITE_LIBRARIES}
+   ${XZ_LIBRARIES}
+-  ${ZLIB_LIBRARIES})
++  ${ZLIB_LIBRARIES}
++  ${EXTENSION_MODULES_OS_LIBRARIES})
+ 
+ add_library(
+   extension
+diff --git a/ext/Modules/config.cpp b/ext/Modules/config.cpp
+--- a/ext/Modules/config.cpp
++++ b/ext/Modules/config.cpp
+@@ -16,8 +16,11 @@ extern "C" PyObject* PyInit__multiproces
+ extern "C" PyObject* PyInit__parser();
+ extern "C" PyObject* PyInit__posixsubprocess();
+ extern "C" PyObject* PyInit__random();
+-extern "C" PyObject* PyInit__socket();
++#ifdef __APPLE__
++extern "C" PyObject* PyInit__scproxy();
++#endif
+ extern "C" PyObject* PyInit__sha3();
++extern "C" PyObject* PyInit__socket();
+ extern "C" PyObject* PyInit__sqlite3();
+ extern "C" PyObject* PyInit__sre();
+ extern "C" PyObject* PyInit__ssl();
+@@ -68,8 +71,11 @@ struct _inittab _PyImport_Inittab[] = {
+     {"_parser", PyInit__parser},
+     {"_posixsubprocess", PyInit__posixsubprocess},
+     {"_random", PyInit__random},
+-    {"_socket", PyInit__socket},
++#ifdef __APPLE__
++    {"_scproxy", PyInit__scproxy},
++#endif
+     {"_sha3", PyInit__sha3},
++    {"_socket", PyInit__socket},
+     {"_sqlite3", PyInit__sqlite3},
+     {"_sre", PyInit__sre},
+     {"_ssl", PyInit__ssl},

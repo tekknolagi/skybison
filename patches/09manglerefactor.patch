@@ -1,0 +1,260 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -468,6 +468,8 @@ add_library(
+   runtime/capi.h
+   runtime/code-builtins.cpp
+   runtime/code-builtins.h
++  runtime/compile-utils.cpp
++  runtime/compile-utils.h
+   runtime/complex-builtins.cpp
+   runtime/complex-builtins.h
+   runtime/debugging.cpp
+diff --git a/ext/Python/compile.cpp b/ext/Python/compile.cpp
+--- a/ext/Python/compile.cpp
++++ b/ext/Python/compile.cpp
+@@ -4,6 +4,7 @@
+ 
+ #include "api-handle.h"
+ #include "builtins-module.h"
++#include "compile-utils.h"
+ #include "globals.h"
+ #include "runtime.h"
+ #include "str-builtins.h"
+@@ -31,48 +32,24 @@ namespace py {
+ 
+ static_assert(Code::kCompileFlagsMask == PyCF_MASK, "flags mismatch");
+ 
+-PY_EXPORT PyObject* _Py_Mangle(PyObject* pyprivateobj, PyObject* pyident) {
+-  if (pyprivateobj == nullptr) {
+-    ApiHandle::fromPyObject(pyident)->incref();
+-    return pyident;
++PY_EXPORT PyObject* _Py_Mangle(PyObject* privateobj, PyObject* ident) {
++  if (privateobj == nullptr) {
++    Py_INCREF(ident);
++    return ident;
+   }
+   Thread* thread = Thread::current();
+   HandleScope scope(thread);
+   Object privateobj_obj(&scope,
+-                        ApiHandle::fromPyObject(pyprivateobj)->asObject());
+-  Object ident_obj(&scope, ApiHandle::fromPyObject(pyident)->asObject());
+-  Str ident(&scope, strUnderlying(*ident_obj));
++                        ApiHandle::fromPyObject(privateobj)->asObject());
+   Runtime* runtime = thread->runtime();
+-  // Only mangle names that start with two underscores, but do not end with
+-  // two underscores or contain a dot.
+-  word ident_length = ident.length();
+-  if (!runtime->isInstanceOfStr(*privateobj_obj) || ident_length < 2 ||
+-      ident.byteAt(0) != '_' || ident.byteAt(1) != '_' ||
+-      (ident.byteAt(ident_length - 2) == '_' &&
+-       ident.byteAt(ident_length - 1) == '_') ||
+-      strFindAsciiChar(ident, '.') >= 0) {
+-    Py_INCREF(pyident);
+-    return pyident;
++  Object ident_obj(&scope, ApiHandle::fromPyObject(ident)->asObject());
++  Str ident_str(&scope, strUnderlying(*ident_obj));
++  Object mangled(&scope, mangle(thread, privateobj_obj, ident_str));
++  if (mangled == ident_str) {
++    Py_INCREF(ident);
++    return ident;
+   }
+-
+-  Str privateobj(&scope, strUnderlying(*privateobj_obj));
+-  word privateobj_length = privateobj.length();
+-  word begin = 0;
+-  while (begin < privateobj_length && privateobj.byteAt(begin) == '_') {
+-    begin++;
+-  }
+-  if (begin == privateobj_length) {
+-    Py_INCREF(pyident);
+-    return pyident;
+-  }
+-
+-  word length0 = privateobj_length - begin;
+-  word length = length0 + ident_length + 1;
+-  MutableBytes result(&scope, runtime->newMutableBytesUninitialized(length));
+-  result.byteAtPut(0, '_');
+-  result.replaceFromWithStrStartAt(1, *privateobj, length0, begin);
+-  result.replaceFromWithStr(1 + length0, *ident, ident_length);
+-  return ApiHandle::newReference(runtime, result.becomeStr());
++  return ApiHandle::newReference(runtime, *mangled);
+ }
+ 
+ PY_EXPORT PyCodeObject* PyNode_Compile(_node* node, const char* filename) {
+diff --git a/ext/Python/pythonrun.cpp b/ext/Python/pythonrun.cpp
+--- a/ext/Python/pythonrun.cpp
++++ b/ext/Python/pythonrun.cpp
+@@ -3,6 +3,7 @@
+ 
+ #include "api-handle.h"
+ #include "builtins-module.h"
++#include "compile-utils.h"
+ #include "exception-builtins.h"
+ #include "fileutils.h"
+ #include "marshal.h"
+diff --git a/runtime/builtins-module.cpp b/runtime/builtins-module.cpp
+--- a/runtime/builtins-module.cpp
++++ b/runtime/builtins-module.cpp
+@@ -685,26 +685,6 @@ RawObject FUNC(builtins, chr)(Thread* th
+   return SmallStr::fromCodePoint(static_cast<int32_t>(code_point));
+ }
+ 
+-RawObject compile(Thread* thread, const Object& source, const Object& filename,
+-                  SymbolId mode, word flags, int optimize) {
+-  HandleScope scope(thread);
+-  Runtime* runtime = thread->runtime();
+-  Object mode_str(&scope, runtime->symbols()->at(mode));
+-  Object flags_int(&scope, runtime->newInt(flags));
+-  Object optimize_int(&scope, SmallInt::fromWord(optimize));
+-
+-  Object dunder_import(&scope, runtime->lookupNameInModule(thread, ID(builtins),
+-                                                           ID(__import__)));
+-  if (dunder_import.isErrorException()) return *dunder_import;
+-  Object compiler_name(&scope, runtime->symbols()->at(ID(_compiler)));
+-  Object import_result(
+-      &scope, Interpreter::call1(thread, dunder_import, compiler_name));
+-  if (import_result.isErrorException()) return *import_result;
+-  Object none(&scope, NoneType::object());
+-  return thread->invokeFunction6(ID(_compiler), ID(compile), source, filename,
+-                                 mode_str, flags_int, none, optimize_int);
+-}
+-
+ RawObject FUNC(builtins, id)(Thread* thread, Arguments args) {
+   // NOTE: This pins a handle until the runtime exits.
+   // TODO(emacs): Either determine that this function is used so little that it
+diff --git a/runtime/builtins-module.h b/runtime/builtins-module.h
+--- a/runtime/builtins-module.h
++++ b/runtime/builtins-module.h
+@@ -17,7 +17,4 @@ RawObject hasAttribute(Thread* thread, c
+ RawObject setAttribute(Thread* thread, const Object& object, const Object& name,
+                        const Object& value);
+ 
+-RawObject compile(Thread* thread, const Object& source, const Object& filename,
+-                  SymbolId mode, word flags, int optimize);
+-
+ }  // namespace py
+diff --git a/runtime/compile-utils.cpp b/runtime/compile-utils.cpp
+new file mode 100644
+--- /dev/null
++++ b/runtime/compile-utils.cpp
+@@ -0,0 +1,66 @@
++#include "compile-utils.h"
++
++#include "handles.h"
++#include "objects.h"
++#include "thread.h"
++#include "runtime.h"
++#include "str-builtins.h"
++
++namespace py {
++
++RawObject compile(Thread* thread, const Object& source, const Object& filename,
++                  SymbolId mode, word flags, int optimize) {
++  HandleScope scope(thread);
++  Runtime* runtime = thread->runtime();
++  Object mode_str(&scope, runtime->symbols()->at(mode));
++  Object flags_int(&scope, runtime->newInt(flags));
++  Object optimize_int(&scope, SmallInt::fromWord(optimize));
++
++  Object dunder_import(&scope, runtime->lookupNameInModule(thread, ID(builtins),
++                                                           ID(__import__)));
++  if (dunder_import.isErrorException()) return *dunder_import;
++  Object compiler_name(&scope, runtime->symbols()->at(ID(_compiler)));
++  Object import_result(
++      &scope, Interpreter::call1(thread, dunder_import, compiler_name));
++  if (import_result.isErrorException()) return *import_result;
++  Object none(&scope, NoneType::object());
++  return thread->invokeFunction6(ID(_compiler), ID(compile), source, filename,
++                                 mode_str, flags_int, none, optimize_int);
++}
++
++RawObject mangle(Thread* thread, const Object& privateobj, const Str& ident) {
++  Runtime* runtime = thread->runtime();
++  // Only mangle names that start with two underscores, but do not end with
++  // two underscores or contain a dot.
++  word ident_length = ident.length();
++  if (ident_length < 2 || ident.byteAt(0) != '_' || ident.byteAt(1) != '_' ||
++      (ident.byteAt(ident_length - 2) == '_' &&
++       ident.byteAt(ident_length - 1) == '_') ||
++      strFindAsciiChar(ident, '.') >= 0) {
++    return *ident;
++  }
++
++  if (!runtime->isInstanceOfStr(*privateobj)) {
++    return *ident;
++  }
++  HandleScope scope(thread);
++  Str privateobj_str(&scope, strUnderlying(*privateobj));
++  word privateobj_length = privateobj_str.length();
++  word begin = 0;
++  while (begin < privateobj_length && privateobj_str.byteAt(begin) == '_') {
++    begin++;
++  }
++  if (begin == privateobj_length) {
++    return *ident;
++  }
++
++  word length0 = privateobj_length - begin;
++  word length = length0 + ident_length + 1;
++  MutableBytes result(&scope, runtime->newMutableBytesUninitialized(length));
++  result.byteAtPut(0, '_');
++  result.replaceFromWithStrStartAt(1, *privateobj_str, length0, begin);
++  result.replaceFromWithStr(1 + length0, *ident, ident_length);
++  return result.becomeStr();
++}
++
++}
+diff --git a/runtime/compile-utils.h b/runtime/compile-utils.h
+new file mode 100644
+--- /dev/null
++++ b/runtime/compile-utils.h
+@@ -0,0 +1,15 @@
++#pragma once
++
++#include "handles-decl.h"
++#include "symbols.h"
++
++namespace py {
++
++class Thread;
++
++RawObject compile(Thread* thread, const Object& source, const Object& filename,
++                  SymbolId mode, word flags, int optimize);
++
++RawObject mangle(Thread* thread, const Object& privateobj, const Str& ident);
++
++}
+diff --git a/runtime/interpreter-test.cpp b/runtime/interpreter-test.cpp
+--- a/runtime/interpreter-test.cpp
++++ b/runtime/interpreter-test.cpp
+@@ -7,6 +7,7 @@
+ #include "attributedict.h"
+ #include "builtins-module.h"
+ #include "bytecode.h"
++#include "compile-utils.h"
+ #include "dict-builtins.h"
+ #include "handles.h"
+ #include "ic.h"
+diff --git a/runtime/test-utils.cpp b/runtime/test-utils.cpp
+--- a/runtime/test-utils.cpp
++++ b/runtime/test-utils.cpp
+@@ -13,6 +13,7 @@
+ #include "builtins-module.h"
+ #include "bytearray-builtins.h"
+ #include "bytes-builtins.h"
++#include "compile-utils.h"
+ #include "debugging.h"
+ #include "exception-builtins.h"
+ #include "frame.h"
+diff --git a/runtime/thread-test.cpp b/runtime/thread-test.cpp
+--- a/runtime/thread-test.cpp
++++ b/runtime/thread-test.cpp
+@@ -6,6 +6,7 @@
+ 
+ #include "builtins-module.h"
+ #include "bytecode.h"
++#include "compile-utils.h"
+ #include "dict-builtins.h"
+ #include "frame.h"
+ #include "globals.h"

@@ -1,0 +1,315 @@
+diff --git a/ext/Python/pylifecycle.cpp b/ext/Python/pylifecycle.cpp
+--- a/ext/Python/pylifecycle.cpp
++++ b/ext/Python/pylifecycle.cpp
+@@ -371,7 +371,8 @@ static void initializeSysFromGlobals(Thr
+   Tuple flags_data(&scope, data.becomeImmutable());
+   CHECK(initializeSys(thread, executable, python_path, flags_data, warnoptions,
+                       /*extend_python_path_with_stdlib=*/
+-                      !has_explicitly_provided_module_search_path)
++                      !has_explicitly_provided_module_search_path,
++                      !Py_UnbufferedStdioFlag)
+             .isNoneType(),
+         "initializeSys() failed");
+ }
+@@ -380,7 +381,6 @@ PY_EXPORT void Py_InitializeEx(int inits
+   CHECK(Py_BytesWarningFlag == 0, "Py_BytesWarningFlag != 0 not supported");
+   CHECK(Py_DebugFlag == 0, "parser debug mode not supported");
+   CHECK(Py_UTF8Mode == 1, "UTF8Mode != 1 not supported");
+-  CHECK(Py_UnbufferedStdioFlag == 0, "Unbuffered stdio not supported");
+   CHECK(initsigs == 1, "Skipping signal handler registration unimplemented");
+   // TODO(T63603973): Reduce initial heap size once we can auto-grow the heap
+   word heap_size = word{2} * kGiB;
+diff --git a/library/command_test.py b/library/command_test.py
+--- a/library/command_test.py
++++ b/library/command_test.py
+@@ -222,6 +222,44 @@ class OptionsTest(unittest.TestCase):
+         result = subprocess.run([sys.executable], stdin=subprocess.DEVNULL)
+         self.assertEqual(result.returncode, 0)
+ 
++    def test_no_arguments_enables_stdio_buffering(self):
++        result = subprocess.run(
++            [
++                sys.executable,
++                "-c",
++                """
++import sys
++print(sys.stdout)
++print(sys.stdout.buffer)
++print(sys.stdout.line_buffering)
++print(sys.stdin)
++print(sys.stdin.buffer)
++print(sys.stdin.line_buffering)
++print(sys.stderr)
++print(sys.stderr.buffer)
++print(sys.stderr.line_buffering)
++""",
++            ],
++            stdin=subprocess.DEVNULL,
++            check=True,
++            capture_output=True,
++            encoding="utf-8",
++        )
++        self.assertEqual(
++            result.stdout,
++            """\
++<_io.TextIOWrapper name='<stdout>' mode='w' encoding='utf-8'>
++<_io.BufferedWriter name='<stdout>'>
++False
++<_io.TextIOWrapper name='<stdin>' mode='r' encoding='utf-8'>
++<_io.BufferedReader name='<stdin>'>
++False
++<_io.TextIOWrapper name='<stderr>' mode='w' encoding='utf-8'>
++<_io.BufferedWriter name='<stderr>'>
++False
++""",
++        )
++
+     def test_s_option_sets_no_user_site_flag(self):
+         result = subprocess.run(
+             [sys.executable, "-s", "-c", "import sys;print(sys.flags)"],
+@@ -230,6 +268,44 @@ class OptionsTest(unittest.TestCase):
+         )
+         self.assertIn(b"no_user_site=1", result.stdout)
+ 
++    def test_u_option_disables_stdio_buffering(self):
++        result = subprocess.run(
++            [
++                sys.executable,
++                "-u",
++                "-c",
++                """
++import sys
++print(sys.stdout)
++print(sys.stdout.buffer)
++print(sys.stdout.line_buffering)
++print(sys.stdin)
++print(sys.stdin.buffer)
++print(sys.stdin.line_buffering)
++print(sys.stderr)
++print(sys.stderr.buffer)
++print(sys.stderr.line_buffering)
++""",
++            ],
++            check=True,
++            capture_output=True,
++            encoding="utf-8",
++        )
++        self.assertEqual(
++            result.stdout,
++            """\
++<_io.TextIOWrapper name='<stdout>' mode='w' encoding='utf-8'>
++<_io.FileIO name='<stdout>' mode='wb' closefd=False>
++False
++<_io.TextIOWrapper name='<stdin>' mode='r' encoding='utf-8'>
++<_io.BufferedReader name='<stdin>'>
++False
++<_io.TextIOWrapper name='<stderr>' mode='w' encoding='utf-8'>
++<_io.FileIO name='<stderr>' mode='wb' closefd=False>
++False
++""",
++        )
++
+     def test_v_option_increments_verbose_flag(self):
+         result = subprocess.run(
+             [sys.executable, "-vvv", "-v", "-c", "import sys;print(sys.flags)"],
+diff --git a/library/sys.py b/library/sys.py
+--- a/library/sys.py
++++ b/library/sys.py
+@@ -100,6 +100,7 @@ def _init(
+     _flags_data,
+     _warnoptions,
+     extend_python_path_with_stdlib,
++    buffered_stdio,
+ ):
+     global executable
+     executable = _executable
+@@ -151,14 +152,68 @@ def _init(
+     global warnoptions
+     warnoptions = _warnoptions
+ 
++    from _io import TextIOWrapper
+ 
+-__stderr__ = open(_stderr_fd, "w", buffering=True, closefd=False, encoding="utf-8")
++    stderr_io = open(
++        _stderr_fd, "wb", buffering=-1 if buffered_stdio else 0, closefd=False
++    )
++    stderr_raw = stderr_io.raw if buffered_stdio else stderr_io
++    stderr_raw.name = "<stderr>"
++    global __stderr__
++    __stderr__ = TextIOWrapper(
++        stderr_io,
++        encoding="utf-8",
++        errors="backslashreplace",
++        newline="\n",
++        line_buffering=buffered_stdio and stderr_raw.isatty(),
++        write_through=not buffered_stdio,
++    )
++    __stderr__.mode = "w"
++    global stderr
++    stderr = __stderr__
++
++    stdin_io = open(_stdin_fd, "rb", buffering=-1, closefd=False)
++    stdin_raw = stdin_io.raw
++    stdin_raw.name = "<stdin>"
++    global __stdin__
++    __stdin__ = TextIOWrapper(
++        stdin_io,
++        encoding="utf-8",
++        errors="strict",
++        newline="\n",
++        line_buffering=buffered_stdio and stdin_raw.isatty(),
++        write_through=not buffered_stdio,
++    )
++    __stdin__.mode = "r"
++    global stdin
++    stdin = __stdin__
++
++    stdout_io = open(
++        _stdout_fd, "wb", buffering=-1 if buffered_stdio else 0, closefd=False
++    )
++    stdout_raw = stdout_io.raw if buffered_stdio else stdout_io
++    stdout_raw.name = "<stdout>"
++    global __stdout__
++    __stdout__ = TextIOWrapper(
++        stdout_io,
++        encoding="utf-8",
++        errors="strict",
++        newline="\n",
++        line_buffering=buffered_stdio and stdout_raw.isatty(),
++        write_through=not buffered_stdio,
++    )
++    __stdout__.mode = "w"
++    global stdout
++    stdout = __stdout__
++
++
++__stderr__ = None  # will be set by _init
+ 
+ 
+-__stdin__ = open(_stdin_fd, "r", buffering=True, closefd=False, encoding="utf-8")
++__stdin__ = None  # will be set by _init
+ 
+ 
+-__stdout__ = open(_stdout_fd, "w", buffering=True, closefd=False, encoding="utf-8")
++__stdout__ = None  # will be set _init
+ 
+ 
+ _base_executable = None  # will be set by _init
+@@ -364,13 +419,13 @@ def settrace(function):
+     _unimplemented()
+ 
+ 
+-stderr = __stderr__
++stderr = None  # will be set by _init
+ 
+ 
+-stdin = __stdin__
++stdin = None  # will be set by _init
+ 
+ 
+-stdout = __stdout__
++stdout = None  # will be set by _init
+ 
+ 
+ def unraisablehook(unraisable):
+diff --git a/library/sys_test.py b/library/sys_test.py
+--- a/library/sys_test.py
++++ b/library/sys_test.py
+@@ -2,7 +2,7 @@
+ import contextlib
+ import sys
+ import unittest
+-from _io import StringIO, TextIOWrapper
++from _io import StringIO, TextIOWrapper, BufferedReader
+ 
+ from test_support import cpython_only, pyro_only
+ 
+@@ -379,20 +379,30 @@ class SysTests(unittest.TestCase):
+     def test_is_finalizing_before_shutdown_returns_false(self):
+         self.assertEqual(sys.is_finalizing(), False)
+ 
+-    def test_stdio_initial_values(self):
+-        self.assertIs(sys.stderr, sys.__stderr__)
+-        self.assertIs(sys.stdin, sys.__stdin__)
+-        self.assertIs(sys.stdout, sys.__stdout__)
+-
+-    def test_std_streams_are_utf_8_encoded(self):
+-        self.assertEqual(sys.stderr.encoding, "utf-8")
++    def test_stdin_properties_match_expectations(self):
++        self.assertIs(sys.stdin, sys.__stdin__),
++        self.assertEqual(sys.stdin.buffer.mode, "rb")
+         self.assertEqual(sys.stdin.encoding, "utf-8")
++        self.assertEqual(sys.stdin.errors, "strict")
++        self.assertEqual(sys.stdin.mode, "r")
++        self.assertEqual(sys.stdin.name, "<stdin>")
++        self.assertIsInstance(sys.stdin.buffer, BufferedReader)
++
++    def test_stdout_properties_match_expectations(self):
++        self.assertIs(sys.stdout, sys.__stdout__)
++        self.assertEqual(sys.stdout.buffer.mode, "wb")
+         self.assertEqual(sys.stdout.encoding, "utf-8")
++        self.assertEqual(sys.stdout.errors, "strict")
++        self.assertEqual(sys.stdout.mode, "w")
++        self.assertEqual(sys.stdout.name, "<stdout>")
+ 
+-    def test_std_streams_have_correct_modes(self):
++    def test_stderr_properties_match_expectations(self):
++        self.assertIs(sys.stderr, sys.__stderr__)
++        self.assertEqual(sys.stderr.buffer.mode, "wb")
++        self.assertEqual(sys.stderr.encoding, "utf-8")
++        self.assertEqual(sys.stderr.errors, "backslashreplace")
+         self.assertEqual(sys.stderr.mode, "w")
+-        self.assertEqual(sys.stdin.mode, "r")
+-        self.assertEqual(sys.stdout.mode, "w")
++        self.assertEqual(sys.stderr.name, "<stderr>")
+ 
+     @pyro_only
+     def test_std_streams_point_to_correct_fileno(self):
+diff --git a/runtime/sys-module.cpp b/runtime/sys-module.cpp
+--- a/runtime/sys-module.cpp
++++ b/runtime/sys-module.cpp
+@@ -185,13 +185,15 @@ void initializeRuntimePaths(Thread* thre
+ RawObject initializeSys(Thread* thread, const Str& executable,
+                         const List& python_path, const Tuple& flags_data,
+                         const List& warnoptions,
+-                        bool extend_python_path_with_stdlib) {
++                        bool extend_python_path_with_stdlib,
++                        bool buffered_stdio) {
+   HandleScope scope(thread);
+   Object extend_python_path_with_stdlib_obj(
+       &scope, Bool::fromBool(extend_python_path_with_stdlib));
+-  return thread->invokeFunction5(ID(sys), ID(_init), executable, python_path,
++  Object buffering(&scope, Bool::fromBool(buffered_stdio));
++  return thread->invokeFunction6(ID(sys), ID(_init), executable, python_path,
+                                  flags_data, warnoptions,
+-                                 extend_python_path_with_stdlib_obj);
++                                 extend_python_path_with_stdlib_obj, buffering);
+ }
+ 
+ void setPycachePrefix(Thread* thread, const Object& pycache_prefix) {
+diff --git a/runtime/sys-module.h b/runtime/sys-module.h
+--- a/runtime/sys-module.h
++++ b/runtime/sys-module.h
+@@ -37,7 +37,8 @@ void initializeRuntimePaths(Thread* thre
+ RawObject initializeSys(Thread* thread, const Str& executable,
+                         const List& python_path, const Tuple& flags_data,
+                         const List& warnoptions,
+-                        bool extend_python_path_with_stdlib);
++                        bool extend_python_path_with_stdlib,
++                        bool buffered_stdio);
+ 
+ void setPycachePrefix(Thread* thread, const Object& pycache_prefix);
+ 
+diff --git a/runtime/test-utils.cpp b/runtime/test-utils.cpp
+--- a/runtime/test-utils.cpp
++++ b/runtime/test-utils.cpp
+@@ -66,7 +66,8 @@ static RawObject initializeSysWithDefaul
+   Tuple flags_data(&scope, data.becomeImmutable());
+   List warnoptions(&scope, runtime->newList());
+   return initializeSys(thread, executable, python_path, flags_data, warnoptions,
+-                       /*extend_python_path_with_stdlib=*/true);
++                       /*extend_python_path_with_stdlib=*/true,
++                       /*buffered_stdio=*/true);
+ }
+ 
+ bool useCppInterpreter() {
