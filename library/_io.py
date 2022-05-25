@@ -968,9 +968,6 @@ class BufferedReader(_BufferedIOMixin, bootstrap=True):
     def tell(self):
         return _BufferedIOMixin.tell(self) - self._buffer_num_bytes + self._read_pos
 
-    def _readinto(self, buf, read1):
-        _unimplemented()
-
     def __init__(self, raw, buffer_size=DEFAULT_BUFFER_SIZE):
         if not raw.readable():
             raise UnsupportedOperation("File or stream is not readable.")
