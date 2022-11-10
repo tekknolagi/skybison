@@ -1,13 +1,12 @@
 #include "ssa.h"
 
 #include <deque>
-
-#include "interpreter.h"
-#include "utils.h"
-// #include <unordered_map>
 #include <sstream>
 #include <unordered_set>
 #include <vector>
+
+#include "interpreter.h"
+#include "utils.h"
 
 namespace py {
 
@@ -263,7 +262,6 @@ void ssaify(Thread* thread, const Function& function) {
         break;
       }
     }
-    (void)op;
   }
 }
 
