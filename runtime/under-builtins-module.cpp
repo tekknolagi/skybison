@@ -31,6 +31,7 @@
 #include "strarray-builtins.h"
 #include "structseq-builtins.h"
 #include "super-builtins.h"
+#include "ssa.h"
 #include "traceback-builtins.h"
 #include "tuple-builtins.h"
 #include "type-builtins.h"
@@ -6298,6 +6299,17 @@ RawObject FUNC(_builtins, _weakref_referent)(Thread* thread, Arguments args) {
   }
   WeakRef self(&scope, weakRefUnderlying(*self_obj));
   return self.referent();
+}
+
+RawObject FUNC(_builtins, _ssaify)(Thread* thread, Arguments args) {
+  HandleScope scope(thread);
+  Object self_obj(&scope, args.get(0));
+  if (!self_obj.isFunction()) {
+    return thread->raiseRequiresType(self_obj, ID(function));
+  }
+  Function func(&scope, *self_obj);
+  ssaify(thread, func);
+  return NoneType::object();
 }
 
 }  // namespace py

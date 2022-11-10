@@ -575,6 +575,8 @@ add_library(
   runtime/structseq-builtins.h
   runtime/super-builtins.cpp
   runtime/super-builtins.h
+  runtime/ssa.cpp
+  runtime/ssa.h
   runtime/symbols.cpp
   runtime/symbols.h
   runtime/sys-module.cpp

@@ -1373,4 +1373,8 @@ def _weakref_referent(self):
     _builtin()
 
 
+def _ssaify(self):
+    _builtin()
+
+
 maxunicode = maxunicode  # noqa: F821
