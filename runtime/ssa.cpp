@@ -203,7 +203,11 @@ void ssaify(Thread* thread, const Function& function) {
   word num_opcodes = rewrittenBytecodeLength(bytecode);
   std::vector<Node*> const_nodes(consts.length());
   std::vector<Node*> stack_nodes(code.stacksize());
+  std::vector<Node*> local_nodes(function.totalArgs());
   Env env;
+  for (word i = 0; i < function.totalArgs(); i++) {
+    local_nodes[i] = env.emit<LoadFast>(i);
+  }
   for (word i = 0; i < num_opcodes;) {
     BytecodeOp op = nextBytecodeOp(bytecode, &i);
     switch (op.bc) {
@@ -221,7 +225,7 @@ void ssaify(Thread* thread, const Function& function) {
       };
       case LOAD_FAST_REVERSE_UNCHECKED: {
         stack_nodes.push_back(
-            env.emit<LoadFast>(function.totalLocals() - op.arg - 1));
+            local_nodes.at(function.totalLocals() - op.arg - 1));
         break;
       };
       case BINARY_ADD_SMALLINT: {
