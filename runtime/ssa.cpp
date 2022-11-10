@@ -48,7 +48,8 @@ class BumpAllocator {
 #define FOREACH_NODE(V)                                                        \
   V(Immediate)                                                                 \
   V(LoadFast)                                                                  \
-  V(BinaryOpSmallInt)
+  V(BinaryOpSmallInt)                                                          \
+  V(Undefined)
 
 enum class NodeType {
 #define ENUM(name) k##name,
@@ -73,18 +74,23 @@ class NodeVisitor {
 class Node {
  public:
   Node(NodeType type) : type_(type) {}
-  virtual void visitEdges(NodeVisitor* visitor) = 0;
+  virtual void visitEdges(NodeVisitor*){};
   word id() const { return id_; }
   void setId(word id) { id_ = id; }
   NodeType type() const { return type_; }
   std::string typeName() const {
     return kNodeTypeNames[static_cast<word>(type())];
   }
-  virtual std::string toString() const = 0;
+  virtual std::string toString() const { return typeName(); };
 
  private:
   word id_{0};
   NodeType type_;
+};
+
+class Undefined : public Node {
+ public:
+  Undefined() : Node(NodeType::kUndefined) {}
 };
 
 class Immediate : public Node {
@@ -98,8 +104,6 @@ class Immediate : public Node {
     return typeName() + " " + std::to_string(SmallInt::cast(value_).value());
   }
 
-  void visitEdges(NodeVisitor*) {}
-
  private:
   RawObject value_;
 };
@@ -111,8 +115,6 @@ class LoadFast : public Node {
   virtual std::string toString() const {
     return typeName() + " " + std::to_string(idx_);
   }
-
-  void visitEdges(NodeVisitor*) {}
 
  private:
   word idx_{-1};
@@ -203,10 +205,13 @@ void ssaify(Thread* thread, const Function& function) {
   word num_opcodes = rewrittenBytecodeLength(bytecode);
   std::vector<Node*> const_nodes(consts.length());
   std::vector<Node*> stack_nodes(code.stacksize());
-  std::vector<Node*> local_nodes(function.totalArgs());
+  std::vector<Node*> local_nodes(function.totalLocals());
   Env env;
   for (word i = 0; i < function.totalArgs(); i++) {
     local_nodes[i] = env.emit<LoadFast>(i);
+  }
+  for (word i = function.totalArgs(); i < function.totalLocals(); i++) {
+    local_nodes[i] = env.emit<Undefined>();
   }
   for (word i = 0; i < num_opcodes;) {
     BytecodeOp op = nextBytecodeOp(bytecode, &i);
@@ -223,9 +228,16 @@ void ssaify(Thread* thread, const Function& function) {
         stack_nodes.pop_back();
         break;
       };
+      case LOAD_FAST_REVERSE:
       case LOAD_FAST_REVERSE_UNCHECKED: {
         stack_nodes.push_back(
             local_nodes.at(function.totalLocals() - op.arg - 1));
+        break;
+      };
+      case STORE_FAST_REVERSE: {
+        Node* right = stack_nodes.back();
+        stack_nodes.pop_back();
+        local_nodes.at(function.totalLocals() - op.arg - 1) = right;
         break;
       };
       case BINARY_ADD_SMALLINT: {
