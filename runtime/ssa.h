@@ -5,6 +5,6 @@
 
 namespace py {
 
-void ssaify(Thread* thread, const Function& function);
+RawObject ssaify(Thread* thread, const Function& function);
 
 }

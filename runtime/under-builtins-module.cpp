@@ -6308,8 +6308,7 @@ RawObject FUNC(_builtins, _ssaify)(Thread* thread, Arguments args) {
     return thread->raiseRequiresType(self_obj, ID(function));
   }
   Function func(&scope, *self_obj);
-  ssaify(thread, func);
-  return NoneType::object();
+  return ssaify(thread, func);
 }
 
 }  // namespace py
