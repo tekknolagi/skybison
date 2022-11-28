@@ -4,6 +4,7 @@
 #include <sstream>
 #include <unordered_set>
 #include <vector>
+#include <memory>
 
 #include "bytearray-builtins.h"
 #include "interpreter.h"
@@ -12,6 +13,9 @@
 
 namespace py {
 
+// https://stackoverflow.com/questions/67834499/how-to-properly-use-stdalign
+// https://en.cppreference.com/w/cpp/memory/align
+// https://lesleylai.info/en/std-align/
 class BumpAllocator {
  public:
   BumpAllocator(size_t size) {
@@ -24,6 +28,13 @@ class BumpAllocator {
 
   template <typename T, typename... Args>
   T* allocate(Args&&... args) {
+    void* fill_ptr = reinterpret_cast<void*>(fill_);
+    size_t space_left = end_ - fill_;
+    void* mem = std::align(alignof(T), sizeof(T), fill_ptr, size_remain);
+    if (mem == nullptr) {
+        return nullptr;
+    }
+    fill_ = reinterpret_cast<uword>(fill_ptr);
     uintptr_t fill = fill_;
     uintptr_t free = end_ - fill;
     size_t element_size_ = Utils::roundUp(sizeof(T), alignof(T));
