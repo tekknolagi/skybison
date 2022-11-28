@@ -1023,6 +1023,47 @@ static void emitPushTupleAt(EmitEnv* env, Register r_tuple,
   __ pushq(Address(r_tuple, r_index_smallint, TIMES_4, heapObjectDisp(0)));
 }
 
+template <>
+void emitHandler<BINARY_SUBSCR_TUPLE>(EmitEnv* env) {
+  ScratchReg r_container(env);
+  ScratchReg r_key(env);
+  ScratchReg r_num_items(env);
+  Label slow_path;
+
+  __ popq(r_key);
+  __ popq(r_container);
+  // if (container.isTuple() && key.isSmallInt()) {
+  emitJumpIfNotHeapObjectWithLayoutId(env, r_container, LayoutId::kTuple,
+                                      &slow_path);
+  emitJumpIfNotSmallInt(env, r_key, &slow_path);
+  // r_num_items = container.headerCountOrOverflow()
+  emitHeaderCountOrOverflow(env, r_num_items, r_container);
+  // if (r_index >= r_num_items) goto terminate;
+  // if (0 <= index && index < length) {
+  // length >= 0 always holds. Therefore, ABOVE_EQUAL == NOT_CARRY if r_key
+  // contains a negative value (sign bit == 1) or r_key >= r_num_items.
+  __ cmpq(r_key, r_num_items);
+  __ jcc(ABOVE_EQUAL, &slow_path, Assembler::kNearJump);
+
+  // Push tuple.at(index)
+  emitPushTupleAt(env, r_container, r_key);
+  emitNextOpcode(env);
+
+  __ bind(&slow_path);
+  __ pushq(r_container);
+  __ pushq(r_key);
+  if (env->in_jit) {
+    emitJumpToDeopt(env);
+    return;
+  }
+  __ movq(kArgRegs[0], env->thread);
+  emitSaveInterpreterState(env, kVMPC | kVMStack | kVMFrame);
+  emitCurrentCacheIndex(env, kArgRegs[1]);
+  emitCall<Interpreter::Continue (*)(Thread*, word)>(
+      env, Interpreter::binarySubscrUpdateCache);
+  emitHandleContinue(env, kGenericHandler);
+}
+
 static void emitSetReturnMode(EmitEnv* env) {
   env->register_state.assign(&env->return_mode, kReturnModeReg);
   if (env->in_jit) {
