@@ -463,7 +463,7 @@ RawObject methodTrampolineFast(Thread* thread, word nargs) {
   Object self(&scope, thread->stackPeek(nargs - 1));
   word num_positional = nargs - 1;
 
-  PyObject* small_array[kMaxStackArguments];
+  PyObject* small_array[kMaxStackArguments] = {};
   PyObject** args;
   if (num_positional <= kMaxStackArguments) {
     args = small_array;
@@ -505,7 +505,7 @@ RawObject methodTrampolineFastKw(Thread* thread, word nargs) {
   Object self(&scope, thread->stackPeek(nargs));
   word num_positional = nargs - 1;
 
-  PyObject* small_array[kMaxStackArguments];
+  PyObject* small_array[kMaxStackArguments] = {};
   PyObject** args;
   if (num_positional <= kMaxStackArguments) {
     args = small_array;
@@ -556,7 +556,7 @@ RawObject methodTrampolineFastEx(Thread* thread, word flags) {
   Object self(&scope, args_tuple.at(0));
   word num_positional = args_length - 1;
 
-  PyObject* small_array[kMaxStackArguments];
+  PyObject* small_array[kMaxStackArguments] = {};
   PyObject** args;
   if (num_positional <= kMaxStackArguments) {
     args = small_array;
