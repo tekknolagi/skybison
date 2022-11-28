@@ -9,10 +9,10 @@ on:
 jobs:
   build-prev:
     if: ${{ github.event_name == 'pull_request' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
-    - name: Install Python 3.8
-      run: sudo apt install -y python3.8
+      # - name: Install Python 3.8
+      #   run: sudo apt install -y python3.8
     - uses: actions/checkout@v3
       with:
         fetch-depth: 2
@@ -49,11 +49,11 @@ jobs:
     # well on Windows or Mac.  You can convert this to a matrix build if you need
     # cross-platform coverage.
     # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
 
     steps:
-    - name: Install Python 3.8
-      run: sudo apt install -y python3.8
+      # - name: Install Python 3.8
+      #   run: sudo apt install -y python3.8
     - uses: actions/checkout@v3
 
     - name: Configure CMake
@@ -116,11 +116,11 @@ jobs:
 
   benchmark:
     if: ${{ github.event_name == 'pull_request' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs: [build, build-prev]
     steps:
-    - name: Install Python 3.8
-      run: sudo apt install -y python3.8
+      # - name: Install Python 3.8
+      #   run: sudo apt install -y python3.8
     - uses: actions/checkout@v3
       with:
         fetch-depth: 1
@@ -172,7 +172,7 @@ jobs:
           })
 
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     # TODO(max): Install and run Black on Python code
     steps:
     - name: Install clang-format
