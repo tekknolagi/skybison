@@ -996,6 +996,33 @@ void emitHandler<BINARY_SUBSCR_LIST>(EmitEnv* env) {
   emitHandleContinue(env, kGenericHandler);
 }
 
+void emitHeaderCountOrOverflow(EmitEnv* env, Register r_dst,
+                               Register r_container) {
+  // Load header().count() as a SmallInt
+  // r_dst = header().count()
+  __ movq(r_dst,
+          Address(r_container, heapObjectDisp(RawHeapObject::kHeaderOffset)));
+  __ shrq(r_dst, Immediate(RawHeader::kCountOffset - Object::kSmallIntTagBits));
+  __ andq(r_dst, Immediate(Header::kCountMask << Object::kSmallIntTagBits));
+  // if (r_dst == kCountOverflowFlag)
+  __ cmpq(r_dst, smallIntImmediate(RawHeader::kCountOverflowFlag));
+  Label done;
+  __ jcc(NOT_EQUAL, &done, Assembler::kNearJump);
+  __ movq(r_dst, Address(r_container,
+                         heapObjectDisp(RawHeapObject::kHeaderOverflowOffset)));
+  __ bind(&done);
+}
+
+// Push r_tuple[r_index_smallint] into the stack.
+static void emitPushTupleAt(EmitEnv* env, Register r_tuple,
+                            Register r_index_smallint) {
+  // r_index is a SmallInt, so r_key already stores the index value * 2.
+  // Therefore, applying TIMES_4 will compute index * 8.
+  static_assert(Object::kSmallIntTag == 0, "unexpected tag for SmallInt");
+  static_assert(Object::kSmallIntTagBits == 1, "unexpected tag for SmallInt");
+  __ pushq(Address(r_tuple, r_index_smallint, TIMES_4, heapObjectDisp(0)));
+}
+
 static void emitSetReturnMode(EmitEnv* env) {
   env->register_state.assign(&env->return_mode, kReturnModeReg);
   if (env->in_jit) {
@@ -1976,6 +2003,52 @@ void emitJumpAbsolute(EmitEnv* env) {
   static_assert(kCodeUnitScale == 2, "expect to multiply arg by 2");
   env->register_state.assign(&env->pc, kPCReg);
   __ leaq(env->pc, Address(env->oparg, TIMES_2, 0));
+}
+
+template <>
+void emitHandler<FOR_ITER_TUPLE>(EmitEnv* env) {
+  ScratchReg r_iter(env);
+  Label next_opcode;
+  Label slow_path;
+  Label terminate;
+
+  {
+    ScratchReg r_index(env);
+    ScratchReg r_num_items(env);
+    ScratchReg r_container(env);
+
+    __ popq(r_iter);
+    emitJumpIfNotHeapObjectWithLayoutId(env, r_iter, LayoutId::kTupleIterator,
+                                        &slow_path);
+    __ movq(r_index,
+            Address(r_iter, heapObjectDisp(TupleIterator::kIndexOffset)));
+    __ movq(r_container,
+            Address(r_iter, heapObjectDisp(TupleIterator::kIterableOffset)));
+    // if (r_index >= r_num_items) goto terminate;
+    emitHeaderCountOrOverflow(env, r_num_items, r_container);
+    __ cmpq(r_index, r_num_items);
+    __ jcc(GREATER_EQUAL, &terminate, Assembler::kNearJump);
+    // r_index < r_num_items.
+    __ pushq(r_iter);
+    // Push tuple.at(index).
+    emitPushTupleAt(env, r_container, r_index);
+    __ addq(r_index, smallIntImmediate(1));
+    __ movq(Address(r_iter, heapObjectDisp(TupleIterator::kIndexOffset)),
+            r_index);
+    __ bind(&next_opcode);
+    emitNextOpcode(env);
+  }
+
+  __ bind(&terminate);
+  emitJumpForward(env, &next_opcode);
+
+  __ bind(&slow_path);
+  __ pushq(r_iter);
+  if (env->in_jit) {
+    emitJumpToDeopt(env);
+    return;
+  }
+  emitGenericHandler(env, FOR_ITER_ANAMORPHIC);
 }
 
 template <>
