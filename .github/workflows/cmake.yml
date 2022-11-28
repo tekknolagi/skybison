@@ -9,7 +9,7 @@ on:
 jobs:
   build-prev:
     if: ${{ github.event_name == 'pull_request' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v3
       with:
@@ -47,7 +47,7 @@ jobs:
     # well on Windows or Mac.  You can convert this to a matrix build if you need
     # cross-platform coverage.
     # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
 
     steps:
     - uses: actions/checkout@v3
@@ -112,7 +112,7 @@ jobs:
 
   benchmark:
     if: ${{ github.event_name == 'pull_request' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs: [build, build-prev]
     steps:
     - uses: actions/checkout@v3
@@ -166,7 +166,7 @@ jobs:
           })
 
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     # TODO(max): Install and run Black on Python code
     steps:
     - name: Install clang-format
