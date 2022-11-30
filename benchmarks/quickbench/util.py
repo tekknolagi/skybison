@@ -17,19 +17,17 @@ def run(cmd, check=True, encoding="utf-8", log_level=logging.DEBUG, **kwargs):
 
 
 def get_repo_root(dirname):
-    completed_process = run(
-        ["hg", "root"], check=False, cwd=dirname, stdout=subprocess.PIPE
+    proc = run(
+        ["git", "rev-parse", "--show-toplevel"],
+        stdout=subprocess.PIPE,
+        cwd=dirname,
     )
-    if completed_process.returncode == 0:
-        return completed_process.stdout.strip()
-
-    sys.stderr.write("Unknown source control\n")
-    sys.exit(1)
+    return proc.stdout.strip()
 
 
 def normalize_revision(repo_root, revspec):
     proc = run(
-        ["hg", "log", "-r", revspec, "--template", "{node}"],
+        ["git", "rev-parse", revspec],
         stdout=subprocess.PIPE,
         cwd=repo_root,
     )
