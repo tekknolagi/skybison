@@ -147,7 +147,8 @@ class Interpreter:
                 b = self.create_benchmark_from_file(path)
                 discovered_benchmarks.append(b)
             elif os.path.isdir(path) and (
-                "__pycache__" not in path and "data" not in path
+                "__pycache__" not in path and "data" not in path and "django"
+                not in path
             ):
                 b = self.create_benchmark_from_dir(path)
                 discovered_benchmarks.append(b)
