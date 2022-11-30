@@ -3629,6 +3629,39 @@ HANDLER_INLINE Continue Interpreter::doLoadAttr(Thread* thread, word arg) {
   return Continue::NEXT;
 }
 
+static bool isCachedLoadAttr(Thread* thread, const Function& function,
+                             SmallInt* attr_location) {
+  HandleScope scope(thread);
+  if (!function.rewrittenBytecode().isMutableBytes()) {
+    return false;
+  }
+  MutableBytes bytecode(&scope, function.rewrittenBytecode());
+  if (rewrittenBytecodeLength(bytecode) != 3) {
+    return false;
+  }
+  word i = 0;
+  BytecodeOp op = nextBytecodeOp(bytecode, &i);
+  // TODO(emacs): Check against the name? Or something?
+  if (op.bc != LOAD_FAST_REVERSE_UNCHECKED) {
+    return false;
+  }
+  op = nextBytecodeOp(bytecode, &i);
+  word cache = op.cache;
+  if (op.bc != LOAD_ATTR_INSTANCE) {
+    return false;
+  }
+  op = nextBytecodeOp(bytecode, &i);
+  if (op.bc != RETURN_VALUE) {
+    return false;
+  }
+  MutableTuple caches(&scope, function.caches());
+  word index = cache * kIcPointersPerEntry;
+  DCHECK(!caches.at(index + kIcEntryKeyOffset).isUnbound(),
+         "cache.at(index) is expected to be monomorphic");
+  *attr_location = SmallInt::cast(caches.at(index + kIcEntryValueOffset));
+  return true;
+}
+
 Continue Interpreter::loadAttrUpdateCache(Thread* thread, word arg,
                                           word cache) {
   HandleScope scope(thread);
@@ -3668,6 +3701,22 @@ Continue Interpreter::loadAttrUpdateCache(Thread* thread, word arg,
                      dependent);
         break;
       case LoadAttrKind::kInstanceProperty:
+        DCHECK(location.isFunction(), "expected function for InstanceProperty");
+        {
+          Function callee(&scope, *location);
+          // NB: This relies on function.__code__ being read-only. Otherwise,
+          // it would have to take a dependency on the callee function.
+          SmallInt attr_location(&scope, SmallInt::fromWord(0));
+          if (isCachedLoadAttr(thread, callee, &attr_location)) {
+            rewriteCurrentBytecode(frame, LOAD_ATTR_INSTANCE);
+            icUpdateAttr(thread, caches, cache, receiver_layout_id,
+                         attr_location, name, dependent);
+            // TODO(emacs): Is another dependency needed?
+            // insertDependencyForTypeLookupInMro(thread, receiver_layout_id,
+            // name, dependent);
+            break;
+          }
+        }
         rewriteCurrentBytecode(frame, LOAD_ATTR_INSTANCE_PROPERTY);
         icUpdateAttr(thread, caches, cache, receiver_layout_id, location, name,
                      dependent);
