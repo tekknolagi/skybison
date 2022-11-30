@@ -19,7 +19,7 @@ def benchmark(repo_root, revision, binary, resultsdir, args):
         cgoutdir = f"{resultsdir}/cg/django"
         run(["mkdir", "-p", cgoutdir])
         cmd = [
-            f"{repo_root}/fbcode/pyro/experimental/django/benchmark.py",
+            f"{repo_root}/benchmarks/benchmarks/django/benchmark.py",
             "-i",
             binary,
             "--callgrind-out-dir",
@@ -33,11 +33,11 @@ def benchmark(repo_root, revision, binary, resultsdir, args):
     if args.run_benchmarks:
         cgoutdir = f"{resultsdir}/cg"
         cmd = [
-            f"{repo_root}/fbcode/pyro/benchmarks/run.py",
+            f"{repo_root}/benchmarks/run.py",
             "-i",
             binary,
             "-p",
-            f"{repo_root}/fbcode/pyro/benchmarks/benchmarks",
+            f"{repo_root}/benchmarks/benchmarks",
             "--json",
             "--tool=callgrind",
             "--callgrind-out-dir",

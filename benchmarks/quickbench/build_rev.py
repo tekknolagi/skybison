@@ -25,26 +25,17 @@ def find_binary(builddir):
     return None
 
 
-def find_cmake(repo_root):
-    tp2_cmake = (
-        f"{repo_root}/fbcode/third-party2/cmake/3.15.2/centos7-native/da39a3e/bin/cmake"
-    )
-    if sys.platform == "linux" and os.path.exists(tp2_cmake):
-        return tp2_cmake
-    return "cmake"
-
-
 def build(repo_root, builddir, sourcedir):
     cmake_flags = [
         "-S",
         sourcedir,
         "-B",
         builddir,
-        f"-DCMAKE_TOOLCHAIN_FILE={sourcedir}/util/platform009-gcc.cmake",
+        f"-DCMAKE_TOOLCHAIN_FILE={sourcedir}/util/linux.cmake",
         "-DCMAKE_BUILD_TYPE=Release",
     ]
     run(
-        [find_cmake(repo_root), "-GNinja"] + cmake_flags,
+        ["cmake", "-GNinja"] + cmake_flags,
         stdout=subprocess.DEVNULL,
         log_level=logging.INFO,
     )
@@ -65,18 +56,15 @@ def checkout_and_build(repo_root, revision, builddir):
     with tempfile.TemporaryDirectory(prefix="bench_") as tempdir:
         workdir = f"{tempdir}/workdir"
         run(
-            ["hg-new-workdir", "fbcode", workdir],
+            ["git", "worktree", "add", "--detach", workdir, revision],
             cwd=repo_root,
             stdout=subprocess.DEVNULL,
         )
         try:
-            run(["hg", "checkout", revision], cwd=workdir, stdout=subprocess.DEVNULL)
-
-            sourcedir = f"{workdir}/fbcode/pyro"
             run(["mkdir", "-p", builddir], log_level=logging.DEBUG)
-            return build(repo_root, builddir, sourcedir)
+            return build(repo_root, builddir, workdir)
         finally:
-            run(["eden", "rm", "--no-prompt", workdir], stdout=subprocess.DEVNULL)
+            run(["git", "worktree", "remove", "-f", workdir], stdout=subprocess.DEVNULL)
 
 
 def clean_old_builds():
