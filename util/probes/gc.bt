@@ -1,0 +1,4 @@
+usdt:./build-debugopt/bin/python:python:CollectGarbage {
+  @gc[ustack()]++;
+}
+
