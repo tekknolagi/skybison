@@ -415,6 +415,11 @@ if ("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
     RUNTIME_ARCH_SOURCES
     runtime/interpreter-gen-x64.cpp
   )
+elseif(${CMAKE_OSX_ARCHITECTURES} STREQUAL "x86_64")
+  set(
+    RUNTIME_ARCH_SOURCES
+    runtime/interpreter-gen-x64.cpp
+  )
 else()
   message(FATAL_ERROR "Unsupported architecture ${CMAKE_SYSTEM_PROCESSOR}")
 endif()
