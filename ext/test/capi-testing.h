@@ -14,6 +14,7 @@ namespace testing {
 class __attribute__((warn_unused)) Borrowed {
  public:
   explicit Borrowed(PyObject* obj) : obj_(obj) {}
+  explicit Borrowed(const Borrowed& borrowed) : obj_(borrowed.get()) {}
   PyObject* get() const { return obj_; }
 
   // disable assignment
