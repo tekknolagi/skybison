@@ -2325,6 +2325,30 @@ void emitHandler<UNARY_NOT>(EmitEnv* env) {
   emitGenericHandler(env, UNARY_NOT);
 }
 
+template <>
+void emitHandler<UNARY_NEGATIVE_SMALLINT>(EmitEnv* env) {
+  Label slow_path;
+  ScratchReg r_obj(env);
+  ScratchReg r_scratch(env);
+
+  // Handle SmallInt directly; fall back to C++ for other types
+  __ popq(r_obj);
+  emitJumpIfNotSmallInt(env, r_obj, &slow_path);
+  __ movq(r_scratch, Immediate(-SmallInt::kMinValue));
+  __ addq(r_scratch, r_obj);
+  __ jcc(SIGN, &slow_path, Assembler::kNearJump);
+  // This little dance is shorter (and probably faster) than converting from a
+  // SmallInt, negating, and converting back to SmallInt.
+  __ andq(r_obj, Immediate(~uint64_t{1}));
+  __ negq(r_obj);
+  __ pushq(r_obj);
+  emitNextOpcode(env);
+
+  __ bind(&slow_path);
+  __ pushq(r_obj);
+  emitGenericHandler(env, UNARY_NEGATIVE_SMALLINT);
+}
+
 static void emitPopJumpIfBool(EmitEnv* env, bool jump_value) {
   ScratchReg r_scratch(env);
   Label jump;
@@ -3064,6 +3088,7 @@ bool isSupportedInJIT(Bytecode bc) {
     case STORE_SUBSCR_LIST:
     case UNARY_INVERT:
     case UNARY_NEGATIVE:
+    case UNARY_NEGATIVE_SMALLINT:
     case UNARY_NOT:
     case UNARY_POSITIVE:
     case UNPACK_EX:

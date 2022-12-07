@@ -67,6 +67,13 @@ class Interpreter {
     OR
   };
 
+  enum class UnaryOp {
+    NEGATIVE,
+    POSITIVE,
+    NOT,
+    INVERT,
+  };
+
   enum class Continue {
     NEXT,
     UNWIND,
@@ -484,7 +491,9 @@ class Interpreter {
   static Continue doStoreSubscrPolymorphic(Thread* thread, word arg);
   static Continue doStoreSubscrAnamorphic(Thread* thread, word arg);
   static Continue doUnaryInvert(Thread* thread, word arg);
+  static Continue doUnaryOpAnamorphic(Thread* thread, word arg);
   static Continue doUnaryNegative(Thread* thread, word arg);
+  static Continue doUnaryNegativeSmallInt(Thread* thread, word arg);
   static Continue doUnaryNot(Thread* thread, word arg);
   static Continue doUnaryPositive(Thread* thread, word arg);
   static Continue doUnpackEx(Thread* thread, word arg);

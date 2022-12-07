@@ -669,6 +669,17 @@ TEST_F(InterpreterTest, DoBinaryOpWithSmallIntsRewritesOpcode) {
       isIntEqualsWord(Interpreter::call0(thread_, function), left - right));
 }
 
+static bool functionMatchesRef1(const Function& function,
+                                const Object& reference, const Object& arg0) {
+  Thread* thread = Thread::current();
+  HandleScope scope(thread);
+  Object expected(&scope, Interpreter::call1(thread, reference, arg0));
+  EXPECT_FALSE(expected.isError());
+  Object actual(&scope, Interpreter::call1(thread, function, arg0));
+  EXPECT_FALSE(actual.isError());
+  return Runtime::objectEquals(thread, *expected, *actual) == Bool::trueObj();
+}
+
 static bool functionMatchesRef2(const Function& function,
                                 const Object& reference, const Object& arg0,
                                 const Object& arg1) {
@@ -797,6 +808,48 @@ def new_init(self):
   EXPECT_FALSE(expected.isError());
   EXPECT_EQ(expected.layoutId(), type.instanceLayoutId());
   EXPECT_TRUE(containsBytecode(function, CALL_FUNCTION));
+}
+
+// Test that `function(arg0) == reference(arg0)` with the assumption
+// that `function` contains the original unary opcode that will be
+// specialized to `opcode_specialized` when called with `arg0`.
+// Calling the function with `arg_o` should trigger a revert to
+// the unspecialized unary op.
+static void testUnaryOpRewrite(const Function& function,
+                               const Function& reference,
+                               Bytecode opcode_unspecialized,
+                               Bytecode opcode_specialized, const Object& arg0,
+                               const Object& arg_o) {
+  EXPECT_TRUE(containsBytecode(function, UNARY_OP_ANAMORPHIC));
+
+  EXPECT_TRUE(functionMatchesRef1(function, reference, arg0));
+  EXPECT_FALSE(containsBytecode(function, BINARY_OP_ANAMORPHIC));
+  EXPECT_TRUE(containsBytecode(function, opcode_specialized));
+  EXPECT_TRUE(functionMatchesRef1(function, reference, arg0));
+  EXPECT_TRUE(containsBytecode(function, opcode_specialized));
+
+  EXPECT_TRUE(functionMatchesRef1(function, reference, arg_o));
+  EXPECT_TRUE(containsBytecode(function, opcode_unspecialized));
+  EXPECT_FALSE(containsBytecode(function, opcode_specialized));
+
+  EXPECT_TRUE(functionMatchesRef1(function, reference, arg0));
+}
+
+TEST_F(InterpreterTest, UnaryOpAnamorphicRewritesToUnaryNegativeSmallInt) {
+  HandleScope scope(thread_);
+  ASSERT_FALSE(runFromCStr(runtime_, R"(
+def function(obj):
+    return -obj
+reference = int.__neg__
+)")
+                   .isError());
+  Function function(&scope, mainModuleAt(runtime_, "function"));
+  Function reference(&scope, mainModuleAt(runtime_, "reference"));
+  Object arg0(&scope, SmallInt::fromWord(34));
+  const uword digits2[] = {0x12345678, 0xabcdef};
+  Object arg_l(&scope, runtime_->newLargeIntWithDigits(digits2));
+  testUnaryOpRewrite(function, reference, UNARY_NEGATIVE,
+                     UNARY_NEGATIVE_SMALLINT, arg0, arg_l);
 }
 
 TEST_F(InterpreterTest, BinaryOpAnamorphicRewritesToBinaryAddSmallInt) {
@@ -1772,11 +1825,11 @@ def foo(a, b):
 TEST_F(InterpreterDeathTest, InvalidOpcode) {
   HandleScope scope(thread_);
 
-  const byte bytecode[] = {NOP, 0, NOP, 0, UNUSED_BYTECODE_7, 17, NOP, 7};
+  const byte bytecode[] = {NOP, 0, NOP, 0, UNUSED_BYTECODE_0, 17, NOP, 7};
   Code code(&scope, newCodeWithBytes(bytecode));
 
   ASSERT_DEATH(static_cast<void>(runCode(code)),
-               "bytecode 'UNUSED_BYTECODE_7'");
+               "bytecode 'UNUSED_BYTECODE_0'");
 }
 
 TEST_F(InterpreterTest, CallDescriptorGetWithBuiltinTypeDescriptors) {
@@ -8798,6 +8851,7 @@ class C:
 def foo(obj):
   return -obj
 instance = C()
+foo(instance)  # Change UNARY_OP_ANAMORPHIC to UNARY_NEGATIVE
 )")
                    .isError());
   HandleScope scope(thread_);
@@ -8806,6 +8860,60 @@ instance = C()
   Object obj(&scope, mainModuleAt(runtime_, "instance"));
   Object result(&scope, compileAndCallJITFunction1(thread_, function, obj));
   EXPECT_TRUE(isIntEqualsWord(*result, 5));
+}
+
+TEST_F(JitTest, UnaryNegativeSmallIntWithPositiveReturnsNegative) {
+  if (useCppInterpreter()) {
+    GTEST_SKIP();
+  }
+  ASSERT_FALSE(runFromCStr(runtime_, R"(
+def foo(obj):
+  return -obj
+foo(0)  # Change UNARY_OP_ANAMORPHIC to UNARY_NEGATIVE_SMALLINT
+)")
+                   .isError());
+  HandleScope scope(thread_);
+  Function function(&scope, mainModuleAt(runtime_, "foo"));
+  EXPECT_TRUE(containsBytecode(function, UNARY_NEGATIVE_SMALLINT));
+  Object obj(&scope, SmallInt::fromWord(123));
+  Object result(&scope, compileAndCallJITFunction1(thread_, function, obj));
+  EXPECT_TRUE(isIntEqualsWord(*result, -123));
+}
+
+TEST_F(JitTest, UnaryNegativeSmallIntWithNegativeReturnsPositive) {
+  if (useCppInterpreter()) {
+    GTEST_SKIP();
+  }
+  ASSERT_FALSE(runFromCStr(runtime_, R"(
+def foo(obj):
+  return -obj
+foo(0)  # Change UNARY_OP_ANAMORPHIC to UNARY_NEGATIVE_SMALLINT
+)")
+                   .isError());
+  HandleScope scope(thread_);
+  Function function(&scope, mainModuleAt(runtime_, "foo"));
+  EXPECT_TRUE(containsBytecode(function, UNARY_NEGATIVE_SMALLINT));
+  Object obj(&scope, SmallInt::fromWord(-123));
+  Object result(&scope, compileAndCallJITFunction1(thread_, function, obj));
+  EXPECT_TRUE(isIntEqualsWord(*result, 123));
+}
+
+TEST_F(JitTest, UnaryNegativeSmallIntWithZeroReturnsZero) {
+  if (useCppInterpreter()) {
+    GTEST_SKIP();
+  }
+  ASSERT_FALSE(runFromCStr(runtime_, R"(
+def foo(obj):
+  return -obj
+foo(0)  # Change UNARY_OP_ANAMORPHIC to UNARY_NEGATIVE_SMALLINT
+)")
+                   .isError());
+  HandleScope scope(thread_);
+  Function function(&scope, mainModuleAt(runtime_, "foo"));
+  EXPECT_TRUE(containsBytecode(function, UNARY_NEGATIVE_SMALLINT));
+  Object obj(&scope, SmallInt::fromWord(0));
+  Object result(&scope, compileAndCallJITFunction1(thread_, function, obj));
+  EXPECT_TRUE(isIntEqualsWord(*result, 0));
 }
 
 TEST_F(JitTest, UnaryPositiveCallsDunderPos) {

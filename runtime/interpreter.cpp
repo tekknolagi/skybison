@@ -1456,6 +1456,48 @@ HANDLER_INLINE Continue Interpreter::doUnaryPositive(Thread* thread, word) {
   return doUnaryOperation(ID(__pos__), thread);
 }
 
+HANDLER_INLINE
+Continue Interpreter::doUnaryNegativeSmallInt(Thread* thread, word) {
+  RawObject obj = thread->stackPeek(0);
+  if (obj.isSmallInt()) {
+    word value = SmallInt::cast(obj).value();
+    word result_value = -value;
+    if (SmallInt::isValid(result_value)) {
+      thread->stackSetTop(SmallInt::fromWord(result_value));
+      return Continue::NEXT;
+    }
+  }
+  EVENT_CACHE(UNARY_NEGATIVE_SMALLINT);
+  Frame* frame = thread->currentFrame();
+  rewriteCurrentBytecode(frame, UNARY_NEGATIVE);
+  return doUnaryNegative(thread, /*arg=*/0);
+}
+
+HANDLER_INLINE
+Continue Interpreter::doUnaryOpAnamorphic(Thread* thread, word arg) {
+  Frame* frame = thread->currentFrame();
+  if (thread->stackPeek(0).isSmallInt()) {
+    switch (static_cast<UnaryOp>(arg)) {
+      case UnaryOp::NEGATIVE:
+        rewriteCurrentBytecode(frame, UNARY_NEGATIVE_SMALLINT);
+        return doUnaryNegativeSmallInt(thread, arg);
+      default:
+        UNIMPLEMENTED("cached unary operations other than NEGATIVE");
+        break;
+    }
+  }
+  // TODO(emacs): Add caching for methods on non-smallints
+  switch (static_cast<UnaryOp>(arg)) {
+    case UnaryOp::NEGATIVE:
+      rewriteCurrentBytecode(frame, UNARY_NEGATIVE);
+      return doUnaryNegative(thread, /*arg=*/0);
+    default:
+      UNIMPLEMENTED("cached unary operations other than NEGATIVE");
+      break;
+  }
+  UNREACHABLE("all UnaryOp cases should be handled in the switch");
+}
+
 HANDLER_INLINE Continue Interpreter::doUnaryNegative(Thread* thread, word) {
   return doUnaryOperation(ID(__neg__), thread);
 }

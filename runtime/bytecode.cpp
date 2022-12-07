@@ -98,6 +98,11 @@ static RewrittenOp rewriteOperation(const Function& function, BytecodeOp op) {
     return RewrittenOp{INPLACE_OP_ANAMORPHIC, static_cast<int32_t>(bin_op),
                        true};
   };
+  auto cached_unop = [](Interpreter::UnaryOp unary_op) {
+    // TODO(emacs): Add caching for methods on non-smallints
+    return RewrittenOp{UNARY_OP_ANAMORPHIC, static_cast<int32_t>(unary_op),
+                       false};
+  };
   switch (op.bc) {
     case BINARY_ADD:
       return cached_binop(Interpreter::BinaryOp::ADD);
@@ -175,6 +180,9 @@ static RewrittenOp rewriteOperation(const Function& function, BytecodeOp op) {
       return cached_inplace(Interpreter::BinaryOp::TRUEDIV);
     case INPLACE_XOR:
       return cached_inplace(Interpreter::BinaryOp::XOR);
+      // TODO(emacs): Fill in other unary ops
+    case UNARY_NEGATIVE:
+      return cached_unop(Interpreter::UnaryOp::NEGATIVE);
     case LOAD_ATTR:
       return RewrittenOp{LOAD_ATTR_ANAMORPHIC, op.arg, true};
     case LOAD_FAST: {
@@ -241,6 +249,7 @@ static RewrittenOp rewriteOperation(const Function& function, BytecodeOp op) {
     case LOAD_FAST_REVERSE:
     case LOAD_METHOD_ANAMORPHIC:
     case STORE_ATTR_ANAMORPHIC:
+    case UNARY_OP_ANAMORPHIC:
       UNREACHABLE("should not have cached opcode in input");
     default:
       break;

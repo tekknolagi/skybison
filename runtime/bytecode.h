@@ -24,8 +24,8 @@ namespace py {
   V(DUP_TOP, 4, doDupTop)                                                      \
   V(DUP_TOP_TWO, 5, doDupTopTwo)                                               \
   V(ROT_FOUR, 6, doRotFour)                                                    \
-  V(UNUSED_BYTECODE_7, 7, doInvalidBytecode)                                   \
-  V(UNUSED_BYTECODE_8, 8, doInvalidBytecode)                                   \
+  V(UNARY_OP_ANAMORPHIC, 7, doUnaryOpAnamorphic)                               \
+  V(UNARY_NEGATIVE_SMALLINT, 8, doUnaryNegativeSmallInt)                       \
   V(NOP, 9, doNop)                                                             \
   V(UNARY_POSITIVE, 10, doUnaryPositive)                                       \
   V(UNARY_NEGATIVE, 11, doUnaryNegative)                                       \
