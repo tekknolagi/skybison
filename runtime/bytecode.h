@@ -192,7 +192,7 @@ namespace py {
   V(UNUSED_BYTECODE_172, 172, doInvalidBytecode)                               \
   V(UNUSED_BYTECODE_173, 173, doInvalidBytecode)                               \
   V(UNUSED_BYTECODE_174, 174, doInvalidBytecode)                               \
-  V(UNUSED_BYTECODE_175, 175, doInvalidBytecode)                               \
+  V(LOAD_ATTR_INSTANCE_OVERFLOW, 175, doLoadAttrInstanceOverflow)              \
   V(CALL_FUNCTION_TYPE_NEW, 176, doCallFunctionTypeNew)                        \
   V(CALL_FUNCTION_ANAMORPHIC, 177, doCallFunctionAnamorphic)                   \
   V(COMPARE_NE_STR, 178, doCompareNeStr)                                       \

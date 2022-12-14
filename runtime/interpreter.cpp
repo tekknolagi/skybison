@@ -3657,11 +3657,20 @@ Continue Interpreter::loadAttrUpdateCache(Thread* thread, word arg,
   LayoutId receiver_layout_id = receiver.layoutId();
   if (ic_state == ICState::kAnamorphic) {
     switch (kind) {
-      case LoadAttrKind::kInstanceOffset:
-        rewriteCurrentBytecode(frame, LOAD_ATTR_INSTANCE);
+      case LoadAttrKind::kInstanceOffset: {
+        word offset = SmallInt::cast(*location).value();
+        if (offset >= 0) {
+          // In-object
+          rewriteCurrentBytecode(frame, LOAD_ATTR_INSTANCE);
+        } else {
+          // Overflow
+          rewriteCurrentBytecode(frame, LOAD_ATTR_INSTANCE_OVERFLOW);
+          location = SmallInt::fromWord(-(offset + 1));
+        }
         icUpdateAttr(thread, caches, cache, receiver_layout_id, location, name,
                      dependent);
         break;
+      }
       case LoadAttrKind::kInstanceFunction:
         rewriteCurrentBytecode(frame, LOAD_ATTR_INSTANCE_TYPE_BOUND_METHOD);
         icUpdateAttr(thread, caches, cache, receiver_layout_id, location, name,
@@ -3703,6 +3712,7 @@ Continue Interpreter::loadAttrUpdateCache(Thread* thread, word arg,
   } else {
     DCHECK(
         currentBytecode(thread) == LOAD_ATTR_INSTANCE ||
+            currentBytecode(thread) == LOAD_ATTR_INSTANCE_OVERFLOW ||
             currentBytecode(thread) == LOAD_ATTR_INSTANCE_TYPE_BOUND_METHOD ||
             currentBytecode(thread) == LOAD_ATTR_POLYMORPHIC,
         "unexpected opcode");
@@ -3763,7 +3773,38 @@ HANDLER_INLINE Continue Interpreter::doLoadAttrInstance(Thread* thread,
     EVENT_CACHE(LOAD_ATTR_INSTANCE);
     return Interpreter::loadAttrUpdateCache(thread, arg, cache);
   }
-  RawObject result = loadAttrWithLocation(thread, receiver, cached);
+  CHECK(cached.isSmallInt(), "expected smallint");
+  word offset = SmallInt::cast(cached).value();
+  DCHECK(receiver.isHeapObject(), "expected heap object");
+  RawInstance instance = Instance::cast(receiver);
+  DCHECK(offset >= 0, "expected positive in-object offset");
+  RawObject result = instance.instanceVariableAt(offset);
+  thread->stackSetTop(result);
+  return Continue::NEXT;
+}
+
+HANDLER_INLINE Continue Interpreter::doLoadAttrInstanceOverflow(Thread* thread,
+                                                                word arg) {
+  Frame* frame = thread->currentFrame();
+  word cache = currentCacheIndex(frame);
+  RawMutableTuple caches = MutableTuple::cast(frame->caches());
+  RawObject receiver = thread->stackTop();
+  bool is_found;
+  RawObject cached =
+      icLookupMonomorphic(caches, cache, receiver.layoutId(), &is_found);
+  if (!is_found) {
+    EVENT_CACHE(LOAD_ATTR_INSTANCE);
+    return Interpreter::loadAttrUpdateCache(thread, arg, cache);
+  }
+  CHECK(cached.isSmallInt(), "expected smallint");
+  DCHECK(SmallInt::cast(cached).value() >= 0,
+         "expected positive overflow offset");
+  DCHECK(receiver.isHeapObject(), "expected only heap objects");
+  RawLayout layout = Layout::cast(thread->runtime()->layoutOf(receiver));
+  RawInstance instance = Instance::cast(receiver);
+  RawTuple overflow =
+      Tuple::cast(instance.instanceVariableAt(layout.overflowOffset()));
+  RawObject result = overflow.at(SmallInt::cast(cached).value());
   thread->stackSetTop(result);
   return Continue::NEXT;
 }

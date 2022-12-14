@@ -445,6 +445,7 @@ class Interpreter {
   static Continue doLoadAttr(Thread* thread, word arg);
   static Continue doLoadAttrAnamorphic(Thread* thread, word arg);
   static Continue doLoadAttrInstance(Thread* thread, word arg);
+  static Continue doLoadAttrInstanceOverflow(Thread* thread, word arg);
   static Continue doLoadAttrInstanceTypeBoundMethod(Thread* thread, word arg);
   static Continue doLoadAttrInstanceProperty(Thread* thread, word arg);
   static Continue doLoadAttrInstanceSlotDescr(Thread* thread, word arg);
