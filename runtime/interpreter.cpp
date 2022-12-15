@@ -3662,13 +3662,18 @@ Continue Interpreter::loadAttrUpdateCache(Thread* thread, word arg,
         if (offset >= 0) {
           // In-object
           rewriteCurrentBytecode(frame, LOAD_ATTR_INSTANCE);
+        icUpdateAttr(thread, caches, cache, receiver_layout_id, location, name,
+                     dependent);
         } else {
           // Overflow
           rewriteCurrentBytecode(frame, LOAD_ATTR_INSTANCE_OVERFLOW);
-          location = SmallInt::fromWord(-(offset + 1));
-        }
-        icUpdateAttr(thread, caches, cache, receiver_layout_id, location, name,
+          // location = SmallInt::fromWord(-(offset + 1));
+          Object pos_loc(&scope, SmallInt::fromWord(-offset - 1));
+        icUpdateAttr(thread, caches, cache, receiver_layout_id, pos_loc, name,
                      dependent);
+        }
+        // icUpdateAttr(thread, caches, cache, receiver_layout_id, location, name,
+        //              dependent);
         break;
       }
       case LoadAttrKind::kInstanceFunction:
@@ -3793,7 +3798,7 @@ HANDLER_INLINE Continue Interpreter::doLoadAttrInstanceOverflow(Thread* thread,
   RawObject cached =
       icLookupMonomorphic(caches, cache, receiver.layoutId(), &is_found);
   if (!is_found) {
-    EVENT_CACHE(LOAD_ATTR_INSTANCE);
+    EVENT_CACHE(LOAD_ATTR_INSTANCE_OVERFLOW);
     return Interpreter::loadAttrUpdateCache(thread, arg, cache);
   }
   CHECK(cached.isSmallInt(), "expected smallint");
