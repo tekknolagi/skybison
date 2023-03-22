@@ -16,9 +16,6 @@ class __attribute__((warn_unused)) Borrowed {
   explicit Borrowed(PyObject* obj) : obj_(obj) {}
   PyObject* get() const { return obj_; }
 
-  // disable assignment
-  void operator=(const Borrowed&) = delete;
-
  private:
   PyObject* obj_ = nullptr;
 };
