@@ -90,7 +90,10 @@ _setException(PyObject *exc)
     ERR_clear_error();
 
     lib = ERR_lib_error_string(errcode);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     func = ERR_func_error_string(errcode);
+#pragma GCC diagnostic pop
     reason = ERR_reason_error_string(errcode);
 
     if (lib && func) {
@@ -465,7 +468,10 @@ EVP_get_digest_size(EVPobject *self, void *closure)
 static PyObject *
 EVP_get_name(EVPobject *self, void *closure)
 {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     return py_digest_name(EVP_MD_CTX_md(self->ctx));
+#pragma GCC diagnostic pop
 }
 
 static PyGetSetDef EVP_getseters[] = {
@@ -489,7 +495,10 @@ static PyObject *
 EVP_repr(EVPobject *self)
 {
     PyObject *name_obj, *repr;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     name_obj = py_digest_name(EVP_MD_CTX_md(self->ctx));
+#pragma GCC diagnostic pop
     if (!name_obj) {
         return NULL;
     }

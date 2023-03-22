@@ -177,7 +177,10 @@ RawObject FUNC(_signal, siginterrupt)(Thread* thread, Arguments args) {
     return thread->raiseWithFmt(LayoutId::kValueError,
                                 "signal number out of range");
   }
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
   word result = ::siginterrupt(signalnum, flag);
+#pragma GCC diagnostic pop
   if (result < 0) {
     return thread->raiseOSErrorFromErrno(-result);
   }
