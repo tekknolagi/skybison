@@ -600,13 +600,16 @@ TEST_F(FloatBuiltinsTest, DunderGeWithSmallIntExactReturnsBool) {
 
 TEST_F(FloatBuiltinsTest, DunderGeWithSmallIntInexactReturnsBool) {
   HandleScope scope(thread_);
-  Object float0(&scope, runtime_->newFloat(0x20000000000001));
+  Object float0(&scope,
+                runtime_->newFloat(static_cast<double>(0x20000000000001)));
   Object int0(&scope, runtime_->newInt(0x20000000000001));
   EXPECT_EQ(runBuiltin(METH(float, __ge__), float0, int0), Bool::falseObj());
-  Object float1(&scope, runtime_->newFloat(0x20000000000003));
+  Object float1(&scope,
+                runtime_->newFloat(static_cast<double>(0x20000000000003)));
   Object int1(&scope, runtime_->newInt(0x20000000000003));
   EXPECT_EQ(runBuiltin(METH(float, __ge__), float1, int1), Bool::trueObj());
-  Object float2(&scope, runtime_->newFloat(0x100000000000011));
+  Object float2(&scope,
+                runtime_->newFloat(static_cast<double>(0x100000000000011)));
   Object int2(&scope, runtime_->newInt(0x100000000000011));
   EXPECT_EQ(runBuiltin(METH(float, __ge__), float2, int2), Bool::falseObj());
 }
@@ -956,13 +959,16 @@ TEST_F(FloatBuiltinsTest, DunderLtWithSmallIntExactReturnsBool) {
 
 TEST_F(FloatBuiltinsTest, DunderLtWithSmallIntInexactReturnsBool) {
   HandleScope scope(thread_);
-  Object float0(&scope, runtime_->newFloat(0x20000000000001));
+  Object float0(&scope,
+                runtime_->newFloat(static_cast<double>(0x20000000000001)));
   Object int0(&scope, runtime_->newInt(0x20000000000001));
   EXPECT_EQ(runBuiltin(METH(float, __lt__), float0, int0), Bool::trueObj());
-  Object float1(&scope, runtime_->newFloat(0x20000000000003));
+  Object float1(&scope,
+                runtime_->newFloat(static_cast<double>(0x20000000000003)));
   Object int1(&scope, runtime_->newInt(0x20000000000003));
   EXPECT_EQ(runBuiltin(METH(float, __lt__), float1, int1), Bool::falseObj());
-  Object float2(&scope, runtime_->newFloat(0x100000000000011));
+  Object float2(&scope,
+                runtime_->newFloat(static_cast<double>(0x100000000000011)));
   Object int2(&scope, runtime_->newInt(0x100000000000011));
   EXPECT_EQ(runBuiltin(METH(float, __lt__), float2, int2), Bool::trueObj());
 }
