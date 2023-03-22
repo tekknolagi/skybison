@@ -817,7 +817,7 @@ static bool strInternConstant(Thread* thread, Object* object) {
     Object value(&scope, NoneType::object());
     Object hash(&scope, NoneType::object());
     bool modified = false;
-    for (word j = 0, idx = 0; setNextItem(set, &idx, &value); j++) {
+    for (word idx = 0; setNextItem(set, &idx, &value);) {
       if (strInternConstant(thread, &value)) {
         modified = true;
       }
