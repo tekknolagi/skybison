@@ -195,6 +195,23 @@ class TestBenchmark(unittest.TestCase):
         single_result = json_output[0]
         self.assertEqual(single_result["benchmark"], "bench_pickle")
 
+    def test_choose_loadproperty_benchmark(self):
+        arguments = [
+            "-i",
+            "fbcode-python",
+            "-p",
+            BENCHMARKS_PATH,
+            "-b",
+            "loadproperty",
+            "-t",
+            "time",
+            "--json",
+        ]
+        json_output = json.loads(run.main(arguments))
+        self.assertEqual(len(json_output), 1)
+        single_result = json_output[0]
+        self.assertEqual(single_result["benchmark"], "loadproperty")
+
     def test_choose_multiple_benchmarks(self):
         arguments = [
             "-i",
