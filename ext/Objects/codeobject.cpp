@@ -221,7 +221,7 @@ static RawObject constantKey(Thread* thread, const Object& obj) {
     Object item(&scope, NoneType::object());
     Object item_key(&scope, NoneType::object());
     Object hash_obj(&scope, NoneType::object());
-    for (word j = 0, idx = 0; setNextItem(set, &idx, &item); j++) {
+    for (word idx = 0; setNextItem(set, &idx, &item);) {
       item_key = constantKey(thread, item);
       if (item_key.isError()) return *item_key;
       hash_obj = Interpreter::hash(thread, item_key);

@@ -684,6 +684,7 @@ TEST_F(ObjectExtensionApiTest, IncrementDecrementRefCountWithPyObjectPtr) {
     EXPECT_EQ(Py_REFCNT(o), refcnt + 1);
     testing::PyObjectPtr h(o);
     h = nullptr;
+    static_cast<void>(h);
     EXPECT_EQ(Py_REFCNT(o), refcnt);
   }
   Py_DECREF(o);

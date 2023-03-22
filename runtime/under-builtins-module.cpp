@@ -4080,6 +4080,8 @@ RawObject FUNC(_builtins, _object_keys)(Thread* thread, Arguments args) {
   word result_length = in_object_length;
   if (layout.hasTupleOverflow()) {
     result_length += Tuple::cast(layout.overflowAttributes()).length();
+    // TODO(emacs): Pre-size the tuple in `result' to be result_length.
+    static_cast<void>(result_length);
   }
   for (word i = 0; i < in_object_length; i++) {
     Tuple pair(&scope, in_object.at(i));

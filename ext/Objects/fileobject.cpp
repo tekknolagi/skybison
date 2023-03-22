@@ -116,30 +116,26 @@ PY_EXPORT char* Py_UniversalNewlineFgets(char* buf, int buf_size, FILE* stream,
   char* ptr = buf;
   bool skipnextlf = false;
   for (char ch; --buf_size > 0 && (ch = std::getc(stream)) != EOF;) {
-    int newlinetypes = 0;
     if (skipnextlf) {
       skipnextlf = false;
       if (ch == '\n') {
         // Seeing a \n here with skipnextlf true means we saw a \r before.
-        newlinetypes |= Newline::CRLF;
         ch = std::getc(stream);
         if (ch == EOF) break;
       } else {
         // Note that c == EOF also brings us here, so we're okay
         // if the last char in the file is a CR.
-        newlinetypes |= Newline::CR;
       }
     }
     if (ch == '\r') {
       // A \r is translated into a \n, and we skip  an adjacent \n, if any.
-      // We don't set the newlinetypes flag until we've seen the next char.
       skipnextlf = true;
       ch = '\n';
-    } else if (ch == '\n') {
-      newlinetypes |= Newline::LF;
     }
     *ptr++ = ch;
-    if (ch == '\n') break;
+    if (ch == '\n') {
+      break;
+    }
   }
   *ptr = '\0';
   if (skipnextlf) {
