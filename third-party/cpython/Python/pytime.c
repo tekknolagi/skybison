@@ -151,7 +151,10 @@ _PyTime_DoubleToDenominator(double d, time_t *sec, long *numerator,
     }
     assert(0.0 <= floatpart && floatpart < denominator);
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wimplicit-const-int-float-conversion"
     if (!_Py_InIntegralTypeRange(time_t, intpart)) {
+#pragma clang diagnostic pop
         error_time_t_overflow();
         return -1;
     }
@@ -204,7 +207,10 @@ _PyTime_ObjectToTime_t(PyObject *obj, time_t *sec, _PyTime_round_t round)
         d = _PyTime_Round(d, round);
         (void)modf(d, &intpart);
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wimplicit-const-int-float-conversion"
         if (!_Py_InIntegralTypeRange(time_t, intpart)) {
+#pragma clang diagnostic pop
             error_time_t_overflow();
             return -1;
         }
@@ -389,7 +395,10 @@ _PyTime_FromDouble(_PyTime_t *t, double value, _PyTime_round_t round,
     d *= (double)unit_to_ns;
     d = _PyTime_Round(d, round);
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wimplicit-const-int-float-conversion"
     if (!_Py_InIntegralTypeRange(_PyTime_t, d)) {
+#pragma clang diagnostic pop
         _PyTime_overflow();
         return -1;
     }

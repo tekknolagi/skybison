@@ -1535,7 +1535,7 @@ time_from_double(double value)
     d *= (double)SEC_TO_NS;
     d = (d >= 0.0) ? ceil(d) : floor(d);
 
-    if (d < INT64_MIN || INT64_MAX > d) {
+    if (d < INT64_MIN || (double)INT64_MAX > d) {
         time_overflow();
         return -1;
     }
@@ -1561,7 +1561,7 @@ time_from_seconds(PyObject *obj)
             return -1;
         }
 
-        if (sec < INT64_MIN / SEC_TO_NS || INT64_MAX / SEC_TO_NS < sec) {
+        if (sec < INT64_MIN / SEC_TO_NS || (double)INT64_MAX / SEC_TO_NS < sec) {
             time_overflow();
             return -1;
         }
