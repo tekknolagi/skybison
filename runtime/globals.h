@@ -98,7 +98,7 @@ const word kHashImag = 1000003;
 #endif
 
 #if __GNUG__ && __GNUC__ < 5
-#define IS_TRIVIALLY_COPYABLE(T) __has_trivial_copy(T)
+#define IS_TRIVIALLY_COPYABLE(T) __is_trivially_copyable(T)
 #else
 #define IS_TRIVIALLY_COPYABLE(T) std::is_trivially_copyable<T>::value
 #endif
