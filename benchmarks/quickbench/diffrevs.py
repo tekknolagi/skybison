@@ -13,7 +13,7 @@ def run_benchmarks(revs, revnames, args):
     rev_samples = []
     for rev in revs:
         cmd = [f"{SCRIPT_PATH}/benchmark_rev.py", *args.benchmark_rev_args, rev]
-        proc = run(cmd, stdout=subprocess.PIPE)
+        proc = run(cmd)
         try:
             samples = json.loads(proc.stdout)
             rev_samples.append(samples)
