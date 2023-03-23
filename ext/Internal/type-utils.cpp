@@ -55,7 +55,7 @@ static ALIGN_16 RawObject getterWrapper(Thread* thread, Arguments args) {
   void* closure = getset->closure;
   PyObject* self = ApiHandle::newReference(thread->runtime(), args.get(0));
   PyObject* result = (*func)(self, closure);
-  ApiHandle::fromPyObject(self)->decref();
+  ApiHandle::decref(ApiHandle::fromPyObject(self));
   return ApiHandle::checkFunctionResult(thread, result);
 }
 
@@ -85,8 +85,8 @@ static ALIGN_16 RawObject setterWrapper(Thread* thread, Arguments args) {
   PyObject* self = ApiHandle::newReference(runtime, args.get(0));
   PyObject* value = ApiHandle::newReference(runtime, args.get(1));
   int result = func(self, value, closure);
-  ApiHandle::fromPyObject(self)->decref();
-  ApiHandle::fromPyObject(value)->decref();
+  ApiHandle::decref(ApiHandle::fromPyObject(self));
+  ApiHandle::decref(ApiHandle::fromPyObject(value));
   if (result < 0) return Error::exception();
   return NoneType::object();
 }

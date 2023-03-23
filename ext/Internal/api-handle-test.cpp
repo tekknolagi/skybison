@@ -61,12 +61,12 @@ TEST_F(ApiHandleTest, ManagedObjectHandleWithRefcountZeroIsDisposed) {
   Object object(&scope, runtime_->newStrFromCStr("hello world"));
 
   ApiHandle* handle = ApiHandle::newReference(runtime_, *object);
-  ASSERT_FALSE(handle->isImmediate());
-  ASSERT_FALSE(handle->isBorrowedNoImmediate());
-  EXPECT_EQ(handle->refcnt(), 1);
+  ASSERT_FALSE(ApiHandle::isImmediate(handle));
+  ASSERT_FALSE(ApiHandle::isBorrowedNoImmediate(handle));
+  EXPECT_EQ(ApiHandle::refcnt(handle), 1);
 
   EXPECT_EQ(findHandleMatching(runtime_, "hello world"), handle);
-  handle->decref();
+  ApiHandle::decref(handle);
   EXPECT_EQ(findHandleMatching(runtime_, "hello world"), nullptr);
 }
 
@@ -75,14 +75,14 @@ TEST_F(ApiHandleTest, ManagedObjectHandleWithRefcountZeroAfterGCIsDisposed) {
   Object object(&scope, runtime_->newStrFromCStr("hello world"));
 
   ApiHandle* handle = ApiHandle::newReference(runtime_, *object);
-  ASSERT_FALSE(handle->isImmediate());
-  ASSERT_FALSE(handle->isBorrowedNoImmediate());
-  EXPECT_EQ(handle->refcnt(), 1);
+  ASSERT_FALSE(ApiHandle::isImmediate(handle));
+  ASSERT_FALSE(ApiHandle::isBorrowedNoImmediate(handle));
+  EXPECT_EQ(ApiHandle::refcnt(handle), 1);
 
   EXPECT_EQ(findHandleMatching(runtime_, "hello world"), handle);
   runtime_->collectGarbage();
   EXPECT_EQ(findHandleMatching(runtime_, "hello world"), handle);
-  handle->decref();
+  ApiHandle::decref(handle);
   EXPECT_EQ(findHandleMatching(runtime_, "hello world"), nullptr);
 }
 
@@ -91,9 +91,9 @@ TEST_F(ApiHandleTest, ManagedObjectHandleBorrowedIsNotDisposed) {
   Object object(&scope, runtime_->newStrFromCStr("hello world"));
 
   ApiHandle* handle = ApiHandle::borrowedReference(runtime_, *object);
-  ASSERT_FALSE(handle->isImmediate());
-  ASSERT_TRUE(handle->isBorrowedNoImmediate());
-  EXPECT_EQ(handle->refcnt(), 0);
+  ASSERT_FALSE(ApiHandle::isImmediate(handle));
+  ASSERT_TRUE(ApiHandle::isBorrowedNoImmediate(handle));
+  EXPECT_EQ(ApiHandle::refcnt(handle), 0);
 
   EXPECT_EQ(findHandleMatching(runtime_, "hello world"), handle);
   runtime_->collectGarbage();
@@ -105,9 +105,9 @@ TEST_F(ApiHandleTest, ManagedObjectHandleBorrowedIsDisposedByGC) {
   Object object(&scope, runtime_->newStrFromCStr("hello world"));
 
   ApiHandle* handle = ApiHandle::borrowedReference(runtime_, *object);
-  ASSERT_FALSE(handle->isImmediate());
-  ASSERT_TRUE(handle->isBorrowedNoImmediate());
-  EXPECT_EQ(handle->refcnt(), 0);
+  ASSERT_FALSE(ApiHandle::isImmediate(handle));
+  ASSERT_TRUE(ApiHandle::isBorrowedNoImmediate(handle));
+  EXPECT_EQ(ApiHandle::refcnt(handle), 0);
 
   EXPECT_EQ(findHandleMatching(runtime_, "hello world"), handle);
   object = NoneType::object();
@@ -120,23 +120,23 @@ TEST_F(ApiHandleTest, ManagedObjectHandleCachedIsDisposedByGC) {
   Object object(&scope, runtime_->newStrFromCStr("hello world"));
 
   ApiHandle* handle = ApiHandle::newReference(runtime_, *object);
-  ASSERT_FALSE(handle->isImmediate());
-  ASSERT_FALSE(handle->isBorrowedNoImmediate());
-  ASSERT_EQ(handle->refcnt(), 1);
+  ASSERT_FALSE(ApiHandle::isImmediate(handle));
+  ASSERT_FALSE(ApiHandle::isBorrowedNoImmediate(handle));
+  ASSERT_EQ(ApiHandle::refcnt(handle), 1);
 
   EXPECT_EQ(capiCaches(runtime_)->at(*object), nullptr);
   const char* as_utf8 = PyUnicode_AsUTF8(handle);
   EXPECT_EQ(capiCaches(runtime_)->at(*object), as_utf8);
-  EXPECT_TRUE(handle->isBorrowedNoImmediate());
-  handle->decref();
-  ASSERT_EQ(handle->refcnt(), 0);
+  EXPECT_TRUE(ApiHandle::isBorrowedNoImmediate(handle));
+  ApiHandle::decref(handle);
+  ASSERT_EQ(ApiHandle::refcnt(handle), 0);
   EXPECT_EQ(findHandleMatching(runtime_, "hello world"), handle);
 
   // Check that handle is not disposed while still references by `object`.
   runtime_->collectGarbage();
 
   EXPECT_EQ(capiCaches(runtime_)->at(*object), as_utf8);
-  EXPECT_TRUE(handle->isBorrowedNoImmediate());
+  EXPECT_TRUE(ApiHandle::isBorrowedNoImmediate(handle));
   EXPECT_EQ(std::strcmp(as_utf8, "hello world"), 0);
   EXPECT_EQ(findHandleMatching(runtime_, "hello world"), handle);
 
@@ -152,19 +152,19 @@ TEST_F(ApiHandleTest, BorrowedApiHandles) {
   // Create a new object and a new reference to that object.
   Object obj(&scope, runtime_->newList());
   ApiHandle* new_ref = ApiHandle::newReference(runtime_, *obj);
-  word refcnt = new_ref->refcnt();
+  word refcnt = ApiHandle::refcnt(new_ref);
 
   // Create a borrowed reference to the same object.  This should not affect the
   // reference count of the handle.
   ApiHandle* borrowed_ref = ApiHandle::borrowedReference(runtime_, *obj);
   EXPECT_EQ(borrowed_ref, new_ref);
-  EXPECT_EQ(borrowed_ref->refcnt(), refcnt);
+  EXPECT_EQ(ApiHandle::refcnt(borrowed_ref), refcnt);
 
   // Create another new reference.  This should increment the reference count
   // of the handle.
   ApiHandle* another_ref = ApiHandle::newReference(runtime_, *obj);
   EXPECT_EQ(another_ref, new_ref);
-  EXPECT_EQ(another_ref->refcnt(), refcnt + 1);
+  EXPECT_EQ(ApiHandle::refcnt(another_ref), refcnt + 1);
 }
 
 TEST_F(ApiHandleTest, BuiltinHeapAllocatedIntObjectReturnsApiHandle) {
@@ -172,10 +172,10 @@ TEST_F(ApiHandleTest, BuiltinHeapAllocatedIntObjectReturnsApiHandle) {
   Object obj(&scope, runtime_->newInt(SmallInt::kMaxValue + 1));
   ApiHandle* handle = ApiHandle::newReference(runtime_, *obj);
   EXPECT_NE(handle, nullptr);
-  EXPECT_FALSE(handle->isImmediate());
+  EXPECT_FALSE(ApiHandle::isImmediate(handle));
   ApiHandleDict* dict = capiHandles(runtime_);
   EXPECT_EQ(dict->at(*obj), handle);
-  handle->decref();
+  ApiHandle::decref(handle);
 }
 
 TEST_F(ApiHandleTest, BuiltinImmediateIntObjectReturnsImmediateApiHandle) {
@@ -183,10 +183,10 @@ TEST_F(ApiHandleTest, BuiltinImmediateIntObjectReturnsImmediateApiHandle) {
   Object obj(&scope, runtime_->newInt(1));
   ApiHandle* handle = ApiHandle::newReference(runtime_, *obj);
   EXPECT_NE(handle, nullptr);
-  EXPECT_TRUE(handle->isImmediate());
+  EXPECT_TRUE(ApiHandle::isImmediate(handle));
   ApiHandleDict* dict = capiHandles(runtime_);
   EXPECT_EQ(dict->at(*obj), nullptr);
-  handle->decref();
+  ApiHandle::decref(handle);
 }
 
 TEST_F(ApiHandleTest, BuiltinImmediateTrueObjectReturnsImmediateApiHandle) {
@@ -194,10 +194,10 @@ TEST_F(ApiHandleTest, BuiltinImmediateTrueObjectReturnsImmediateApiHandle) {
   Object obj(&scope, Bool::trueObj());
   ApiHandle* handle = ApiHandle::newReference(runtime_, *obj);
   EXPECT_NE(handle, nullptr);
-  EXPECT_TRUE(handle->isImmediate());
+  EXPECT_TRUE(ApiHandle::isImmediate(handle));
   ApiHandleDict* dict = capiHandles(runtime_);
   EXPECT_EQ(dict->at(*obj), nullptr);
-  handle->decref();
+  ApiHandle::decref(handle);
 }
 
 TEST_F(ApiHandleTest, BuiltinImmediateFalseObjectReturnsImmediateApiHandle) {
@@ -205,10 +205,10 @@ TEST_F(ApiHandleTest, BuiltinImmediateFalseObjectReturnsImmediateApiHandle) {
   Object obj(&scope, Bool::falseObj());
   ApiHandle* handle = ApiHandle::newReference(runtime_, *obj);
   EXPECT_NE(handle, nullptr);
-  EXPECT_TRUE(handle->isImmediate());
+  EXPECT_TRUE(ApiHandle::isImmediate(handle));
   ApiHandleDict* dict = capiHandles(runtime_);
   EXPECT_EQ(dict->at(*obj), nullptr);
-  handle->decref();
+  ApiHandle::decref(handle);
 }
 
 TEST_F(ApiHandleTest,
@@ -217,10 +217,10 @@ TEST_F(ApiHandleTest,
   Object obj(&scope, NotImplementedType::object());
   ApiHandle* handle = ApiHandle::newReference(runtime_, *obj);
   EXPECT_NE(handle, nullptr);
-  EXPECT_TRUE(handle->isImmediate());
+  EXPECT_TRUE(ApiHandle::isImmediate(handle));
   ApiHandleDict* dict = capiHandles(runtime_);
   EXPECT_EQ(dict->at(*obj), nullptr);
-  handle->decref();
+  ApiHandle::decref(handle);
 }
 
 TEST_F(ApiHandleTest, BuiltinImmediateUnboundObjectReturnsImmediateApiHandle) {
@@ -228,10 +228,10 @@ TEST_F(ApiHandleTest, BuiltinImmediateUnboundObjectReturnsImmediateApiHandle) {
   Object obj(&scope, Unbound::object());
   ApiHandle* handle = ApiHandle::newReference(runtime_, *obj);
   EXPECT_NE(handle, nullptr);
-  EXPECT_TRUE(handle->isImmediate());
+  EXPECT_TRUE(ApiHandle::isImmediate(handle));
   ApiHandleDict* dict = capiHandles(runtime_);
   EXPECT_EQ(dict->at(*obj), nullptr);
-  handle->decref();
+  ApiHandle::decref(handle);
 }
 
 TEST_F(ApiHandleTest, ApiHandleReturnsBuiltinIntObject) {
@@ -239,7 +239,7 @@ TEST_F(ApiHandleTest, ApiHandleReturnsBuiltinIntObject) {
 
   Object obj(&scope, runtime_->newInt(1));
   ApiHandle* handle = ApiHandle::newReference(runtime_, *obj);
-  Object handle_obj(&scope, handle->asObject());
+  Object handle_obj(&scope, ApiHandle::asObject(handle));
   EXPECT_TRUE(isIntEqualsWord(*handle_obj, 1));
 }
 
@@ -268,7 +268,7 @@ TEST_F(ApiHandleTest, ApiHandleReturnsBuiltinObject) {
   HandleScope scope(thread_);
   Object obj(&scope, runtime_->newList());
   ApiHandle* handle = ApiHandle::newReference(runtime_, *obj);
-  Object handle_obj(&scope, handle->asObject());
+  Object handle_obj(&scope, ApiHandle::asObject(handle));
   EXPECT_TRUE(handle_obj.isList());
 }
 
@@ -299,7 +299,7 @@ TEST_F(ApiHandleTest, RuntimeInstanceObjectReturnsPyObject) {
   PyObject* result = ApiHandle::newReference(runtime_, *instance);
   ASSERT_NE(result, nullptr);
 
-  Object obj(&scope, ApiHandle::fromPyObject(result)->asObject());
+  Object obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(result)));
   EXPECT_EQ(*obj, *instance);
 }
 
@@ -344,33 +344,33 @@ TEST_F(ApiHandleTest, Cache) {
   HandleScope scope(thread_);
 
   auto handle1 = ApiHandle::newReference(runtime_, runtime_->newList());
-  EXPECT_EQ(handle1->cache(runtime_), nullptr);
+  EXPECT_EQ(ApiHandle::cache(runtime_, handle1), nullptr);
 
   Str str(&scope,
           runtime_->newStrFromCStr("this is too long for a RawSmallStr"));
   auto handle2 = ApiHandle::newReference(runtime_, *str);
-  EXPECT_EQ(handle2->cache(runtime_), nullptr);
+  EXPECT_EQ(ApiHandle::cache(runtime_, handle2), nullptr);
 
   void* buffer1 = std::malloc(16);
-  handle1->setCache(runtime_, buffer1);
-  EXPECT_EQ(handle1->cache(runtime_), buffer1);
-  EXPECT_EQ(handle2->cache(runtime_), nullptr);
+  ApiHandle::setCache(runtime_, handle1, buffer1);
+  EXPECT_EQ(ApiHandle::cache(runtime_, handle1), buffer1);
+  EXPECT_EQ(ApiHandle::cache(runtime_, handle2), nullptr);
 
   void* buffer2 = std::malloc(16);
-  handle2->setCache(runtime_, buffer2);
-  EXPECT_EQ(handle2->cache(runtime_), buffer2);
-  EXPECT_EQ(handle1->cache(runtime_), buffer1);
+  ApiHandle::setCache(runtime_, handle2, buffer2);
+  EXPECT_EQ(ApiHandle::cache(runtime_, handle2), buffer2);
+  EXPECT_EQ(ApiHandle::cache(runtime_, handle1), buffer1);
 
-  handle1->setCache(runtime_, buffer2);
-  handle2->setCache(runtime_, buffer1);
-  EXPECT_EQ(handle1->cache(runtime_), buffer2);
-  EXPECT_EQ(handle2->cache(runtime_), buffer1);
+  ApiHandle::setCache(runtime_, handle1, buffer2);
+  ApiHandle::setCache(runtime_, handle2, buffer1);
+  EXPECT_EQ(ApiHandle::cache(runtime_, handle1), buffer2);
+  EXPECT_EQ(ApiHandle::cache(runtime_, handle2), buffer1);
 
-  Object key(&scope, handle1->asObject());
-  handle1->disposeWithRuntime(runtime_);
+  Object key(&scope, ApiHandle::asObject(handle1));
+  ApiHandle::disposeWithRuntime(runtime_, handle1);
   ApiHandleDict* caches = capiCaches(runtime_);
   EXPECT_FALSE(caches->at(*key) != nullptr);
-  EXPECT_EQ(handle2->cache(runtime_), buffer1);
+  EXPECT_EQ(ApiHandle::cache(runtime_, handle2), buffer1);
 }
 
 TEST_F(ApiHandleTest, VisitApiHandlesVisitsAllHandles) {
@@ -406,7 +406,7 @@ TEST_F(ApiHandleTest, VisitApiHandlesVisitsAllHandles) {
 
   EXPECT_EQ(visitor.obj0_handle, handle0);
   EXPECT_EQ(visitor.obj1_handle, handle1);
-  handle0->decref();
+  ApiHandle::decref(handle0);
 }
 
 TEST_F(CApiHandlesDeathTest, CleanupApiHandlesOnExit) {

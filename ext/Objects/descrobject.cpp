@@ -20,7 +20,7 @@ PY_EXPORT PyTypeObject* PyDictProxy_Type_Ptr() {
 PY_EXPORT PyObject* PyDescr_NAME_Func(PyObject* obj) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object descr_obj(&scope, ApiHandle::fromPyObject(obj)->asObject());
+  Object descr_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
   Runtime* runtime = thread->runtime();
   if (descr_obj.isFunction()) {
     // Method
@@ -68,7 +68,7 @@ PY_EXPORT PyObject* PyDescr_NewClassMethod(PyTypeObject* type,
   Object name(&scope, Runtime::internStrFromCStr(thread, method->ml_name));
   Object type_obj(
       &scope,
-      ApiHandle::fromPyObject(reinterpret_cast<PyObject*>(type))->asObject());
+      ApiHandle::asObject(ApiHandle::fromPyObject(reinterpret_cast<PyObject*>(type))));
   return ApiHandle::newReferenceWithManaged(
       thread->runtime(), newClassMethod(thread, method, name, type_obj));
 }
@@ -76,7 +76,7 @@ PY_EXPORT PyObject* PyDescr_NewClassMethod(PyTypeObject* type,
 PY_EXPORT PyObject* PyDictProxy_New(PyObject* mapping) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object mapping_obj(&scope, ApiHandle::fromPyObject(mapping)->asObject());
+  Object mapping_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(mapping)));
   Object result(&scope, thread->invokeFunction1(ID(builtins), ID(mappingproxy),
                                                 mapping_obj));
   if (result.isError()) return nullptr;
@@ -102,7 +102,7 @@ PY_EXPORT PyObject* PyDescr_NewMethod(PyTypeObject* type, PyMethodDef* method) {
   Object name(&scope, Runtime::internStrFromCStr(thread, method->ml_name));
   Object type_obj(
       &scope,
-      ApiHandle::fromPyObject(reinterpret_cast<PyObject*>(type))->asObject());
+      ApiHandle::asObject(ApiHandle::fromPyObject(reinterpret_cast<PyObject*>(type))));
   return ApiHandle::newReferenceWithManaged(
       thread->runtime(), newMethod(thread, method, name, type_obj));
 }

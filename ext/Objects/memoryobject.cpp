@@ -7,7 +7,7 @@
 namespace py {
 
 PY_EXPORT int PyMemoryView_Check_Func(PyObject* obj) {
-  return ApiHandle::fromPyObject(obj)->asObject().isMemoryView();
+  return ApiHandle::asObject(ApiHandle::fromPyObject(obj)).isMemoryView();
 }
 
 PY_EXPORT PyObject* PyMemoryView_FromMemory(char* memory, Py_ssize_t size,
@@ -29,7 +29,7 @@ PY_EXPORT PyObject* PyMemoryView_FromMemory(char* memory, Py_ssize_t size,
 PY_EXPORT PyObject* PyMemoryView_FromObject(PyObject* obj) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object object(&scope, ApiHandle::fromPyObject(obj)->asObject());
+  Object object(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
   Object result(&scope,
                 thread->invokeFunction1(ID(builtins), ID(memoryview), object));
   if (result.isError()) {

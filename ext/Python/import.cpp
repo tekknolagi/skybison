@@ -17,7 +17,7 @@ PY_EXPORT PyObject* PyImport_GetModule(PyObject* name) {
   HandleScope scope(thread);
   Runtime* runtime = thread->runtime();
   Object modules(&scope, runtime->modules());
-  Object name_obj(&scope, ApiHandle::fromPyObject(name)->asObject());
+  Object name_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(name)));
   if (modules.isDict()) {
     Dict modules_dict(&scope, *modules);
     Object hash_obj(&scope, Interpreter::hash(thread, name_obj));
@@ -63,7 +63,7 @@ PY_EXPORT PyObject* PyImport_ImportModuleLevelObject(PyObject* name,
     return nullptr;
   }
   HandleScope scope(thread);
-  Object globals_obj(&scope, ApiHandle::fromPyObject(globals)->asObject());
+  Object globals_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(globals)));
   Runtime* runtime = thread->runtime();
   if (!runtime->isInstanceOfDict(*globals_obj)) {
     thread->raiseWithFmt(LayoutId::kTypeError, "globals must be a dict");
@@ -74,12 +74,12 @@ PY_EXPORT PyObject* PyImport_ImportModuleLevelObject(PyObject* name,
   Object fromlist_obj(&scope,
                       fromlist == nullptr
                           ? runtime->emptyTuple()
-                          : ApiHandle::fromPyObject(fromlist)->asObject());
+                          : ApiHandle::asObject(ApiHandle::fromPyObject(fromlist)));
 
-  Object name_obj(&scope, ApiHandle::fromPyObject(name)->asObject());
+  Object name_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(name)));
   Object locals_obj(&scope, locals == nullptr
                                 ? NoneType::object()
-                                : ApiHandle::fromPyObject(locals)->asObject());
+                                : ApiHandle::asObject(ApiHandle::fromPyObject(locals)));
   Object result(&scope, thread->invokeFunction5(
                             ID(_frozen_importlib), ID(__import__), name_obj,
                             globals_obj, locals_obj, fromlist_obj, level_obj));
@@ -101,7 +101,7 @@ PY_EXPORT PyObject* PyImport_AddModuleObject(PyObject* name) {
   HandleScope scope(thread);
 
   Dict modules_dict(&scope, runtime->modules());
-  Object name_obj(&scope, ApiHandle::fromPyObject(name)->asObject());
+  Object name_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(name)));
   Object hash_obj(&scope, Interpreter::hash(thread, name_obj));
   if (hash_obj.isErrorException()) return nullptr;
   word hash = SmallInt::cast(*hash_obj).value();
@@ -227,7 +227,7 @@ PY_EXPORT PyObject* PyImport_Import(PyObject* module_name) {
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
 
-  Object name_obj(&scope, ApiHandle::fromPyObject(module_name)->asObject());
+  Object name_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(module_name)));
   Object globals_obj(&scope, NoneType::object());
   Frame* current_frame = thread->currentFrame();
   if (current_frame->isSentinel()) {

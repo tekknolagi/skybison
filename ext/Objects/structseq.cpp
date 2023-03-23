@@ -19,7 +19,7 @@ PY_EXPORT PyObject* PyStructSequence_GET_ITEM_Func(PyObject* structseq,
                                                    Py_ssize_t pos) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object structseq_obj(&scope, ApiHandle::fromPyObject(structseq)->asObject());
+  Object structseq_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(structseq)));
   Object result(&scope, structseqGetItem(thread, structseq_obj, pos));
   return result.isUnbound()
              ? nullptr
@@ -42,17 +42,17 @@ PY_EXPORT void PyStructSequence_SetItem(PyObject* structseq, Py_ssize_t pos,
                                         PyObject* value) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object structseq_obj(&scope, ApiHandle::fromPyObject(structseq)->asObject());
+  Object structseq_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(structseq)));
   Object value_obj(&scope, value == nullptr
                                ? Unbound::object()
-                               : ApiHandle::fromPyObject(value)->asObject());
+                               : ApiHandle::asObject(ApiHandle::fromPyObject(value)));
   structseqSetItem(thread, structseq_obj, pos, value_obj);
 }
 
 PY_EXPORT PyObject* PyStructSequence_New(PyTypeObject* pytype) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Type type(&scope, ApiHandle::fromPyTypeObject(pytype)->asObject());
+  Type type(&scope, ApiHandle::asObject(ApiHandle::fromPyTypeObject(pytype)));
   Object result(&scope, structseqNew(thread, type));
   if (result.isErrorException()) return nullptr;
   return ApiHandle::newReferenceWithManaged(thread->runtime(), *result);

@@ -19,7 +19,7 @@ PY_EXPORT PyObject* _PyNamespace_New(PyObject* kwds) {
                                                     ID(SimpleNamespace)));
     thread->stackPush(*type);
     thread->stackPush(runtime->emptyTuple());
-    thread->stackPush(ApiHandle::fromPyObject(kwds)->asObject());
+    thread->stackPush(ApiHandle::asObject(ApiHandle::fromPyObject(kwds)));
     result = Interpreter::callEx(thread, CallFunctionExFlag::VAR_KEYWORDS);
   }
   if (result.isError()) {

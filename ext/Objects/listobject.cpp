@@ -43,12 +43,12 @@ PY_EXPORT PyTypeObject* PyList_Type_Ptr() {
 }
 
 PY_EXPORT int PyList_CheckExact_Func(PyObject* obj) {
-  return ApiHandle::fromPyObject(obj)->asObject().isList();
+  return ApiHandle::asObject(ApiHandle::fromPyObject(obj)).isList();
 }
 
 PY_EXPORT int PyList_Check_Func(PyObject* obj) {
   return Thread::current()->runtime()->isInstanceOfList(
-      ApiHandle::fromPyObject(obj)->asObject());
+      ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
 }
 
 PY_EXPORT PyObject* PyList_AsTuple(PyObject* pylist) {
@@ -59,7 +59,7 @@ PY_EXPORT PyObject* PyList_AsTuple(PyObject* pylist) {
     thread->raiseBadInternalCall();
     return nullptr;
   }
-  Object list_obj(&scope, ApiHandle::fromPyObject(pylist)->asObject());
+  Object list_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pylist)));
   if (!runtime->isInstanceOfList(*list_obj)) {
     thread->raiseBadInternalCall();
     return nullptr;
@@ -78,7 +78,7 @@ PY_EXPORT PyObject* PyList_GetItem(PyObject* pylist, Py_ssize_t i) {
   Thread* thread = Thread::current();
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
-  Object list_obj(&scope, ApiHandle::fromPyObject(pylist)->asObject());
+  Object list_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pylist)));
   if (!runtime->isInstanceOfList(*list_obj)) {
     thread->raiseBadInternalCall();
     return nullptr;
@@ -100,7 +100,7 @@ PY_EXPORT int PyList_Reverse(PyObject* pylist) {
   }
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
-  Object list_obj(&scope, ApiHandle::fromPyObject(pylist)->asObject());
+  Object list_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pylist)));
   if (!runtime->isInstanceOfList(*list_obj)) {
     thread->raiseBadInternalCall();
     return -1;
@@ -115,7 +115,7 @@ PY_EXPORT int PyList_SET_ITEM_Func(PyObject* pylist, Py_ssize_t i,
   Thread* thread = Thread::current();
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
-  Object list_obj(&scope, ApiHandle::fromPyObject(pylist)->asObject());
+  Object list_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pylist)));
   DCHECK(runtime->isInstanceOfList(*list_obj), "pylist must be a list");
   List list(&scope, *list_obj);
   DCHECK_INDEX(i, list.numItems());
@@ -128,7 +128,7 @@ PY_EXPORT int PyList_SetItem(PyObject* pylist, Py_ssize_t i, PyObject* item) {
   Thread* thread = Thread::current();
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
-  Object list_obj(&scope, ApiHandle::fromPyObject(pylist)->asObject());
+  Object list_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pylist)));
   Object newitem(&scope, item == nullptr ? NoneType::object()
                                          : ApiHandle::stealReference(item));
   if (!runtime->isInstanceOfList(*list_obj)) {
@@ -154,9 +154,9 @@ PY_EXPORT int PyList_Append(PyObject* op, PyObject* newitem) {
     thread->raiseBadInternalCall();
     return -1;
   }
-  Object value(&scope, ApiHandle::fromPyObject(newitem)->asObject());
+  Object value(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(newitem)));
 
-  Object list_obj(&scope, ApiHandle::fromPyObject(op)->asObject());
+  Object list_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(op)));
   if (!runtime->isInstanceOfList(*list_obj)) {
     thread->raiseBadInternalCall();
     return -1;
@@ -172,7 +172,7 @@ PY_EXPORT PyObject* PyList_GetSlice(PyObject* pylist, Py_ssize_t low,
   Thread* thread = Thread::current();
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
-  Object list_obj(&scope, ApiHandle::fromPyObject(pylist)->asObject());
+  Object list_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pylist)));
   if (!runtime->isInstanceOfList(*list_obj)) {
     thread->raiseBadInternalCall();
     return nullptr;
@@ -202,7 +202,7 @@ PY_EXPORT int PyList_Insert(PyObject* pylist, Py_ssize_t where,
     thread->raiseBadInternalCall();
     return -1;
   }
-  Object list_obj(&scope, ApiHandle::fromPyObject(pylist)->asObject());
+  Object list_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pylist)));
   if (!runtime->isInstanceOfList(*list_obj)) {
     thread->raiseBadInternalCall();
     return -1;
@@ -213,7 +213,7 @@ PY_EXPORT int PyList_Insert(PyObject* pylist, Py_ssize_t where,
                          "cannot add more objects to list");
     return -1;
   }
-  Object item_obj(&scope, ApiHandle::fromPyObject(item)->asObject());
+  Object item_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(item)));
   listInsert(thread, list, item_obj, where);
   return 0;
 }
@@ -223,7 +223,7 @@ PY_EXPORT int PyList_SetSlice(PyObject* list, Py_ssize_t low, Py_ssize_t high,
   Thread* thread = Thread::current();
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
-  Object list_obj(&scope, ApiHandle::fromPyObject(list)->asObject());
+  Object list_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(list)));
   if (!runtime->isInstanceOfList(*list_obj)) {
     thread->raiseBadInternalCall();
     return -1;
@@ -252,7 +252,7 @@ PY_EXPORT int PyList_SetSlice(PyObject* list, Py_ssize_t low, Py_ssize_t high,
     result = thread->invokeMethodStatic2(LayoutId::kList, ID(__delitem__),
                                          list_obj, slice);
   } else {
-    Object items_obj(&scope, ApiHandle::fromPyObject(items)->asObject());
+    Object items_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(items)));
     result = thread->invokeMethodStatic3(LayoutId::kList, ID(__setitem__),
                                          list_obj, slice, items_obj);
   }
@@ -264,7 +264,7 @@ PY_EXPORT Py_ssize_t PyList_Size(PyObject* p) {
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
 
-  Object list_obj(&scope, ApiHandle::fromPyObject(p)->asObject());
+  Object list_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(p)));
   if (!runtime->isInstanceOfList(*list_obj)) {
     thread->raiseBadInternalCall();
     return -1;
@@ -281,7 +281,7 @@ PY_EXPORT int PyList_Sort(PyObject* pylist) {
     return -1;
   }
   HandleScope scope(thread);
-  Object list_obj(&scope, ApiHandle::fromPyObject(pylist)->asObject());
+  Object list_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pylist)));
   Runtime* runtime = thread->runtime();
   if (!runtime->isInstanceOfList(*list_obj)) {
     thread->raiseBadInternalCall();

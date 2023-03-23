@@ -314,9 +314,9 @@ static void freeHandle(Runtime* runtime, ApiHandle* handle) {
   *free_handles = node;
 }
 
-RawNativeProxy ApiHandle::asNativeProxy() {
-  DCHECK(!isImmediate() && reference_ != 0, "expected extension object handle");
-  return RawObject{reference_}.rawCast<RawNativeProxy>();
+RawNativeProxy ApiHandle::asNativeProxy(ApiHandle* handle) {
+  DCHECK(!isImmediate(handle) && handle->reference_ != 0, "expected extension object handle");
+  return RawObject{handle->reference_}.rawCast<RawNativeProxy>();
 }
 
 ApiHandle* ApiHandle::newReference(Runtime* runtime, RawObject obj) {
@@ -326,7 +326,7 @@ ApiHandle* ApiHandle::newReference(Runtime* runtime, RawObject obj) {
   if (runtime->isInstanceOfNativeProxy(obj)) {
     ApiHandle* result = static_cast<ApiHandle*>(
         Int::cast(obj.rawCast<RawNativeProxy>().native()).asCPtr());
-    result->increfNoImmediate();
+    increfNoImmediate(result);
     return result;
   }
   return ApiHandle::newReferenceWithManaged(runtime, obj);
@@ -342,7 +342,7 @@ ApiHandle* ApiHandle::newReferenceWithManaged(Runtime* runtime, RawObject obj) {
   int32_t index;
   if (!handles->atPutLookup(obj, &index)) {
     ApiHandle* result = reinterpret_cast<ApiHandle*>(handles->atIndex(index));
-    result->increfNoImmediate();
+    increfNoImmediate(result);
     return result;
   }
 
@@ -391,33 +391,33 @@ RawObject ApiHandle::checkFunctionResult(Thread* thread, PyObject* result) {
   return result_obj;
 }
 
-void* ApiHandle::cache(Runtime* runtime) {
+void* ApiHandle::cache(Runtime* runtime, ApiHandle* handle) {
   // Only managed objects can have a cached value
-  DCHECK(!isImmediate(), "immediate handles do not have caches");
+  DCHECK(!isImmediate(handle), "immediate handles do not have caches");
 
   ApiHandleDict* caches = capiCaches(runtime);
-  RawObject obj = asObjectNoImmediate();
+  RawObject obj = asObjectNoImmediate(handle);
   DCHECK(!runtime->isInstanceOfNativeProxy(obj),
          "cache must not be called on extension object");
   return caches->at(obj);
 }
 
-NEVER_INLINE void ApiHandle::dispose() {
-  disposeWithRuntime(Thread::current()->runtime());
+NEVER_INLINE void ApiHandle::dispose(ApiHandle* handle) {
+  disposeWithRuntime(Thread::current()->runtime(), handle);
 }
 
-void ApiHandle::disposeWithRuntime(Runtime* runtime) {
+void ApiHandle::disposeWithRuntime(Runtime* runtime, ApiHandle* handle) {
   // TODO(T46009838): If a module handle is being disposed, this should register
   // a weakref to call the module's m_free once's the module is collected
 
-  RawObject obj = asObjectNoImmediate();
+  RawObject obj = asObjectNoImmediate(handle);
   DCHECK(!runtime->isInstanceOfNativeProxy(obj),
          "Dispose must not be called on extension object");
   capiHandles(runtime)->remove(obj);
 
   void* cache = capiCaches(runtime)->remove(obj);
   std::free(cache);
-  freeHandle(runtime, this);
+  freeHandle(runtime, handle);
 }
 
 // TODO(T58710656): Allow immediate handles for SmallStr
@@ -428,17 +428,17 @@ bool ApiHandle::isEncodeableAsImmediate(RawObject obj) {
   return !obj.isHeapObject() && !obj.isSmallStr() && !obj.isSmallBytes();
 }
 
-void ApiHandle::setCache(Runtime* runtime, void* value) {
+void ApiHandle::setCache(Runtime* runtime, ApiHandle* handle, void* value) {
   ApiHandleDict* caches = capiCaches(runtime);
-  RawObject obj = asObjectNoImmediate();
+  RawObject obj = asObjectNoImmediate(handle);
   caches->atPut(obj, value);
 }
 
-void ApiHandle::setRefcnt(Py_ssize_t count) {
-  if (isImmediate()) return;
+void ApiHandle::setRefcnt(ApiHandle* handle, Py_ssize_t count) {
+  if (isImmediate(handle)) return;
   DCHECK((count & kBorrowedBit) == 0, "count must not have high bits set");
-  Py_ssize_t flags = ob_refcnt & kBorrowedBit;
-  ob_refcnt = count | flags;
+  Py_ssize_t flags = handle->ob_refcnt & kBorrowedBit;
+  handle->ob_refcnt = count | flags;
 }
 
 void disposeApiHandles(Runtime* runtime) {
@@ -451,7 +451,7 @@ void disposeApiHandles(Runtime* runtime) {
   void* value;
   for (int32_t i = 0; nextItem(keys, values, &i, end, &key, &value);) {
     ApiHandle* handle = reinterpret_cast<ApiHandle*>(value);
-    handle->disposeWithRuntime(runtime);
+    ApiHandle::disposeWithRuntime(runtime, handle);
   }
 }
 
@@ -484,7 +484,7 @@ void visitIncrementedApiHandles(Runtime* runtime, PointerVisitor* visitor) {
   void* value;
   for (int32_t i = 0; nextItem(keys, values, &i, end, &key, &value);) {
     ApiHandle* handle = reinterpret_cast<ApiHandle*>(value);
-    if (handle->refcntNoImmediate() > 0) {
+    if (ApiHandle::refcntNoImmediate(handle) > 0) {
       visitor->visitPointer(&key, PointerKind::kApiHandle);
       // We do not write back the changed `key` to the dictionary yet but leave
       // that to `visitNotIncrementedBorrowedApiHandles` because we still need
@@ -525,8 +525,8 @@ void visitNotIncrementedBorrowedApiHandles(Runtime* runtime,
   int32_t count = 0;
   for (int32_t i = 0; nextItem(keys, values, &i, end, &key, &value);) {
     ApiHandle* handle = reinterpret_cast<ApiHandle*>(value);
-    if (handle->refcntNoImmediate() == 0) {
-      DCHECK(handle->isBorrowedNoImmediate(),
+    if (ApiHandle::refcntNoImmediate(handle) == 0) {
+      DCHECK(ApiHandle::isBorrowedNoImmediate(handle),
              "non-borrowed object should already be disposed");
       if (key.isHeapObject() &&
           isWhiteObject(scavenger, HeapObject::cast(key))) {
@@ -573,7 +573,7 @@ void visitNotIncrementedBorrowedApiHandles(Runtime* runtime,
 RawObject objectGetMember(Thread* thread, RawObject ptr, RawObject name) {
   ApiHandle* value = *reinterpret_cast<ApiHandle**>(Int::cast(ptr).asCPtr());
   if (value != nullptr) {
-    return value->asObject();
+    return ApiHandle::asObject(value);
   }
   if (name.isNoneType()) {
     return NoneType::object();
@@ -585,7 +585,7 @@ RawObject objectGetMember(Thread* thread, RawObject ptr, RawObject name) {
 }
 
 bool objectHasHandleCache(Runtime* runtime, RawObject obj) {
-  return ApiHandle::borrowedReference(runtime, obj)->cache(runtime) != nullptr;
+  return ApiHandle::cache(runtime, ApiHandle::borrowedReference(runtime, obj)) != nullptr;
 }
 
 void* objectNewReference(Runtime* runtime, RawObject obj) {
@@ -594,7 +594,7 @@ void* objectNewReference(Runtime* runtime, RawObject obj) {
 
 void objectSetMember(Runtime* runtime, RawObject old_ptr, RawObject new_val) {
   ApiHandle** old = reinterpret_cast<ApiHandle**>(Int::cast(old_ptr).asCPtr());
-  (*old)->decref();
+  ApiHandle::decref(*old);
   *old = ApiHandle::newReference(runtime, new_val);
 }
 
@@ -603,7 +603,7 @@ void dump(PyObject* obj) {
     std::fprintf(stderr, "<nullptr>\n");
     return;
   }
-  dump(ApiHandle::fromPyObject(obj)->asObject());
+  dump(ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
 }
 
 }  // namespace py

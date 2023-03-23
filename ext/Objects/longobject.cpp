@@ -41,13 +41,13 @@ const unsigned char _PyLong_DigitValue[256] = { // NOLINT
 namespace py {
 
 PY_EXPORT int PyLong_CheckExact_Func(PyObject* obj) {
-  RawObject arg = ApiHandle::fromPyObject(obj)->asObject();
+  RawObject arg = ApiHandle::asObject(ApiHandle::fromPyObject(obj));
   return arg.isSmallInt() || arg.isLargeInt();
 }
 
 PY_EXPORT int PyLong_Check_Func(PyObject* obj) {
   return Thread::current()->runtime()->isInstanceOfInt(
-      ApiHandle::fromPyObject(obj)->asObject());
+      ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
 }
 
 // Converting from signed ints.
@@ -117,7 +117,7 @@ static T asInt(Thread* thread, PyObject* pylong, const char* type_name,
   }
 
   HandleScope scope(thread);
-  Object long_obj(&scope, ApiHandle::fromPyObject(pylong)->asObject());
+  Object long_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pylong)));
   if (!thread->runtime()->isInstanceOfInt(*long_obj)) {
     long_obj =
         thread->invokeFunction1(ID(builtins), ID(_index_or_int), long_obj);
@@ -155,7 +155,7 @@ static T asIntWithoutOverflowCheck(PyObject* pylong) {
   }
 
   HandleScope scope(thread);
-  Object long_obj(&scope, ApiHandle::fromPyObject(pylong)->asObject());
+  Object long_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pylong)));
   if (!thread->runtime()->isInstanceOfInt(*long_obj)) {
     long_obj =
         thread->invokeFunction1(ID(builtins), ID(_index_or_int), long_obj);
@@ -172,7 +172,7 @@ PY_EXPORT size_t _PyLong_NumBits(PyObject* pylong) {
   DCHECK(pylong != nullptr, "argument to _PyLong_NumBits must not be null");
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object long_obj(&scope, ApiHandle::fromPyObject(pylong)->asObject());
+  Object long_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pylong)));
   DCHECK(thread->runtime()->isInstanceOfInt(*long_obj),
          "argument to _PyLong_NumBits must be an int");
   Int obj(&scope, intUnderlying(*long_obj));
@@ -261,7 +261,7 @@ PY_EXPORT double PyLong_AsDouble(PyObject* obj) {
     return -1.0;
   }
   HandleScope scope(thread);
-  Object object(&scope, ApiHandle::fromPyObject(obj)->asObject());
+  Object object(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
   if (!thread->runtime()->isInstanceOfInt(*object)) {
     thread->raiseWithFmt(LayoutId::kTypeError, "an integer is required");
     return -1.0;
@@ -309,7 +309,7 @@ PY_EXPORT int _PyLong_AsByteArray(PyLongObject* longobj, unsigned char* dst,
   HandleScope scope(thread);
   Runtime* runtime = thread->runtime();
   PyObject* pyobj = reinterpret_cast<PyObject*>(longobj);
-  Object self_obj(&scope, ApiHandle::fromPyObject(pyobj)->asObject());
+  Object self_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pyobj)));
   Int self(&scope, intUnderlying(*self_obj));
   if (!is_signed && self.isNegative()) {
     thread->raiseWithFmt(LayoutId::kOverflowError,
@@ -343,7 +343,7 @@ PY_EXPORT PyObject* _PyLong_Copy(PyLongObject* longobj) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
   PyObject* pyobj = reinterpret_cast<PyObject*>(longobj);
-  Object obj(&scope, ApiHandle::fromPyObject(pyobj)->asObject());
+  Object obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pyobj)));
   Runtime* runtime = thread->runtime();
   DCHECK(runtime->isInstanceOfInt(*obj), "_PyLong_Copy requires an int");
   return ApiHandle::newReference(runtime, intUnderlying(*obj));
@@ -353,8 +353,8 @@ PY_EXPORT PyObject* _PyLong_DivmodNear(PyObject* a, PyObject* b) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
   Runtime* runtime = thread->runtime();
-  Object dividend_obj(&scope, ApiHandle::fromPyObject(a)->asObject());
-  Object divisor_obj(&scope, ApiHandle::fromPyObject(b)->asObject());
+  Object dividend_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(a)));
+  Object divisor_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(b)));
   if (!runtime->isInstanceOfInt(*dividend_obj) ||
       !runtime->isInstanceOfInt(*divisor_obj)) {
     thread->raiseWithFmt(LayoutId::kTypeError,
@@ -398,8 +398,8 @@ PY_EXPORT PyObject* _PyLong_FromByteArray(const unsigned char* bytes, size_t n,
 PY_EXPORT PyObject* _PyLong_GCD(PyObject* a, PyObject* b) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object dividend_obj(&scope, ApiHandle::fromPyObject(a)->asObject());
-  Object divisor_obj(&scope, ApiHandle::fromPyObject(b)->asObject());
+  Object dividend_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(a)));
+  Object divisor_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(b)));
   Runtime* runtime = thread->runtime();
 
   DCHECK(runtime->isInstanceOfInt(*dividend_obj),
@@ -419,7 +419,7 @@ PY_EXPORT PyLongObject* _PyLong_FromNbInt(PyObject*) {
 PY_EXPORT PyObject* _PyLong_Lshift(PyObject* a, size_t shiftby) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object obj(&scope, ApiHandle::fromPyObject(a)->asObject());
+  Object obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(a)));
   Runtime* runtime = thread->runtime();
   DCHECK(runtime->isInstanceOfInt(*obj), "_PyLong_Lshift requires an int");
   Int num(&scope, intUnderlying(*obj));
@@ -439,7 +439,7 @@ PY_EXPORT PyObject* _PyLong_One_Ptr() {
 PY_EXPORT PyObject* _PyLong_Rshift(PyObject* a, size_t shiftby) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object obj(&scope, ApiHandle::fromPyObject(a)->asObject());
+  Object obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(a)));
   Runtime* runtime = thread->runtime();
   DCHECK(runtime->isInstanceOfInt(*obj), "_PyLong_Rshift requires an int");
   Int num(&scope, intUnderlying(*obj));
@@ -454,7 +454,7 @@ PY_EXPORT PyObject* _PyLong_Rshift(PyObject* a, size_t shiftby) {
 PY_EXPORT int _PyLong_Sign(PyObject* vv) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object obj(&scope, ApiHandle::fromPyObject(vv)->asObject());
+  Object obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(vv)));
   DCHECK(thread->runtime()->isInstanceOfInt(*obj), "requires an integer");
   Int value(&scope, intUnderlying(*obj));
   return value.isZero() ? 0 : (value.isNegative() ? -1 : 1);
@@ -464,7 +464,7 @@ template <typename T>
 static T unsignedConverter(PyObject* obj, void* ptr, const char* type_name) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object object(&scope, ApiHandle::fromPyObject(obj)->asObject());
+  Object object(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
   if (thread->runtime()->isInstanceOfInt(*object)) {
     Int num(&scope, intUnderlying(*object));
     if (num.isNegative()) {

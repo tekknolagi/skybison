@@ -62,19 +62,19 @@ PY_EXPORT Py_complex _Py_c_sum(Py_complex x, Py_complex y) {
 }
 
 PY_EXPORT int PyComplex_CheckExact_Func(PyObject* p) {
-  return ApiHandle::fromPyObject(p)->asObject().isComplex();
+  return ApiHandle::asObject(ApiHandle::fromPyObject(p)).isComplex();
 }
 
 PY_EXPORT int PyComplex_Check_Func(PyObject* p) {
   return Thread::current()->runtime()->isInstanceOfComplex(
-      ApiHandle::fromPyObject(p)->asObject());
+      ApiHandle::asObject(ApiHandle::fromPyObject(p)));
 }
 
 PY_EXPORT Py_complex PyComplex_AsCComplex(PyObject* pycomplex) {
   Thread* thread = Thread::current();
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
-  Object obj(&scope, ApiHandle::fromPyObject(pycomplex)->asObject());
+  Object obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pycomplex)));
   if (runtime->isInstanceOfComplex(*obj)) {
     Complex comp(&scope, complexUnderlying(*obj));
     return {comp.real(), comp.imag()};
@@ -114,7 +114,7 @@ PY_EXPORT double PyComplex_ImagAsDouble(PyObject* pycomplex) {
   Thread* thread = Thread::current();
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
-  Object obj(&scope, ApiHandle::fromPyObject(pycomplex)->asObject());
+  Object obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pycomplex)));
   if (!runtime->isInstanceOfComplex(*obj)) return 0.0;
   Complex comp(&scope, complexUnderlying(*obj));
   return comp.imag();
@@ -124,7 +124,7 @@ PY_EXPORT double PyComplex_RealAsDouble(PyObject* pycomplex) {
   Thread* thread = Thread::current();
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
-  Object obj(&scope, ApiHandle::fromPyObject(pycomplex)->asObject());
+  Object obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pycomplex)));
   if (runtime->isInstanceOfComplex(*obj)) {
     Complex comp(&scope, complexUnderlying(*obj));
     return comp.real();

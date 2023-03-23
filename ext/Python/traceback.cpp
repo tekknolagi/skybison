@@ -8,7 +8,7 @@ namespace py {
 struct PyFrameObject;
 
 PY_EXPORT int PyTraceBack_Check_Func(PyObject* obj) {
-  return ApiHandle::fromPyObject(obj)->asObject().isTraceback();
+  return ApiHandle::asObject(ApiHandle::fromPyObject(obj)).isTraceback();
 }
 
 PY_EXPORT int PyTraceBack_Here(PyFrameObject* frame) {
@@ -16,7 +16,7 @@ PY_EXPORT int PyTraceBack_Here(PyFrameObject* frame) {
   HandleScope scope(thread);
   FrameProxy proxy(
       &scope,
-      ApiHandle::fromPyObject(reinterpret_cast<PyObject*>(frame))->asObject());
+      ApiHandle::asObject(ApiHandle::fromPyObject(reinterpret_cast<PyObject*>(frame))));
   Traceback new_tb(&scope, thread->runtime()->newTraceback());
   new_tb.setFunction(proxy.function());
   new_tb.setLasti(proxy.lasti());
@@ -32,14 +32,14 @@ PY_EXPORT int PyTraceBack_Print(PyObject* traceback, PyObject* file) {
 
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object tb_obj(&scope, ApiHandle::fromPyObject(traceback)->asObject());
+  Object tb_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(traceback)));
   if (!tb_obj.isTraceback()) {
     thread->raiseBadInternalCall();
     return -1;
   }
 
   Traceback tb(&scope, *tb_obj);
-  Object file_obj(&scope, ApiHandle::fromPyObject(file)->asObject());
+  Object file_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(file)));
   return tracebackWrite(thread, tb, file_obj).isErrorException() ? -1 : 0;
 }
 

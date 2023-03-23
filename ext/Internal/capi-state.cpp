@@ -49,7 +49,7 @@ void freeExtensionModules(Thread* thread) {
     if (obj == nullptr) {
       continue;
     }
-    module_obj = ApiHandle::fromPyObject(obj)->asObject();
+    module_obj = ApiHandle::asObject(ApiHandle::fromPyObject(obj));
     if (!runtime->isInstanceOfModule(*module_obj)) {
       continue;
     }

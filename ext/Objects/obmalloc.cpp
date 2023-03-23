@@ -57,7 +57,7 @@ PY_EXPORT void PyObject_Free(void* ptr) {
     // Set native pointer to `None` to signal the `finalizeExtensionObject` code
     // that the object memory was freed.
     PyObject* obj = reinterpret_cast<PyObject*>(ptr);
-    ApiHandle::fromPyObject(obj)->asNativeProxy().setNative(NoneType::object());
+    ApiHandle::asNativeProxy(ApiHandle::fromPyObject(obj)).setNative(NoneType::object());
   }
   return PyMem_RawFree(entry);
 }

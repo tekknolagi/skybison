@@ -30,7 +30,7 @@ PY_EXPORT double PyFloat_AsDouble(PyObject* op) {
 
   // Object is float
   HandleScope scope(thread);
-  Object obj(&scope, ApiHandle::fromPyObject(op)->asObject());
+  Object obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(op)));
   if (!thread->runtime()->isInstanceOfFloat(*obj)) {
     obj = thread->invokeFunction1(ID(builtins), ID(_float), obj);
     if (obj.isError()) return -1;
@@ -39,12 +39,12 @@ PY_EXPORT double PyFloat_AsDouble(PyObject* op) {
 }
 
 PY_EXPORT int PyFloat_CheckExact_Func(PyObject* obj) {
-  return ApiHandle::fromPyObject(obj)->asObject().isFloat();
+  return ApiHandle::asObject(ApiHandle::fromPyObject(obj)).isFloat();
 }
 
 PY_EXPORT int PyFloat_Check_Func(PyObject* obj) {
   return Thread::current()->runtime()->isInstanceOfFloat(
-      ApiHandle::fromPyObject(obj)->asObject());
+      ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
 }
 
 PY_EXPORT PyObject* PyFloat_FromString(PyObject* obj) {
@@ -56,7 +56,7 @@ PY_EXPORT PyObject* PyFloat_FromString(PyObject* obj) {
   HandleScope scope(thread);
   Runtime* runtime = thread->runtime();
   ApiHandle* handle = ApiHandle::fromPyObject(obj);
-  Object object(&scope, handle->asObject());
+  Object object(&scope, ApiHandle::asObject(handle));
 
   // First, handle all string like items here
   if (runtime->isInstanceOfStr(*object) ||

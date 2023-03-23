@@ -19,8 +19,8 @@ static PyObject* capiFunctionNoArgs(PyObject* self, PyObject* args) {
   Runtime* runtime = Thread::current()->runtime();
   runtime->collectGarbage();
   ApiHandle* handle = ApiHandle::fromPyObject(self);
-  EXPECT_GT(handle->refcnt(), 0);
-  EXPECT_TRUE(isStrEqualsCStr(handle->asObject(), "the self argument"));
+  EXPECT_GT(ApiHandle::refcnt(handle), 0);
+  EXPECT_TRUE(isStrEqualsCStr(ApiHandle::asObject(handle), "the self argument"));
   EXPECT_EQ(args, nullptr);
   return ApiHandle::newReference(runtime, SmallInt::fromWord(1230));
 }
@@ -158,11 +158,11 @@ static PyObject* capiFunctionOneArg(PyObject* self, PyObject* arg) {
   Runtime* runtime = Thread::current()->runtime();
   runtime->collectGarbage();
   ApiHandle* handle = ApiHandle::fromPyObject(self);
-  EXPECT_GT(handle->refcnt(), 0);
-  EXPECT_TRUE(isStrEqualsCStr(handle->asObject(), "the self argument"));
+  EXPECT_GT(ApiHandle::refcnt(handle), 0);
+  EXPECT_TRUE(isStrEqualsCStr(ApiHandle::asObject(handle), "the self argument"));
   ApiHandle* arg_handle = ApiHandle::fromPyObject(arg);
-  EXPECT_GT(arg_handle->refcnt(), 0);
-  EXPECT_TRUE(isFloatEqualsDouble(arg_handle->asObject(), 42.5));
+  EXPECT_GT(ApiHandle::refcnt(arg_handle), 0);
+  EXPECT_TRUE(isFloatEqualsDouble(ApiHandle::asObject(arg_handle), 42.5));
   return ApiHandle::newReference(runtime, SmallInt::fromWord(1231));
 }
 
@@ -308,11 +308,11 @@ static PyObject* capiFunctionVarArgs(PyObject* self, PyObject* args) {
   Runtime* runtime = thread->runtime();
   runtime->collectGarbage();
   ApiHandle* self_handle = ApiHandle::fromPyObject(self);
-  EXPECT_GT(self_handle->refcnt(), 0);
-  EXPECT_TRUE(isStrEqualsCStr(self_handle->asObject(), "the self argument"));
+  EXPECT_GT(ApiHandle::refcnt(self_handle), 0);
+  EXPECT_TRUE(isStrEqualsCStr(ApiHandle::asObject(self_handle), "the self argument"));
   ApiHandle* args_handle = ApiHandle::fromPyObject(args);
-  EXPECT_GT(args_handle->refcnt(), 0);
-  Object args_obj(&scope, args_handle->asObject());
+  EXPECT_GT(ApiHandle::refcnt(args_handle), 0);
+  Object args_obj(&scope, ApiHandle::asObject(args_handle));
   EXPECT_TRUE(args_obj.isTuple());
   Tuple args_tuple(&scope, *args_obj);
   EXPECT_EQ(args_tuple.length(), 2);
@@ -436,11 +436,11 @@ static PyObject* capiFunctionKeywordsNullKwargs(PyObject* self, PyObject* args,
   Runtime* runtime = thread->runtime();
   runtime->collectGarbage();
   ApiHandle* self_handle = ApiHandle::fromPyObject(self);
-  EXPECT_GT(self_handle->refcnt(), 0);
-  EXPECT_TRUE(isStrEqualsCStr(self_handle->asObject(), "the self argument"));
+  EXPECT_GT(ApiHandle::refcnt(self_handle), 0);
+  EXPECT_TRUE(isStrEqualsCStr(ApiHandle::asObject(self_handle), "the self argument"));
   ApiHandle* args_handle = ApiHandle::fromPyObject(args);
-  EXPECT_GT(args_handle->refcnt(), 0);
-  Object args_obj(&scope, args_handle->asObject());
+  EXPECT_GT(ApiHandle::refcnt(args_handle), 0);
+  Object args_obj(&scope, ApiHandle::asObject(args_handle));
   EXPECT_TRUE(args_obj.isTuple());
   Tuple args_tuple(&scope, *args_obj);
   EXPECT_EQ(args_tuple.length(), 2);
@@ -485,11 +485,11 @@ static PyObject* capiFunctionKeywords(PyObject* self, PyObject* args,
   Runtime* runtime = thread->runtime();
   runtime->collectGarbage();
   ApiHandle* self_handle = ApiHandle::fromPyObject(self);
-  EXPECT_GT(self_handle->refcnt(), 0);
-  EXPECT_TRUE(isStrEqualsCStr(self_handle->asObject(), "the self argument"));
+  EXPECT_GT(ApiHandle::refcnt(self_handle), 0);
+  EXPECT_TRUE(isStrEqualsCStr(ApiHandle::asObject(self_handle), "the self argument"));
   ApiHandle* args_handle = ApiHandle::fromPyObject(args);
-  EXPECT_GT(args_handle->refcnt(), 0);
-  Object args_obj(&scope, args_handle->asObject());
+  EXPECT_GT(ApiHandle::refcnt(args_handle), 0);
+  Object args_obj(&scope, ApiHandle::asObject(args_handle));
   EXPECT_TRUE(args_obj.isTuple());
   Tuple args_tuple(&scope, *args_obj);
   EXPECT_EQ(args_tuple.length(), 2);
@@ -497,8 +497,8 @@ static PyObject* capiFunctionKeywords(PyObject* self, PyObject* args,
   EXPECT_TRUE(isIntEqualsWord(args_tuple.at(1), -8));
 
   ApiHandle* kwargs_handle = ApiHandle::fromPyObject(kwargs);
-  EXPECT_GT(kwargs_handle->refcnt(), 0);
-  Object kwargs_obj(&scope, kwargs_handle->asObject());
+  EXPECT_GT(ApiHandle::refcnt(kwargs_handle), 0);
+  Object kwargs_obj(&scope, ApiHandle::asObject(kwargs_handle));
   EXPECT_TRUE(kwargs_obj.isDict());
   Dict kwargs_dict(&scope, *kwargs_obj);
   EXPECT_EQ(kwargs_dict.numItems(), 1);
@@ -582,16 +582,16 @@ static PyObject* capiFunctionFast(PyObject* self, PyObject* const* args,
   Runtime* runtime = Thread::current()->runtime();
   runtime->collectGarbage();
   ApiHandle* self_handle = ApiHandle::fromPyObject(self);
-  EXPECT_GT(self_handle->refcnt(), 0);
-  EXPECT_TRUE(isStrEqualsCStr(ApiHandle::fromPyObject(self)->asObject(),
+  EXPECT_GT(ApiHandle::refcnt(self_handle), 0);
+  EXPECT_TRUE(isStrEqualsCStr(ApiHandle::asObject(ApiHandle::fromPyObject(self)),
                               "the self argument"));
   EXPECT_EQ(nargs, 2);
   ApiHandle* arg0_handle = ApiHandle::fromPyObject(args[0]);
-  EXPECT_GT(arg0_handle->refcnt(), 0);
+  EXPECT_GT(ApiHandle::refcnt(arg0_handle), 0);
   ApiHandle* arg1_handle = ApiHandle::fromPyObject(args[1]);
-  EXPECT_GT(arg1_handle->refcnt(), 0);
-  EXPECT_TRUE(isFloatEqualsDouble(arg0_handle->asObject(), -13.));
-  EXPECT_TRUE(isFloatEqualsDouble(arg1_handle->asObject(), 0.125));
+  EXPECT_GT(ApiHandle::refcnt(arg1_handle), 0);
+  EXPECT_TRUE(isFloatEqualsDouble(ApiHandle::asObject(arg0_handle), -13.));
+  EXPECT_TRUE(isFloatEqualsDouble(ApiHandle::asObject(arg1_handle), 0.125));
   return ApiHandle::newReference(runtime, SmallInt::fromWord(1236));
 }
 
@@ -710,16 +710,16 @@ static PyObject* capiFunctionFastWithKeywordsNullKwnames(PyObject* self,
   Runtime* runtime = Thread::current()->runtime();
   runtime->collectGarbage();
   ApiHandle* self_handle = ApiHandle::fromPyObject(self);
-  EXPECT_GT(self_handle->refcnt(), 0);
-  EXPECT_TRUE(isStrEqualsCStr(ApiHandle::fromPyObject(self)->asObject(),
+  EXPECT_GT(ApiHandle::refcnt(self_handle), 0);
+  EXPECT_TRUE(isStrEqualsCStr(ApiHandle::asObject(ApiHandle::fromPyObject(self)),
                               "the self argument"));
   EXPECT_EQ(nargs, 2);
   ApiHandle* arg0_handle = ApiHandle::fromPyObject(args[0]);
-  EXPECT_GT(arg0_handle->refcnt(), 0);
+  EXPECT_GT(ApiHandle::refcnt(arg0_handle), 0);
   ApiHandle* arg1_handle = ApiHandle::fromPyObject(args[1]);
-  EXPECT_GT(arg1_handle->refcnt(), 0);
-  EXPECT_TRUE(isFloatEqualsDouble(arg0_handle->asObject(), 42.5));
-  EXPECT_TRUE(isFloatEqualsDouble(arg1_handle->asObject(), -8.8));
+  EXPECT_GT(ApiHandle::refcnt(arg1_handle), 0);
+  EXPECT_TRUE(isFloatEqualsDouble(ApiHandle::asObject(arg0_handle), 42.5));
+  EXPECT_TRUE(isFloatEqualsDouble(ApiHandle::asObject(arg1_handle), -8.8));
   EXPECT_EQ(kwnames, nullptr);
   return ApiHandle::newReference(runtime, SmallInt::fromWord(1238));
 }
@@ -765,28 +765,28 @@ static PyObject* capiFunctionFastWithKeywords(PyObject* self,
   Runtime* runtime = thread->runtime();
   runtime->collectGarbage();
   ApiHandle* self_handle = ApiHandle::fromPyObject(self);
-  EXPECT_GT(self_handle->refcnt(), 0);
-  EXPECT_TRUE(isStrEqualsCStr(ApiHandle::fromPyObject(self)->asObject(),
+  EXPECT_GT(ApiHandle::refcnt(self_handle), 0);
+  EXPECT_TRUE(isStrEqualsCStr(ApiHandle::asObject(ApiHandle::fromPyObject(self)),
                               "the self argument"));
   EXPECT_EQ(nargs, 2);
   ApiHandle* arg0_handle = ApiHandle::fromPyObject(args[0]);
-  EXPECT_GT(arg0_handle->refcnt(), 0);
+  EXPECT_GT(ApiHandle::refcnt(arg0_handle), 0);
   ApiHandle* arg1_handle = ApiHandle::fromPyObject(args[1]);
-  EXPECT_GT(arg1_handle->refcnt(), 0);
-  EXPECT_TRUE(isFloatEqualsDouble(arg0_handle->asObject(), 42.5));
-  EXPECT_TRUE(isFloatEqualsDouble(arg1_handle->asObject(), -8.8));
+  EXPECT_GT(ApiHandle::refcnt(arg1_handle), 0);
+  EXPECT_TRUE(isFloatEqualsDouble(ApiHandle::asObject(arg0_handle), 42.5));
+  EXPECT_TRUE(isFloatEqualsDouble(ApiHandle::asObject(arg1_handle), -8.8));
 
   ApiHandle* kwnames_handle = ApiHandle::fromPyObject(kwnames);
-  EXPECT_GT(kwnames_handle->refcnt(), 0);
-  Object kwnames_obj(&scope, kwnames_handle->asObject());
+  EXPECT_GT(ApiHandle::refcnt(kwnames_handle), 0);
+  Object kwnames_obj(&scope, ApiHandle::asObject(kwnames_handle));
   EXPECT_TRUE(kwnames_obj.isTuple());
   Tuple kwnames_tuple(&scope, *kwnames_obj);
   EXPECT_EQ(kwnames_tuple.length(), 2);
   EXPECT_TRUE(isStrEqualsCStr(kwnames_tuple.at(0), "foo"));
   EXPECT_TRUE(isStrEqualsCStr(kwnames_tuple.at(1), "bar"));
-  EXPECT_TRUE(isStrEqualsCStr(ApiHandle::fromPyObject(args[2])->asObject(),
+  EXPECT_TRUE(isStrEqualsCStr(ApiHandle::asObject(ApiHandle::fromPyObject(args[2])),
                               "foo_value"));
-  EXPECT_TRUE(isStrEqualsCStr(ApiHandle::fromPyObject(args[3])->asObject(),
+  EXPECT_TRUE(isStrEqualsCStr(ApiHandle::asObject(ApiHandle::fromPyObject(args[3])),
                               "bar_value"));
   return ApiHandle::newReference(runtime, SmallInt::fromWord(1238));
 }

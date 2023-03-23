@@ -58,7 +58,7 @@ PY_EXPORT void _Py_Dealloc(PyObject* pyobj) {
   Thread* thread = Thread::current();
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
-  Object obj(&scope, ApiHandle::fromPyObject(pyobj)->asObject());
+  Object obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pyobj)));
   if (!runtime->isInstanceOfNativeProxy(*obj)) return;
   Type obj_type(&scope, runtime->typeOf(*obj));
   // Do nothing for builtin types since we have our own GC to deallocate objects
@@ -75,34 +75,34 @@ PY_EXPORT void _Py_NewReference(PyObject*) {
 
 PY_EXPORT void Py_INCREF_Func(PyObject* obj) {
   ApiHandle* handle = ApiHandle::fromPyObject(obj);
-  handle->incref();
+  ApiHandle::incref(handle);
 }
 
 PY_EXPORT Py_ssize_t Py_REFCNT_Func(PyObject* obj) {
   ApiHandle* handle = ApiHandle::fromPyObject(obj);
-  return handle->refcnt();
+  return ApiHandle::refcnt(handle);
 }
 
 PY_EXPORT void Py_SET_REFCNT_Func(PyObject* obj, Py_ssize_t refcnt) {
   ApiHandle* handle = ApiHandle::fromPyObject(obj);
-  handle->setRefcnt(refcnt);
+  ApiHandle::setRefcnt(handle, refcnt);
 }
 
 PY_EXPORT void Py_DECREF_Func(PyObject* obj) {
   ApiHandle* handle = ApiHandle::fromPyObject(obj);
-  if (handle->isImmediate()) return;
-  handle->decrefNoImmediate();
-  DCHECK(handle->refcnt() > 0 ||
+  if (ApiHandle::isImmediate(handle)) return;
+  ApiHandle::decrefNoImmediate(handle);
+  DCHECK(ApiHandle::refcnt(handle) > 0 ||
              !Thread::current()->runtime()->isInstanceOfNativeProxy(
-                 ApiHandle::fromPyObject(obj)->asObjectNoImmediate()),
+                 ApiHandle::asObjectNoImmediate(ApiHandle::fromPyObject(obj))),
          "native proxies should not reach refcount 0 without GC");
 }
 
 PY_EXPORT Py_ssize_t* Py_SIZE_Func(PyVarObject* obj) {
   // Cannot call this on builtin types like `int`.
   DCHECK(Thread::current()->runtime()->isInstanceOfNativeProxy(
-             ApiHandle::fromPyObject(reinterpret_cast<PyObject*>(obj))
-                 ->asObject()),
+             ApiHandle::asObject(ApiHandle::fromPyObject(reinterpret_cast<PyObject*>(obj)))
+),
          "must only be called on extension object");
   return &(obj->ob_size);
 }
@@ -111,7 +111,7 @@ PY_EXPORT int PyCallable_Check(PyObject* obj) {
   if (obj == nullptr) return 0;
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object object(&scope, ApiHandle::fromPyObject(obj)->asObject());
+  Object object(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
   return thread->runtime()->isCallable(thread, object);
 }
 
@@ -122,7 +122,7 @@ PY_EXPORT PyObject* PyObject_ASCII(PyObject* pyobj) {
     return ApiHandle::newReference(runtime, SmallStr::fromCStr("<NULL>"));
   }
   HandleScope scope(thread);
-  Object obj(&scope, ApiHandle::fromPyObject(pyobj)->asObject());
+  Object obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pyobj)));
   Object result(&scope, thread->invokeFunction1(ID(builtins), ID(ascii), obj));
   if (result.isError()) {
     return nullptr;
@@ -140,9 +140,9 @@ PY_EXPORT PyObject* PyObject_Bytes(PyObject* pyobj) {
   }
 
   ApiHandle* handle = ApiHandle::fromPyObject(pyobj);
-  Object obj(&scope, handle->asObject());
+  Object obj(&scope, ApiHandle::asObject(handle));
   if (obj.isBytes()) {
-    handle->incref();
+    ApiHandle::incref(handle);
     return pyobj;
   }
 
@@ -208,8 +208,8 @@ PY_EXPORT int PyObject_CallFinalizerFromDealloc(PyObject* self) {
 PY_EXPORT int PyObject_DelAttr(PyObject* obj, PyObject* attr_name) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object object(&scope, ApiHandle::fromPyObject(obj)->asObject());
-  Object name_obj(&scope, ApiHandle::fromPyObject(attr_name)->asObject());
+  Object object(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
+  Object name_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(attr_name)));
   Object result(&scope, delAttribute(thread, object, name_obj));
   return result.isErrorException() ? -1 : 0;
 }
@@ -248,7 +248,7 @@ PY_EXPORT PyObject* PyObject_Dir(PyObject* obj) {
     return ApiHandle::newReference(runtime, *list);
   }
 
-  Object object(&scope, ApiHandle::fromPyObject(obj)->asObject());
+  Object object(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
   Type type(&scope, runtime->typeOf(*object));
   Object func(&scope, typeLookupInMroById(thread, *type, ID(__dir__)));
   if (func.isError() || !func.isFunction()) {
@@ -276,8 +276,8 @@ PY_EXPORT PyObject* PyObject_Dir(PyObject* obj) {
 PY_EXPORT PyObject* PyObject_GenericGetAttr(PyObject* obj, PyObject* name) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object object(&scope, ApiHandle::fromPyObject(obj)->asObject());
-  Object name_obj(&scope, ApiHandle::fromPyObject(name)->asObject());
+  Object object(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
+  Object name_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(name)));
   name_obj = attributeName(thread, name_obj);
   if (name_obj.isErrorException()) return nullptr;
   Object result(&scope, objectGetAttribute(thread, object, name_obj));
@@ -301,8 +301,8 @@ PY_EXPORT int _PyObject_LookupAttr(PyObject* obj, PyObject* name,
   // raised.
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object object(&scope, ApiHandle::fromPyObject(obj)->asObject());
-  Object name_obj(&scope, ApiHandle::fromPyObject(name)->asObject());
+  Object object(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
+  Object name_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(name)));
   Object name_str(&scope, attributeName(thread, name_obj));
   if (name_str.isErrorException()) {
     // name was not a str instance
@@ -329,11 +329,11 @@ PY_EXPORT int PyObject_GenericSetAttr(PyObject* obj, PyObject* name,
                                       PyObject* value) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object object(&scope, ApiHandle::fromPyObject(obj)->asObject());
-  Object name_obj(&scope, ApiHandle::fromPyObject(name)->asObject());
+  Object object(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
+  Object name_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(name)));
   name_obj = attributeName(thread, name_obj);
   if (name_obj.isErrorException()) return -1;
-  Object value_obj(&scope, ApiHandle::fromPyObject(value)->asObject());
+  Object value_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(value)));
   Object result(&scope, objectSetAttr(thread, object, name_obj, value_obj));
   if (result.isErrorException()) {
     return -1;
@@ -349,8 +349,8 @@ PY_EXPORT int PyObject_GenericSetDict(PyObject* /* j */, PyObject* /* e */,
 PY_EXPORT PyObject* PyObject_GetAttr(PyObject* obj, PyObject* name) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object object(&scope, ApiHandle::fromPyObject(obj)->asObject());
-  Object name_obj(&scope, ApiHandle::fromPyObject(name)->asObject());
+  Object object(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
+  Object name_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(name)));
   Object result(&scope, getAttribute(thread, object, name_obj));
   return result.isError() ? nullptr
                           : ApiHandle::newReference(thread->runtime(), *result);
@@ -361,7 +361,7 @@ PY_EXPORT PyObject* PyObject_GetAttrString(PyObject* pyobj, const char* name) {
   DCHECK(name != nullptr, "name must not be nullptr");
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object object(&scope, ApiHandle::fromPyObject(pyobj)->asObject());
+  Object object(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pyobj)));
   Runtime* runtime = thread->runtime();
   Object result(&scope, runtime->attributeAtByCStr(thread, object, name));
   if (result.isError()) return nullptr;
@@ -371,8 +371,8 @@ PY_EXPORT PyObject* PyObject_GetAttrString(PyObject* pyobj, const char* name) {
 PY_EXPORT int PyObject_HasAttr(PyObject* pyobj, PyObject* pyname) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object obj(&scope, ApiHandle::fromPyObject(pyobj)->asObject());
-  Object name(&scope, ApiHandle::fromPyObject(pyname)->asObject());
+  Object obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pyobj)));
+  Object name(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pyname)));
   Object result(&scope, hasAttribute(thread, obj, name));
   if (result.isBool()) return Bool::cast(*result).value();
   thread->clearPendingException();
@@ -382,7 +382,7 @@ PY_EXPORT int PyObject_HasAttr(PyObject* pyobj, PyObject* pyname) {
 PY_EXPORT int PyObject_HasAttrString(PyObject* pyobj, const char* name) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object obj(&scope, ApiHandle::fromPyObject(pyobj)->asObject());
+  Object obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pyobj)));
   Object name_str(&scope, Runtime::internStrFromCStr(thread, name));
   Object result(&scope, thread->runtime()->attributeAt(thread, obj, name_str));
   if (!result.isErrorException()) return true;
@@ -394,7 +394,7 @@ PY_EXPORT Py_hash_t PyObject_Hash(PyObject* obj) {
   DCHECK(obj != nullptr, "obj should not be nullptr");
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object object(&scope, ApiHandle::fromPyObject(obj)->asObject());
+  Object object(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
   Object result(&scope, Interpreter::hash(thread, object));
   if (result.isErrorException()) return -1;
   return SmallInt::cast(*result).value();
@@ -413,7 +413,7 @@ PY_EXPORT PyObject* PyObject_Init(PyObject* obj, PyTypeObject* typeobj) {
   Thread* thread = Thread::current();
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
-  Type type_obj(&scope, ApiHandle::fromPyTypeObject(typeobj)->asObject());
+  Type type_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyTypeObject(typeobj)));
   Layout layout(&scope, type_obj.instanceLayout());
   Object instance(&scope, runtime->newInstance(layout));
   return initializeExtensionObject(thread, obj, typeobj, instance);
@@ -431,7 +431,7 @@ PY_EXPORT int PyObject_IsTrue(PyObject* obj) {
   DCHECK(obj != nullptr, "nullptr passed into PyObject_IsTrue");
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object obj_obj(&scope, ApiHandle::fromPyObject(obj)->asObject());
+  Object obj_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
   Object result(&scope, Interpreter::isTrue(thread, *obj_obj));
   if (result.isError()) {
     return -1;
@@ -489,7 +489,7 @@ PY_EXPORT PyObject* PyObject_Repr(PyObject* obj) {
     return ApiHandle::newReference(runtime, SmallStr::fromCStr("<NULL>"));
   }
   HandleScope scope(thread);
-  Object object(&scope, ApiHandle::fromPyObject(obj)->asObject());
+  Object object(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
   Object result(&scope, thread->invokeMethod1(object, ID(__repr__)));
   if (result.isError()) {
     return nullptr;
@@ -513,8 +513,8 @@ PY_EXPORT PyObject* PyObject_RichCompare(PyObject* v, PyObject* w, int op) {
   }
   // TODO(emacs): Recursive call check
   HandleScope scope(thread);
-  Object left(&scope, ApiHandle::fromPyObject(v)->asObject());
-  Object right(&scope, ApiHandle::fromPyObject(w)->asObject());
+  Object left(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(v)));
+  Object right(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(w)));
   Object result(&scope, Interpreter::compareOperation(
                             thread, static_cast<CompareOp>(op), left, right));
   if (result.isError()) {
@@ -560,9 +560,9 @@ PY_EXPORT int PyObject_SetAttr(PyObject* obj, PyObject* name, PyObject* value) {
   }
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object object(&scope, ApiHandle::fromPyObject(obj)->asObject());
-  Object name_obj(&scope, ApiHandle::fromPyObject(name)->asObject());
-  Object value_obj(&scope, ApiHandle::fromPyObject(value)->asObject());
+  Object object(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
+  Object name_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(name)));
+  Object value_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(value)));
   Object result(&scope, setAttribute(thread, object, name_obj, value_obj));
   return result.isErrorException() ? -1 : 0;
 }
@@ -584,7 +584,7 @@ PY_EXPORT PyObject* PyObject_Str(PyObject* obj) {
     return ApiHandle::newReference(runtime, SmallStr::fromCStr("<NULL>"));
   }
   HandleScope scope(thread);
-  Object object(&scope, ApiHandle::fromPyObject(obj)->asObject());
+  Object object(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
   Object result(&scope, thread->invokeMethod1(object, ID(__str__)));
   if (result.isError()) {
     return nullptr;
@@ -610,7 +610,7 @@ PY_EXPORT void Py_IncRef(PyObject* obj) {
 PY_EXPORT int Py_ReprEnter(PyObject* obj) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object object(&scope, ApiHandle::fromPyObject(obj)->asObject());
+  Object object(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
   Object result(&scope, thread->reprEnter(object));
   if (result.isError()) {
     return -1;
@@ -621,7 +621,7 @@ PY_EXPORT int Py_ReprEnter(PyObject* obj) {
 PY_EXPORT void Py_ReprLeave(PyObject* obj) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object object(&scope, ApiHandle::fromPyObject(obj)->asObject());
+  Object object(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
   thread->reprLeave(object);
 }
 
@@ -637,7 +637,7 @@ PY_EXPORT int _PyObject_HasAttrId(PyObject* /* v */, _Py_Identifier* /* e */) {
 PY_EXPORT PyObject* _PyObject_New(PyTypeObject* type) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Type type_obj(&scope, ApiHandle::fromPyTypeObject(type)->asObject());
+  Type type_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyTypeObject(type)));
   if (!type_obj.hasNativeData()) {
     // Since the type will be pointed to by the layout as long as there are any
     // objects of its type, we don't need to INCREF the type object if it

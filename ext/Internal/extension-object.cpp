@@ -32,14 +32,14 @@ void finalizeExtensionObject(Thread* thread, RawObject object) {
   DCHECK(tp_dealloc != nullptr, "Extension types must have a dealloc slot");
   ApiHandle* handle = ApiHandle::fromPyObject(
       reinterpret_cast<PyObject*>(Int::cast(proxy.native()).asCPtr()));
-  CHECK(handle->refcnt() == 1,
+  CHECK(ApiHandle::refcnt(handle) == 1,
         "The runtime must hold the last reference to the PyObject* (%p). "
         "Expecting a refcount of 1, but found %ld\n",
-        reinterpret_cast<void*>(handle), handle->refcnt());
-  handle->setRefcnt(0);
-  handle->setBorrowedNoImmediate();
+        reinterpret_cast<void*>(handle), ApiHandle::refcnt(handle));
+  ApiHandle::setRefcnt(handle, 0);
+  ApiHandle::setBorrowedNoImmediate(handle);
   (*tp_dealloc)(handle);
-  if (!proxy.native().isNoneType() && handle->refcnt() == 0) {
+  if (!proxy.native().isNoneType() && ApiHandle::refcnt(handle) == 0) {
     // `proxy.native()` being `None` indicates the extension object memory was
     // not freed. `ob_refcnt == 0` means the object was not resurrected.
     // This typically indicates that the user maintains a free-list and wants to
@@ -92,8 +92,8 @@ void visitExtensionObjects(Runtime* runtime, Scavenger* scavenger,
     next = entry->next;
     void* native_instance = entry + 1;
     ApiHandle* handle = reinterpret_cast<ApiHandle*>(native_instance);
-    RawObject object = handle->asObjectNoImmediate();
-    bool alive = handle->refcnt() > 1 ||
+    RawObject object = ApiHandle::asObjectNoImmediate(handle);
+    bool alive = ApiHandle::refcnt(handle) > 1 ||
                  !isWhiteObject(scavenger, HeapObject::cast(object));
     visitor->visitPointer(&object, PointerKind::kApiHandle);
     handle->reference_ = reinterpret_cast<uintptr_t>(object.raw());

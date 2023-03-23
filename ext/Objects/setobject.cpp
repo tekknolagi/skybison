@@ -11,25 +11,25 @@ PY_EXPORT int PyAnySet_Check_Func(PyObject* arg) {
   DCHECK(arg != nullptr, "obj must not be nullptr");
   Thread* thread = Thread::current();
   Runtime* runtime = thread->runtime();
-  RawObject obj = ApiHandle::fromPyObject(arg)->asObject();
+  RawObject obj = ApiHandle::asObject(ApiHandle::fromPyObject(arg));
   return runtime->isInstanceOfSet(obj) || runtime->isInstanceOfFrozenSet(obj);
 }
 
 PY_EXPORT int PyAnySet_CheckExact_Func(PyObject* arg) {
   DCHECK(arg != nullptr, "obj must not be nullptr");
-  RawObject obj = ApiHandle::fromPyObject(arg)->asObject();
+  RawObject obj = ApiHandle::asObject(ApiHandle::fromPyObject(arg));
   return obj.isSet() || obj.isFrozenSet();
 }
 
 PY_EXPORT int PyFrozenSet_Check_Func(PyObject* obj) {
   DCHECK(obj != nullptr, "obj must not be nullptr");
   return Thread::current()->runtime()->isInstanceOfFrozenSet(
-      ApiHandle::fromPyObject(obj)->asObject());
+      ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
 }
 
 PY_EXPORT int PyFrozenSet_CheckExact_Func(PyObject* obj) {
   DCHECK(obj != nullptr, "obj must not be nullptr");
-  return ApiHandle::fromPyObject(obj)->asObject().isFrozenSet();
+  return ApiHandle::asObject(ApiHandle::fromPyObject(obj)).isFrozenSet();
 }
 
 PY_EXPORT PyObject* PyFrozenSet_New(PyObject* iterable) {
@@ -40,7 +40,7 @@ PY_EXPORT PyObject* PyFrozenSet_New(PyObject* iterable) {
                                               runtime->emptyFrozenSet());
   }
   HandleScope scope(thread);
-  Object obj(&scope, ApiHandle::fromPyObject(iterable)->asObject());
+  Object obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(iterable)));
   FrozenSet set(&scope, runtime->newFrozenSet());
   Object result(&scope, setUpdate(thread, set, obj));
   if (result.isError()) {
@@ -66,7 +66,7 @@ PY_EXPORT int PySet_Add(PyObject* anyset, PyObject* key) {
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
 
-  Object set_obj(&scope, ApiHandle::fromPyObject(anyset)->asObject());
+  Object set_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(anyset)));
 
   // TODO(T28454727): add FrozenSet
   if (!runtime->isInstanceOfSet(*set_obj)) {
@@ -75,7 +75,7 @@ PY_EXPORT int PySet_Add(PyObject* anyset, PyObject* key) {
   }
 
   Set set(&scope, *set_obj);
-  Object key_obj(&scope, ApiHandle::fromPyObject(key)->asObject());
+  Object key_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(key)));
   Object hash_obj(&scope, Interpreter::hash(thread, key_obj));
   if (hash_obj.isErrorException()) {
     return -1;
@@ -88,14 +88,14 @@ PY_EXPORT int PySet_Add(PyObject* anyset, PyObject* key) {
 
 PY_EXPORT int PySet_Check_Func(PyObject* obj) {
   return Thread::current()->runtime()->isInstanceOfSet(
-      ApiHandle::fromPyObject(obj)->asObject());
+      ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
 }
 
 PY_EXPORT int _PySet_NextEntry(PyObject* pyset, Py_ssize_t* ppos,
                                PyObject** pkey, Py_hash_t* phash) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object set_obj(&scope, ApiHandle::fromPyObject(pyset)->asObject());
+  Object set_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pyset)));
   Runtime* runtime = thread->runtime();
   if (!runtime->isInstanceOfSetBase(*set_obj)) {
     thread->raiseBadInternalCall();
@@ -116,7 +116,7 @@ PY_EXPORT int PySet_Clear(PyObject* anyset) {
   Thread* thread = Thread::current();
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
-  Object set_obj(&scope, ApiHandle::fromPyObject(anyset)->asObject());
+  Object set_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(anyset)));
   if (!runtime->isInstanceOfSetBase(*set_obj)) {
     thread->raiseBadInternalCall();
     return -1;
@@ -132,7 +132,7 @@ PY_EXPORT int PySet_Contains(PyObject* anyset, PyObject* key) {
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
 
-  Object set_obj(&scope, ApiHandle::fromPyObject(anyset)->asObject());
+  Object set_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(anyset)));
 
   if (!runtime->isInstanceOfSetBase(*set_obj)) {
     thread->raiseBadInternalCall();
@@ -140,7 +140,7 @@ PY_EXPORT int PySet_Contains(PyObject* anyset, PyObject* key) {
   }
 
   SetBase set(&scope, *set_obj);
-  Object key_obj(&scope, ApiHandle::fromPyObject(key)->asObject());
+  Object key_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(key)));
   Object hash_obj(&scope, Interpreter::hash(thread, key_obj));
   if (hash_obj.isErrorException()) {
     return -1;
@@ -153,13 +153,13 @@ PY_EXPORT int PySet_Discard(PyObject* pyset, PyObject* pykey) {
   Thread* thread = Thread::current();
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
-  Object set_obj(&scope, ApiHandle::fromPyObject(pyset)->asObject());
+  Object set_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pyset)));
   if (!runtime->isInstanceOfSet(*set_obj)) {
     thread->raiseBadInternalCall();
     return -1;
   }
   Set set(&scope, *set_obj);
-  Object key(&scope, ApiHandle::fromPyObject(pykey)->asObject());
+  Object key(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pykey)));
   Object hash_obj(&scope, Interpreter::hash(thread, key));
   if (hash_obj.isErrorException()) {
     return -1;
@@ -176,7 +176,7 @@ PY_EXPORT PyObject* PySet_New(PyObject* iterable) {
   }
 
   HandleScope scope(thread);
-  Object obj(&scope, ApiHandle::fromPyObject(iterable)->asObject());
+  Object obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(iterable)));
   Set set(&scope, runtime->newSet());
 
   Object result(&scope, setUpdate(thread, set, obj));
@@ -191,7 +191,7 @@ PY_EXPORT PyObject* PySet_Pop(PyObject* pyset) {
   Thread* thread = Thread::current();
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
-  Object set_obj(&scope, ApiHandle::fromPyObject(pyset)->asObject());
+  Object set_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pyset)));
   if (!runtime->isInstanceOfSet(*set_obj)) {
     thread->raiseBadInternalCall();
     return nullptr;
@@ -207,7 +207,7 @@ PY_EXPORT Py_ssize_t PySet_Size(PyObject* anyset) {
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
 
-  Object set_obj(&scope, ApiHandle::fromPyObject(anyset)->asObject());
+  Object set_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(anyset)));
   if (!runtime->isInstanceOfSetBase(*set_obj)) {
     thread->raiseBadInternalCall();
     return -1;

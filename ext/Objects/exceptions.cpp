@@ -273,7 +273,7 @@ PY_EXPORT int PyExceptionClass_Check_Func(PyObject* obj) {
   Thread* thread = Thread::current();
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
-  Object object(&scope, ApiHandle::fromPyObject(obj)->asObject());
+  Object object(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
   if (!runtime->isInstanceOfType(*object)) {
     return false;
   }
@@ -285,7 +285,7 @@ PY_EXPORT int PyExceptionInstance_Check_Func(PyObject* obj) {
   DCHECK(obj != nullptr, "obj should not be null");
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object object(&scope, ApiHandle::fromPyObject(obj)->asObject());
+  Object object(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
   return thread->runtime()->isInstanceOfBaseException(*object);
 }
 
@@ -293,21 +293,21 @@ PY_EXPORT void PyException_SetCause(PyObject* self, PyObject* cause) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
 
-  BaseException exc(&scope, ApiHandle::fromPyObject(self)->asObject());
+  BaseException exc(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(self)));
   if (cause == nullptr) {
     exc.setCause(Unbound::object());
     return;
   }
   ApiHandle* new_cause = ApiHandle::fromPyObject(cause);
-  exc.setCause(new_cause->asObject());
-  new_cause->decref();
+  exc.setCause(ApiHandle::asObject(new_cause));
+  ApiHandle::decref(new_cause);
 }
 
 PY_EXPORT PyObject* PyException_GetCause(PyObject* self) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
 
-  BaseException exc(&scope, ApiHandle::fromPyObject(self)->asObject());
+  BaseException exc(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(self)));
   Object cause(&scope, exc.causeOrUnbound());
   if (cause.isUnbound()) {
     return nullptr;
@@ -319,7 +319,7 @@ PY_EXPORT PyObject* PyException_GetContext(PyObject* self) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
 
-  BaseException exc(&scope, ApiHandle::fromPyObject(self)->asObject());
+  BaseException exc(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(self)));
   Object context(&scope, exc.contextOrUnbound());
   if (context.isUnbound()) {
     return nullptr;
@@ -331,14 +331,14 @@ PY_EXPORT void PyException_SetContext(PyObject* self, PyObject* context) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
 
-  BaseException exc(&scope, ApiHandle::fromPyObject(self)->asObject());
+  BaseException exc(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(self)));
   if (context == nullptr) {
     exc.setContext(Unbound::object());
     return;
   }
   ApiHandle* new_context = ApiHandle::fromPyObject(context);
-  exc.setContext(new_context->asObject());
-  new_context->decref();
+  exc.setContext(ApiHandle::asObject(new_context));
+  ApiHandle::decref(new_context);
 }
 
 PY_EXPORT int PyException_SetTraceback(PyObject* self, PyObject* tb) {
@@ -350,8 +350,8 @@ PY_EXPORT int PyException_SetTraceback(PyObject* self, PyObject* tb) {
                          "__traceback__ may not be deleted");
     return -1;
   }
-  BaseException exc(&scope, ApiHandle::fromPyObject(self)->asObject());
-  Object tb_obj(&scope, ApiHandle::fromPyObject(tb)->asObject());
+  BaseException exc(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(self)));
+  Object tb_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(tb)));
   if (!tb_obj.isNoneType() && !tb_obj.isTraceback()) {
     thread->raiseWithFmt(LayoutId::kTypeError,
                          "__traceback__ must be a traceback or None");
@@ -365,7 +365,7 @@ PY_EXPORT PyObject* PyException_GetTraceback(PyObject* self) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
 
-  BaseException exc(&scope, ApiHandle::fromPyObject(self)->asObject());
+  BaseException exc(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(self)));
   Object tb(&scope, exc.tracebackOrUnbound());
   if (tb.isUnbound()) return nullptr;
 
@@ -416,7 +416,7 @@ PY_EXPORT PyObject* PyUnicodeDecodeError_GetEncoding(PyObject* exc) {
 PY_EXPORT int PyUnicodeDecodeError_GetEnd(PyObject* exc, Py_ssize_t* end) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object exc_obj(&scope, ApiHandle::fromPyObject(exc)->asObject());
+  Object exc_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(exc)));
   Runtime* runtime = thread->runtime();
   DCHECK(runtime->isInstanceOfUnicodeErrorBase(*exc_obj),
          "exc must be instance of UnicodeError");
@@ -477,7 +477,7 @@ PY_EXPORT PyObject* PyUnicodeDecodeError_GetReason(PyObject* exc) {
 PY_EXPORT int PyUnicodeDecodeError_GetStart(PyObject* exc, Py_ssize_t* start) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object exc_obj(&scope, ApiHandle::fromPyObject(exc)->asObject());
+  Object exc_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(exc)));
   Runtime* runtime = thread->runtime();
   DCHECK(runtime->isInstanceOfUnicodeErrorBase(*exc_obj),
          "exc must be instance of UnicodeError");
@@ -507,7 +507,7 @@ PY_EXPORT int PyUnicodeDecodeError_GetStart(PyObject* exc, Py_ssize_t* start) {
 static int unicodeErrorSetEnd(PyObject* unicode_error, Py_ssize_t end) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object exc_obj(&scope, ApiHandle::fromPyObject(unicode_error)->asObject());
+  Object exc_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(unicode_error)));
   Runtime* runtime = thread->runtime();
   DCHECK(runtime->isInstanceOfUnicodeErrorBase(*exc_obj),
          "exc must be instance of UnicodeError");
@@ -524,7 +524,7 @@ PY_EXPORT int PyUnicodeDecodeError_SetReason(PyObject* unicode_error,
                                              const char* reason) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object exc_obj(&scope, ApiHandle::fromPyObject(unicode_error)->asObject());
+  Object exc_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(unicode_error)));
   Runtime* runtime = thread->runtime();
   DCHECK(runtime->isInstanceOfUnicodeErrorBase(*exc_obj),
          "exc must be instance of UnicodeError");
@@ -536,7 +536,7 @@ PY_EXPORT int PyUnicodeDecodeError_SetReason(PyObject* unicode_error,
 static int unicodeErrorSetStart(PyObject* unicode_error, Py_ssize_t start) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object exc_obj(&scope, ApiHandle::fromPyObject(unicode_error)->asObject());
+  Object exc_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(unicode_error)));
   Runtime* runtime = thread->runtime();
   DCHECK(runtime->isInstanceOfUnicodeErrorBase(*exc_obj),
          "exc must be instance of UnicodeError");
@@ -556,7 +556,7 @@ PY_EXPORT PyObject* PyUnicodeEncodeError_GetEncoding(PyObject* exc) {
 PY_EXPORT int PyUnicodeEncodeError_GetEnd(PyObject* exc, Py_ssize_t* end) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object exc_obj(&scope, ApiHandle::fromPyObject(exc)->asObject());
+  Object exc_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(exc)));
   Runtime* runtime = thread->runtime();
   DCHECK(runtime->isInstanceOfUnicodeErrorBase(*exc_obj),
          "exc must be instance of UnicodeError");
@@ -605,7 +605,7 @@ PY_EXPORT PyObject* PyUnicodeEncodeError_GetReason(PyObject* exc) {
 PY_EXPORT int PyUnicodeEncodeError_GetStart(PyObject* exc, Py_ssize_t* start) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object exc_obj(&scope, ApiHandle::fromPyObject(exc)->asObject());
+  Object exc_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(exc)));
   Runtime* runtime = thread->runtime();
   DCHECK(runtime->isInstanceOfUnicodeErrorBase(*exc_obj),
          "exc must be instance of UnicodeError");

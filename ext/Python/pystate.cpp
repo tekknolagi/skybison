@@ -63,7 +63,7 @@ static int moduleListAdd(Thread* thread, PyObject* module, PyModuleDef* def) {
   }
   HandleScope scope(thread);
   Runtime* runtime = thread->runtime();
-  Module module_obj(&scope, ApiHandle::fromPyObject(module)->asObject());
+  Module module_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(module)));
   module_obj.setDef(runtime->newIntFromCPtr(def));
   moduleListAtPut(runtime, def->m_base.m_index, module);
   return 0;

@@ -19,7 +19,7 @@ namespace py {
 PY_EXPORT size_t _PySys_GetSizeOf(PyObject* o) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object obj(&scope, ApiHandle::fromPyObject(o)->asObject());
+  Object obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(o)));
   Object result_obj(&scope,
                     thread->invokeFunction1(ID(sys), ID(getsizeof), obj));
   if (result_obj.isError()) {
