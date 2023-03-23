@@ -36,6 +36,16 @@ def ccache_flags():
     ]
 
 
+def compiler_flags():
+    clang = shutil.which("clang")
+    if not clang:
+        return []
+    return [
+        f"-DCMAKE_C_COMPILER=clang",
+        f"-DCMAKE_CXX_COMPILER=clang++",
+    ]
+
+
 def build(repo_root, builddir, sourcedir):
     cmake_flags = [
         "-S",
@@ -45,6 +55,7 @@ def build(repo_root, builddir, sourcedir):
         f"-DCMAKE_TOOLCHAIN_FILE={sourcedir}/util/linux.cmake",
         "-DCMAKE_BUILD_TYPE=Release",
         *ccache_flags(),
+        *compiler_flags(),
     ]
     run(
         ["cmake", "-GNinja"] + cmake_flags,
