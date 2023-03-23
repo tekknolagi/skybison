@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import logging
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -25,6 +26,16 @@ def find_binary(builddir):
     return None
 
 
+def ccache_flags():
+    ccache = shutil.which("ccache")
+    if not ccache:
+        return []
+    return [
+        f"-DCMAKE_C_COMPILER_LAUNCHER=ccache",
+        f"-DCMAKE_CXX_COMPILER_LAUNCHER=ccache",
+    ]
+
+
 def build(repo_root, builddir, sourcedir):
     cmake_flags = [
         "-S",
@@ -33,6 +44,7 @@ def build(repo_root, builddir, sourcedir):
         builddir,
         f"-DCMAKE_TOOLCHAIN_FILE={sourcedir}/util/linux.cmake",
         "-DCMAKE_BUILD_TYPE=Release",
+        *ccache_flags(),
     ]
     run(
         ["cmake", "-GNinja"] + cmake_flags,
