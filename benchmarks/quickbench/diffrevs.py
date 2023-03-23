@@ -117,7 +117,7 @@ Example:
     args = parser.parse_args()
 
     log_level = logging.DEBUG if args.verbose else logging.INFO
-    logging.basicConfig(format="%(message)s", level=log_level)
+    logging.basicConfig(format="%(message)s", level=log_level, stream=sys.stderr)
 
     if args.verbose:
         args.benchmark_rev_args.insert(0, "--verbose")
