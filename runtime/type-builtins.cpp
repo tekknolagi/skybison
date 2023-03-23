@@ -81,9 +81,13 @@ RawObject findBuiltinTypeWithName(Thread* thread, const Object& name) {
   Runtime* runtime = thread->runtime();
   Object layout(&scope, NoneType::object());
   Object type_obj(&scope, NoneType::object());
+  Tuple layouts(&scope, runtime->layouts());
   for (int i = 0; i <= static_cast<int>(LayoutId::kLastBuiltinId); i++) {
-    layout = runtime->layoutAtSafe(static_cast<LayoutId>(i));
-    if (layout.isErrorNotFound()) continue;
+    layout = layouts.at(i);
+    if (layout == SmallInt::fromWord(0)) {
+      // Indicates an invalid LayoutId.
+      continue;
+    }
     type_obj = Layout::cast(*layout).describedType();
     if (!type_obj.isType()) continue;
     if (Type::cast(*type_obj).name() == name) {
