@@ -129,7 +129,7 @@ class AssemblerBuffer {
   template <typename T>
   void emit(T value) {
     DCHECK(hasEnsuredCapacity(), "assert()");
-    *reinterpret_cast<T*>(cursor_) = value;
+    std::memcpy(reinterpret_cast<char*>(cursor_), &value, sizeof value);
     cursor_ += sizeof(T);
   }
 
@@ -146,14 +146,18 @@ class AssemblerBuffer {
   T load(word position) {
     DCHECK(position >= 0, "assert()");
     DCHECK(position <= (size() - static_cast<word>(sizeof(T))), "assert()");
-    return *reinterpret_cast<T*>(contents_ + position);
+    T result;
+    std::memcpy(&result, reinterpret_cast<char*>(contents_ + position),
+                sizeof result);
+    return result;
   }
 
   template <typename T>
   void store(word position, T value) {
     DCHECK(position >= 0, "assert()");
     DCHECK(position <= (size() - static_cast<word>(sizeof(T))), "assert()");
-    *reinterpret_cast<T*>(contents_ + position) = value;
+    std::memcpy(reinterpret_cast<char*>(contents_ + position), &value,
+                sizeof value);
   }
 
   const Vector<word>& pointerOffsets() const {
