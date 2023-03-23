@@ -48,6 +48,11 @@ if (${SKYBISON_ASAN})
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
 endif()
 
+# Add -DSKYBISON_UBSAN=1 to the cmake command line to enable ubsan.
+if (${SKYBISON_UBSAN})
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=undefined")
+endif()
+
 set(BENCHMARK_ENABLE_TESTING CACHE BOOL OFF FORCE)
 set(BENCHMARK_ENABLE_EXCEPTIONS CACHE BOOL OFF FORCE)
 set(BENCHMARK_ENABLE_INSTALL CACHE BOOL OFF FORCE)
