@@ -8,7 +8,7 @@
 namespace py {
 
 PY_EXPORT int PySlice_Check_Func(PyObject* pyobj) {
-  return ApiHandle::fromPyObject(pyobj)->asObject().isSlice();
+  return ApiHandle::asObject(ApiHandle::fromPyObject(pyobj)).isSlice();
 }
 
 PY_EXPORT PyObject* PySlice_New(PyObject* start, PyObject* stop,
@@ -19,13 +19,13 @@ PY_EXPORT PyObject* PySlice_New(PyObject* start, PyObject* stop,
   Object stop_obj(&scope, NoneType::object());
   Object step_obj(&scope, NoneType::object());
   if (start != nullptr) {
-    start_obj = ApiHandle::fromPyObject(start)->asObject();
+    start_obj = ApiHandle::asObject(ApiHandle::fromPyObject(start));
   }
   if (stop != nullptr) {
-    stop_obj = ApiHandle::fromPyObject(stop)->asObject();
+    stop_obj = ApiHandle::asObject(ApiHandle::fromPyObject(stop));
   }
   if (step != nullptr) {
-    step_obj = ApiHandle::fromPyObject(step)->asObject();
+    step_obj = ApiHandle::asObject(ApiHandle::fromPyObject(step));
   }
   Runtime* runtime = thread->runtime();
   return ApiHandle::newReferenceWithManaged(
@@ -76,7 +76,7 @@ PY_EXPORT int PySlice_Unpack(PyObject* pyobj, Py_ssize_t* start_ptr,
          SmallInt::kMinValue, SmallInt::kMaxValue);
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object obj(&scope, ApiHandle::fromPyObject(pyobj)->asObject());
+  Object obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pyobj)));
   if (!obj.isSlice()) {
     thread->raiseBadInternalCall();
     return -1;

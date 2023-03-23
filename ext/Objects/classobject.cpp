@@ -5,27 +5,27 @@
 namespace py {
 
 PY_EXPORT int PyMethod_Check_Func(PyObject* obj) {
-  return ApiHandle::fromPyObject(obj)->asObject().isBoundMethod();
+  return ApiHandle::asObject(ApiHandle::fromPyObject(obj)).isBoundMethod();
 }
 
 PY_EXPORT int PyInstanceMethod_Check(PyObject* obj) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object obj_obj(&scope, ApiHandle::fromPyObject(obj)->asObject());
+  Object obj_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
   return obj_obj.isInstanceMethod();
 }
 
 PY_EXPORT PyObject* PyInstanceMethod_GET_FUNCTION_Func(PyObject* obj) {
   return ApiHandle::borrowedReference(
       Thread::current()->runtime(),
-      InstanceMethod::cast(ApiHandle::fromPyObject(obj)->asObject())
+      InstanceMethod::cast(ApiHandle::asObject(ApiHandle::fromPyObject(obj)))
           .function());
 }
 
 PY_EXPORT PyObject* PyInstanceMethod_New(PyObject* obj) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object callable(&scope, ApiHandle::fromPyObject(obj)->asObject());
+  Object callable(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
   Runtime* runtime = thread->runtime();
   InstanceMethod method(&scope,
                         runtime->newInstanceWithSize(LayoutId::kInstanceMethod,
@@ -37,7 +37,7 @@ PY_EXPORT PyObject* PyInstanceMethod_New(PyObject* obj) {
 PY_EXPORT PyObject* PyMethod_Function(PyObject* obj) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object method(&scope, ApiHandle::fromPyObject(obj)->asObject());
+  Object method(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
   if (!method.isBoundMethod()) {
     thread->raiseBadInternalCall();
     return nullptr;
@@ -49,7 +49,7 @@ PY_EXPORT PyObject* PyMethod_Function(PyObject* obj) {
 PY_EXPORT PyObject* PyMethod_GET_FUNCTION_Func(PyObject* obj) {
   return ApiHandle::borrowedReference(
       Thread::current()->runtime(),
-      BoundMethod::cast(ApiHandle::fromPyObject(obj)->asObject()).function());
+      BoundMethod::cast(ApiHandle::asObject(ApiHandle::fromPyObject(obj))).function());
 }
 
 PY_EXPORT PyObject* PyMethod_New(PyObject* callable, PyObject* self) {
@@ -60,8 +60,8 @@ PY_EXPORT PyObject* PyMethod_New(PyObject* callable, PyObject* self) {
     return nullptr;
   }
   HandleScope scope(thread);
-  Object callable_obj(&scope, ApiHandle::fromPyObject(callable)->asObject());
-  Object self_obj(&scope, ApiHandle::fromPyObject(self)->asObject());
+  Object callable_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(callable)));
+  Object self_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(self)));
   Runtime* runtime = thread->runtime();
   return ApiHandle::newReferenceWithManaged(
       runtime, runtime->newBoundMethod(callable_obj, self_obj));
@@ -70,7 +70,7 @@ PY_EXPORT PyObject* PyMethod_New(PyObject* callable, PyObject* self) {
 PY_EXPORT PyObject* PyMethod_Self(PyObject* obj) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object method(&scope, ApiHandle::fromPyObject(obj)->asObject());
+  Object method(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
   if (!method.isBoundMethod()) {
     thread->raiseBadInternalCall();
     return nullptr;
@@ -82,7 +82,7 @@ PY_EXPORT PyObject* PyMethod_Self(PyObject* obj) {
 PY_EXPORT PyObject* PyMethod_GET_SELF_Func(PyObject* obj) {
   return ApiHandle::borrowedReference(
       Thread::current()->runtime(),
-      BoundMethod::cast(ApiHandle::fromPyObject(obj)->asObject()).self());
+      BoundMethod::cast(ApiHandle::asObject(ApiHandle::fromPyObject(obj))).self());
 }
 
 PY_EXPORT PyTypeObject* PyMethod_Type_Ptr() {

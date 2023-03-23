@@ -28,11 +28,11 @@ PY_EXPORT int PyFile_WriteObject(PyObject* pyobj, PyObject* pyfile, int flags) {
     return -1;
   }
 
-  Object file(&scope, ApiHandle::fromPyObject(pyfile)->asObject());
+  Object file(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pyfile)));
   Runtime* runtime = thread->runtime();
   Object obj(&scope, NoneType::object());
   if (pyobj != nullptr) {
-    obj = ApiHandle::fromPyObject(pyobj)->asObject();
+    obj = ApiHandle::asObject(ApiHandle::fromPyObject(pyobj));
     obj = thread->invokeFunction1(
         ID(builtins), flags & Py_PRINT_RAW ? ID(str) : ID(repr), obj);
     if (obj.isError()) return -1;
@@ -56,7 +56,7 @@ PY_EXPORT int PyFile_WriteString(const char* str, PyObject* pyfile) {
     return -1;
   }
 
-  Object file(&scope, ApiHandle::fromPyObject(pyfile)->asObject());
+  Object file(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pyfile)));
   Object str_obj(&scope, thread->runtime()->newStrFromCStr(str));
   Object result(&scope, thread->invokeMethod2(file, ID(write), str_obj));
   return result.isError() ? -1 : 0;
@@ -66,7 +66,7 @@ PY_EXPORT int PyObject_AsFileDescriptor(PyObject* obj) {
   DCHECK(obj != nullptr, "obj must not be null");
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object object(&scope, ApiHandle::fromPyObject(obj)->asObject());
+  Object object(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
   Runtime* runtime = thread->runtime();
   if (!runtime->isInstanceOfInt(*object)) {
     object = thread->invokeMethod1(object, ID(fileno));

@@ -28,12 +28,12 @@ static int callWarn(PyObject* category, PyObject* message,
   stack_level++;
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object category_obj(&scope, ApiHandle::fromPyObject(category)->asObject());
+  Object category_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(category)));
   DCHECK(message != nullptr, "message cannot be null");
-  Object message_obj(&scope, ApiHandle::fromPyObject(message)->asObject());
+  Object message_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(message)));
   Runtime* runtime = thread->runtime();
   Int stack_level_obj(&scope, runtime->newInt(stack_level));
-  Object source_obj(&scope, ApiHandle::fromPyObject(source)->asObject());
+  Object source_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(source)));
   // Like CPython, bail out if we are finalizing the runtime
   if (runtime->isFinalizing()) {
     return 0;
@@ -110,19 +110,19 @@ PY_EXPORT int PyErr_WarnExplicitObject(PyObject* category, PyObject* message,
   Thread* thread = Thread::current();
   HandleScope scope(thread);
   DCHECK(category != nullptr, "category cannot be null");
-  Object category_obj(&scope, ApiHandle::fromPyObject(category)->asObject());
+  Object category_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(category)));
   DCHECK(message != nullptr, "message cannot be null");
-  Object message_obj(&scope, ApiHandle::fromPyObject(message)->asObject());
+  Object message_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(message)));
   DCHECK(filename != nullptr, "filename cannot be null");
-  Object filename_obj(&scope, ApiHandle::fromPyObject(filename)->asObject());
+  Object filename_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(filename)));
   Runtime* runtime = thread->runtime();
   Int lineno_obj(&scope, runtime->newInt(lineno));
   DCHECK(module != nullptr, "module cannot be null");
-  Object module_obj(&scope, ApiHandle::fromPyObject(module)->asObject());
+  Object module_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(module)));
   Object registry_obj(&scope,
                       registry == nullptr
                           ? NoneType::object()
-                          : ApiHandle::fromPyObject(registry)->asObject());
+                          : ApiHandle::asObject(ApiHandle::fromPyObject(registry)));
   // Like CPython, bail out if we are finalizing the runtime
   if (runtime->isFinalizing()) {
     return 0;

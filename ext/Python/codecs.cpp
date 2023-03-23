@@ -125,7 +125,7 @@ PY_EXPORT PyObject* PyCodec_StrictErrors(PyObject* exc) {
   DCHECK(exc != nullptr, "exception should not be null");
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object exc_obj(&scope, ApiHandle::fromPyObject(exc)->asObject());
+  Object exc_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(exc)));
   Object result(
       &scope, thread->invokeFunction1(ID(_codecs), ID(strict_errors), exc_obj));
   if (result.isErrorNotFound()) {

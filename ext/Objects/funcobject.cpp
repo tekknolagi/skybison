@@ -9,7 +9,7 @@ PY_EXPORT PyObject* PyClassMethod_New(PyObject* callable) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
   Runtime* runtime = thread->runtime();
-  Object callable_obj(&scope, ApiHandle::fromPyObject(callable)->asObject());
+  Object callable_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(callable)));
   ClassMethod result(&scope, runtime->newClassMethod());
   result.setFunction(*callable_obj);
   return ApiHandle::newReferenceWithManaged(runtime, *result);
@@ -20,7 +20,7 @@ PY_EXPORT PyObject* PyStaticMethod_New(PyObject* callable) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
   Runtime* runtime = thread->runtime();
-  Object callable_obj(&scope, ApiHandle::fromPyObject(callable)->asObject());
+  Object callable_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(callable)));
   StaticMethod result(&scope, runtime->newStaticMethod());
   result.setFunction(*callable_obj);
   return ApiHandle::newReferenceWithManaged(runtime, *result);

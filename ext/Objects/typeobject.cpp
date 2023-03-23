@@ -38,19 +38,19 @@ PY_EXPORT PyTypeObject* PySuper_Type_Ptr() {
 }
 
 PY_EXPORT int PyType_CheckExact_Func(PyObject* obj) {
-  return ApiHandle::fromPyObject(obj)->asObject().isType();
+  return ApiHandle::asObject(ApiHandle::fromPyObject(obj)).isType();
 }
 
 PY_EXPORT int PyType_Check_Func(PyObject* obj) {
   return Thread::current()->runtime()->isInstanceOfType(
-      ApiHandle::fromPyObject(obj)->asObject());
+      ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
 }
 
 PY_EXPORT unsigned long PyType_GetFlags(PyTypeObject* type_obj) {
   ApiHandle* handle = ApiHandle::fromPyTypeObject(type_obj);
 
   HandleScope scope(Thread::current());
-  Type type(&scope, handle->asObjectNoImmediate());
+  Type type(&scope, ApiHandle::asObjectNoImmediate(handle));
   if (type.isBuiltin()) return Py_TPFLAGS_DEFAULT;
 
   if (!typeHasSlots(type)) {
@@ -858,15 +858,15 @@ static PyObject* superclassTpNew(PyTypeObject* typeobj, PyObject* args,
   HandleScope scope(thread);
   Runtime* runtime = thread->runtime();
 
-  Type type(&scope, ApiHandle::fromPyTypeObject(typeobj)->asObject());
+  Type type(&scope, ApiHandle::asObject(ApiHandle::fromPyTypeObject(typeobj)));
   Object args_obj(&scope, args == nullptr
                               ? runtime->emptyTuple()
-                              : ApiHandle::fromPyObject(args)->asObject());
+                              : ApiHandle::asObject(ApiHandle::fromPyObject(args)));
   DCHECK(runtime->isInstanceOfTuple(*args_obj),
          "Slot __new__ expected tuple args");
   Object kwargs_obj(&scope, kwargs == nullptr
                                 ? NoneType::object()
-                                : ApiHandle::fromPyObject(kwargs)->asObject());
+                                : ApiHandle::asObject(ApiHandle::fromPyObject(kwargs)));
   DCHECK(kwargs == nullptr || runtime->isInstanceOfDict(*kwargs_obj),
          "Slot __new__ expected nullptr or dict kwargs");
 
@@ -911,11 +911,11 @@ static PyObject* slotTpNew(PyObject* type, PyObject* args, PyObject* kwargs) {
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
 
-  Object type_obj(&scope, ApiHandle::fromPyObject(type)->asObject());
-  Object args_obj(&scope, ApiHandle::fromPyObject(args)->asObject());
+  Object type_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(type)));
+  Object args_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(args)));
   DCHECK(runtime->isInstanceOfTuple(*args_obj),
          "Slot __new__ expected tuple args");
-  Object kwargs_obj(&scope, kwargs ? ApiHandle::fromPyObject(kwargs)->asObject()
+  Object kwargs_obj(&scope, kwargs ? ApiHandle::asObject(ApiHandle::fromPyObject(kwargs))
                                    : NoneType::object());
   DCHECK(kwargs == nullptr || runtime->isInstanceOfDict(*kwargs_obj),
          "Slot __new__ expected nullptr or dict kwargs");
@@ -970,7 +970,7 @@ static void builtinDealloc(PyObject* self) {
   Thread* thread = Thread::current();
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
-  Object self_obj(&scope, ApiHandle::fromPyObject(self)->asObject());
+  Object self_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(self)));
   Type type(&scope, runtime->typeOf(*self_obj));
   if (type.hasNativeData()) {
     PyObject_Del(self);
@@ -986,7 +986,7 @@ PY_EXPORT void* PyType_GetSlot(PyTypeObject* type_obj, int slot_id) {
 
   HandleScope scope(thread);
   ApiHandle* handle = ApiHandle::fromPyTypeObject(type_obj);
-  Type type(&scope, handle->asObjectNoImmediate());
+  Type type(&scope, ApiHandle::asObjectNoImmediate(handle));
   if (!type.isCPythonHeaptype()) {
     if (slot_id == Py_tp_new) {
       return reinterpret_cast<void*>(&superclassTpNew);
@@ -1366,7 +1366,7 @@ static void subtypeDealloc(PyObject* self) {
   Thread* thread = Thread::current();
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
-  Object self_obj(&scope, ApiHandle::fromPyObject(self)->asObject());
+  Object self_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(self)));
   Type type(&scope, runtime->typeOf(*self_obj));
 
   DCHECK(type.isCPythonHeaptype(), "must be called with heaptype");
@@ -1402,7 +1402,7 @@ static void subtypeDealloc(PyObject* self) {
   type = runtime->typeOf(*self_obj);
   (*base_dealloc)(self);
   if (type.isCPythonHeaptype() && !base_type.isCPythonHeaptype()) {
-    ApiHandle::borrowedReference(runtime, *type)->decref();
+    ApiHandle::decref(ApiHandle::borrowedReference(runtime, *type));
   }
 }
 
@@ -1573,9 +1573,9 @@ static int typeSetattro(PyTypeObject* type, PyObject* name, PyObject* value) {
          "extension type");
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Type type_obj(&scope, ApiHandle::fromPyTypeObject(type)->asObject());
-  Object name_obj(&scope, ApiHandle::fromPyObject(name)->asObject());
-  Object value_obj(&scope, ApiHandle::fromPyObject(value)->asObject());
+  Type type_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyTypeObject(type)));
+  Object name_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(name)));
+  Object value_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(value)));
   if (thread
           ->invokeMethodStatic3(LayoutId::kType, ID(__setattr__), type_obj,
                                 name_obj, value_obj)
@@ -1774,7 +1774,7 @@ PY_EXPORT PyObject* PyType_FromSpecWithBases(PyType_Spec* spec,
   // matching the layout of RawNativeProxy
   // TODO(T54277314): Fill the dictionary before creating the type
   Tuple bases_obj(&scope, runtime->implicitBases());
-  if (bases != nullptr) bases_obj = ApiHandle::fromPyObject(bases)->asObject();
+  if (bases != nullptr) bases_obj = ApiHandle::asObject(ApiHandle::fromPyObject(bases));
   Dict dict(&scope, runtime->newDict());
   if (!module_name.isNoneType()) {
     dictAtPutById(thread, dict, ID(__module__), module_name);
@@ -1897,7 +1897,7 @@ PY_EXPORT PyObject* PyType_GenericAlloc(PyTypeObject* type_obj,
   Thread* thread = Thread::current();
   HandleScope scope(thread);
   Type type(&scope,
-            ApiHandle::fromPyTypeObject(type_obj)->asObjectNoImmediate());
+            ApiHandle::asObjectNoImmediate(ApiHandle::fromPyTypeObject(type_obj)));
   DCHECK(!type.isBuiltin(),
          "Type is unmanaged. Please initialize using PyType_FromSpec");
   DCHECK(typeHasSlots(type),
@@ -1929,13 +1929,13 @@ PY_EXPORT PyObject* PyType_GenericAlloc(PyTypeObject* type_obj,
 
 PY_EXPORT Py_ssize_t _PyObject_SIZE_Func(PyObject* obj) {
   HandleScope scope(Thread::current());
-  Type type(&scope, ApiHandle::fromPyObject(obj)->asObject());
+  Type type(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
   return typeSlotUWordAt(type, kSlotBasicSize);
 }
 
 PY_EXPORT Py_ssize_t _PyObject_VAR_SIZE_Func(PyObject* obj, Py_ssize_t nitems) {
   HandleScope scope(Thread::current());
-  Type type(&scope, ApiHandle::fromPyObject(obj)->asObject());
+  Type type(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
   uword basic_size = typeSlotUWordAt(type, kSlotBasicSize);
   uword item_size = typeSlotUWordAt(type, kSlotItemSize);
   return Utils::roundUp(nitems * item_size + basic_size, kWordSize);
@@ -1960,8 +1960,8 @@ PY_EXPORT int PyObject_TypeCheck_Func(PyObject* obj, PyTypeObject* type) {
 }
 
 PY_EXPORT int PyType_IsSubtype(PyTypeObject* a, PyTypeObject* b) {
-  return a == b || typeIsSubclass(ApiHandle::fromPyTypeObject(a)->asObject(),
-                                  ApiHandle::fromPyTypeObject(b)->asObject())
+  return a == b || typeIsSubclass(ApiHandle::asObject(ApiHandle::fromPyTypeObject(a)),
+                                  ApiHandle::asObject(ApiHandle::fromPyTypeObject(b)))
              ? 1
              : 0;
 }
@@ -1989,7 +1989,7 @@ PY_EXPORT const char* _PyType_Name(PyTypeObject* type) {
   }
   HandleScope scope(thread);
   Runtime* runtime = thread->runtime();
-  Object obj(&scope, ApiHandle::fromPyTypeObject(type)->asObject());
+  Object obj(&scope, ApiHandle::asObject(ApiHandle::fromPyTypeObject(type)));
   if (!runtime->isInstanceOfType(*obj)) {
     thread->raiseBadInternalCall();
     return nullptr;
@@ -2004,8 +2004,8 @@ PY_EXPORT PyObject* _PyType_Lookup(PyTypeObject* type, PyObject* name) {
   HandleScope scope(thread);
   Type type_obj(
       &scope,
-      ApiHandle::fromPyObject(reinterpret_cast<PyObject*>(type))->asObject());
-  Object name_obj(&scope, ApiHandle::fromPyObject(name)->asObject());
+      ApiHandle::asObject(ApiHandle::fromPyObject(reinterpret_cast<PyObject*>(type))));
+  Object name_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(name)));
   name_obj = attributeNameNoException(thread, name_obj);
   if (name_obj.isErrorError()) return nullptr;
   Object res(&scope, typeLookupInMro(thread, *type_obj, *name_obj));

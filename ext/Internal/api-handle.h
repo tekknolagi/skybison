@@ -42,47 +42,47 @@ class ApiHandle : public PyObject {
   static ApiHandle* fromPyTypeObject(PyTypeObject* type);
 
   // Get the object from the handle's reference field.
-  RawObject asObject();
+  static RawObject asObject(ApiHandle* handle);
 
-  RawObject asObjectImmediate();
+  static RawObject asObjectImmediate(ApiHandle* handle);
 
-  RawObject asObjectNoImmediate();
+  static RawObject asObjectNoImmediate(ApiHandle* handle);
 
   // Return native proxy belonging to an extension object.
-  RawNativeProxy asNativeProxy();
+  static RawNativeProxy asNativeProxy(ApiHandle* handle);
 
   // Each ApiHandle can have one pointer to cached data, which will be freed
   // when the handle is destroyed.
-  void* cache(Runtime* runtime);
-  void setCache(Runtime* runtime, void* value);
+  static void* cache(Runtime* runtime, ApiHandle* handle);
+  static void setCache(Runtime* runtime, ApiHandle* handle, void* value);
 
   // Decrements the reference count of the handle to signal the removal of a
   // reference count from extension code.
-  void decref();
+  static void decref(ApiHandle* handle);
 
-  void decrefNoImmediate();
+  static void decrefNoImmediate(ApiHandle* handle);
 
   // Remove the ApiHandle from the dictionary and free its memory
-  void dispose();
-  void disposeWithRuntime(Runtime* runtime);
+  static void dispose(ApiHandle* handle);
+  static void disposeWithRuntime(Runtime* runtime, ApiHandle* handle);
 
-  bool isImmediate();
+  static bool isImmediate(ApiHandle* handle);
 
   // Increments the reference count of the handle to signal the addition of a
   // reference from extension code.
-  void incref();
+  static void incref(ApiHandle* handle);
 
-  void increfNoImmediate();
+  static void increfNoImmediate(ApiHandle* handle);
 
   // Returns the number of references to this handle from extension code.
-  Py_ssize_t refcnt();
+  static Py_ssize_t refcnt(ApiHandle* handle);
 
-  Py_ssize_t refcntNoImmediate();
+  static Py_ssize_t refcntNoImmediate(ApiHandle* handle);
 
-  void setRefcnt(Py_ssize_t count);
+  static void setRefcnt(ApiHandle* handle, Py_ssize_t count);
 
-  void setBorrowedNoImmediate();
-  bool isBorrowedNoImmediate();
+  static void setBorrowedNoImmediate(ApiHandle* handle);
+  static bool isBorrowedNoImmediate(ApiHandle* handle);
 
  private:
   static bool isEncodeableAsImmediate(RawObject obj);
@@ -111,33 +111,33 @@ struct FreeListNode {
 static_assert(sizeof(FreeListNode) <= sizeof(ApiHandle),
               "Free ApiHandle should be usable as a FreeListNode");
 
-inline RawObject ApiHandle::asObject() {
-  if (isImmediate()) return asObjectImmediate();
-  return asObjectNoImmediate();
+inline RawObject ApiHandle::asObject(ApiHandle* handle) {
+  if (isImmediate(handle)) return asObjectImmediate(handle);
+  return asObjectNoImmediate(handle);
 }
 
-inline RawObject ApiHandle::asObjectImmediate() {
-  DCHECK(isImmediate(), "expected immediate");
-  return RawObject{reinterpret_cast<uword>(this) ^ kImmediateTag};
+inline RawObject ApiHandle::asObjectImmediate(ApiHandle* handle) {
+  DCHECK(isImmediate(handle), "expected immediate");
+  return RawObject{reinterpret_cast<uword>(handle) ^ kImmediateTag};
 }
 
-inline RawObject ApiHandle::asObjectNoImmediate() {
-  DCHECK(!isImmediate(), "must not be called with immediate object");
-  return RawObject{reference_};
+inline RawObject ApiHandle::asObjectNoImmediate(ApiHandle* handle) {
+  DCHECK(!isImmediate(handle), "must not be called with immediate object");
+  return RawObject{handle->reference_};
 }
 
-inline void ApiHandle::decref() {
-  if (isImmediate()) return;
-  decrefNoImmediate();
+inline void ApiHandle::decref(ApiHandle* handle) {
+  if (isImmediate(handle)) return;
+  decrefNoImmediate(handle);
 }
 
-inline void ApiHandle::decrefNoImmediate() {
-  DCHECK(!isImmediate(), "must not be called with immediate object");
-  DCHECK((ob_refcnt & ~kBorrowedBit) > 0, "reference count underflow");
-  --ob_refcnt;
+inline void ApiHandle::decrefNoImmediate(ApiHandle* handle) {
+  DCHECK(!isImmediate(handle), "must not be called with immediate object");
+  DCHECK((handle->ob_refcnt & ~kBorrowedBit) > 0, "reference count underflow");
+  --handle->ob_refcnt;
   // Dispose `ApiHandle`s without `kBorrowedBit` when they reach refcount zero.
-  if (ob_refcnt == 0) {
-    dispose();
+  if (handle->ob_refcnt == 0) {
+    dispose(handle);
   }
 }
 
@@ -154,46 +154,47 @@ inline ApiHandle* ApiHandle::handleFromImmediate(RawObject obj) {
   return reinterpret_cast<ApiHandle*>(obj.raw() ^ kImmediateTag);
 }
 
-inline void ApiHandle::incref() {
-  if (isImmediate()) return;
-  increfNoImmediate();
+inline void ApiHandle::incref(ApiHandle* handle) {
+  if (isImmediate(handle)) return;
+  // fprintf(stderr, "incref(%p)\n", (void*)this);
+  increfNoImmediate(handle);
 }
 
-inline void ApiHandle::increfNoImmediate() {
-  DCHECK(!isImmediate(), "must not be called with immediate object");
-  DCHECK((ob_refcnt & ~kBorrowedBit) <
+inline void ApiHandle::increfNoImmediate(ApiHandle* handle) {
+  DCHECK(!isImmediate(handle), "must not be called with immediate object");
+  DCHECK((handle->ob_refcnt & ~kBorrowedBit) <
              (std::numeric_limits<Py_ssize_t>::max() & ~kBorrowedBit),
          "Reference count overflowed");
-  ++ob_refcnt;
+  ++handle->ob_refcnt;
 }
 
-inline bool ApiHandle::isImmediate() {
-  return (reinterpret_cast<uword>(this) & kImmediateMask) != 0;
+inline bool ApiHandle::isImmediate(ApiHandle* handle) {
+  return (reinterpret_cast<uword>(handle) & kImmediateMask) != 0;
 }
 
-inline Py_ssize_t ApiHandle::refcnt() {
-  if (isImmediate()) return kImmediateRefcnt;
-  return refcntNoImmediate();
+inline Py_ssize_t ApiHandle::refcnt(ApiHandle* handle) {
+  if (isImmediate(handle)) return kImmediateRefcnt;
+  return refcntNoImmediate(handle);
 }
 
-inline Py_ssize_t ApiHandle::refcntNoImmediate() {
-  DCHECK(!isImmediate(), "must not be called with immediate object");
-  return ob_refcnt & ~kBorrowedBit;
+inline Py_ssize_t ApiHandle::refcntNoImmediate(ApiHandle* handle) {
+  DCHECK(!isImmediate(handle), "must not be called with immediate object");
+  return handle->ob_refcnt & ~kBorrowedBit;
 }
 
-inline void ApiHandle::setBorrowedNoImmediate() {
-  DCHECK(!isImmediate(), "must not be called with immediate object");
-  ob_refcnt |= kBorrowedBit;
+inline void ApiHandle::setBorrowedNoImmediate(ApiHandle* handle) {
+  DCHECK(!isImmediate(handle), "must not be called with immediate object");
+  handle->ob_refcnt |= kBorrowedBit;
 }
 
-inline bool ApiHandle::isBorrowedNoImmediate() {
-  DCHECK(!isImmediate(), "must not be called with immediate object");
-  return (ob_refcnt & kBorrowedBit) != 0;
+inline bool ApiHandle::isBorrowedNoImmediate(ApiHandle* handle) {
+  DCHECK(!isImmediate(handle), "must not be called with immediate object");
+  return (handle->ob_refcnt & kBorrowedBit) != 0;
 }
 
 inline RawObject ApiHandle::stealReference(PyObject* py_obj) {
   ApiHandle* handle = ApiHandle::fromPyObject(py_obj);
-  if (handle->isImmediate()) return handle->asObjectImmediate();
+  if (isImmediate(handle)) return asObjectImmediate(handle);
   DCHECK((handle->ob_refcnt & ~kBorrowedBit) > 0, "refcount underflow");
   // Mark stolen reference as borrowed. This is to support code like this that
   // increases refcount after the fact:
@@ -201,7 +202,7 @@ inline RawObject ApiHandle::stealReference(PyObject* py_obj) {
   //     Py_INCREF(x);
   handle->ob_refcnt |= kBorrowedBit;
   handle->ob_refcnt--;
-  return handle->asObjectNoImmediate();
+  return asObjectNoImmediate(handle);
 }
 
 }  // namespace py

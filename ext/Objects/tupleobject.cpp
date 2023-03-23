@@ -27,17 +27,17 @@ PY_EXPORT PyObject* PyTuple_New(Py_ssize_t length) {
 }
 
 PY_EXPORT int PyTuple_CheckExact_Func(PyObject* obj) {
-  return ApiHandle::fromPyObject(obj)->asObject().isTuple();
+  return ApiHandle::asObject(ApiHandle::fromPyObject(obj)).isTuple();
 }
 
 PY_EXPORT int PyTuple_Check_Func(PyObject* obj) {
   return Thread::current()->runtime()->isInstanceOfTuple(
-      ApiHandle::fromPyObject(obj)->asObject());
+      ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
 }
 
 PY_EXPORT PyObject* PyTuple_GET_ITEM_Func(PyObject* pytuple, Py_ssize_t pos) {
   Runtime* runtime = Thread::current()->runtime();
-  RawObject obj = ApiHandle::fromPyObject(pytuple)->asObjectNoImmediate();
+  RawObject obj = ApiHandle::asObjectNoImmediate(ApiHandle::fromPyObject(pytuple));
   DCHECK(runtime->isInstanceOfTuple(obj),
          "non-tuple argument to PyTuple_GET_ITEM");
   RawTuple tuple = tupleUnderlying(obj);
@@ -46,7 +46,7 @@ PY_EXPORT PyObject* PyTuple_GET_ITEM_Func(PyObject* pytuple, Py_ssize_t pos) {
 }
 
 PY_EXPORT Py_ssize_t PyTuple_GET_SIZE_Func(PyObject* pytuple) {
-  RawObject obj = ApiHandle::fromPyObject(pytuple)->asObjectNoImmediate();
+  RawObject obj = ApiHandle::asObjectNoImmediate(ApiHandle::fromPyObject(pytuple));
   DCHECK(Thread::current()->runtime()->isInstanceOfTuple(obj),
          "non-tuple argument to PyTuple_GET_SIZE");
   return tupleUnderlying(obj).length();
@@ -55,7 +55,7 @@ PY_EXPORT Py_ssize_t PyTuple_GET_SIZE_Func(PyObject* pytuple) {
 PY_EXPORT PyObject* PyTuple_GetItem(PyObject* pytuple, Py_ssize_t pos) {
   Thread* thread = Thread::current();
   Runtime* runtime = thread->runtime();
-  RawObject obj = ApiHandle::fromPyObject(pytuple)->asObject();
+  RawObject obj = ApiHandle::asObject(ApiHandle::fromPyObject(pytuple));
   if (!runtime->isInstanceOfTuple(obj)) {
     thread->raiseBadInternalCall();
     return nullptr;
@@ -72,7 +72,7 @@ PY_EXPORT PyObject* PyTuple_GetItem(PyObject* pytuple, Py_ssize_t pos) {
 
 PY_EXPORT PyObject* PyTuple_SET_ITEM_Func(PyObject* pytuple, Py_ssize_t pos,
                                           PyObject* pyitem) {
-  RawObject obj = ApiHandle::fromPyObject(pytuple)->asObjectNoImmediate();
+  RawObject obj = ApiHandle::asObjectNoImmediate(ApiHandle::fromPyObject(pytuple));
   RawObject item = pyitem == nullptr ? NoneType::object()
                                      : ApiHandle::stealReference(pyitem);
   DCHECK(Thread::current()->runtime()->isInstanceOfTuple(obj),
@@ -87,7 +87,7 @@ PY_EXPORT int PyTuple_SetItem(PyObject* pytuple, Py_ssize_t pos,
                               PyObject* pyitem) {
   Thread* thread = Thread::current();
   Runtime* runtime = thread->runtime();
-  RawObject obj = ApiHandle::fromPyObject(pytuple)->asObject();
+  RawObject obj = ApiHandle::asObject(ApiHandle::fromPyObject(pytuple));
   RawObject item = pyitem == nullptr ? NoneType::object()
                                      : ApiHandle::stealReference(pyitem);
   if (!runtime->isInstanceOfTuple(obj)) {
@@ -109,7 +109,7 @@ PY_EXPORT int PyTuple_SetItem(PyObject* pytuple, Py_ssize_t pos,
 PY_EXPORT Py_ssize_t PyTuple_Size(PyObject* pytuple) {
   Thread* thread = Thread::current();
   Runtime* runtime = thread->runtime();
-  RawObject obj = ApiHandle::fromPyObject(pytuple)->asObject();
+  RawObject obj = ApiHandle::asObject(ApiHandle::fromPyObject(pytuple));
   if (!runtime->isInstanceOfTuple(obj)) {
     thread->raiseBadInternalCall();
     return -1;
@@ -136,7 +136,7 @@ PY_EXPORT PyObject* PyTuple_Pack(Py_ssize_t n, ...) {
   MutableTuple tuple(&scope, runtime->newMutableTuple(n));
   for (Py_ssize_t i = 0; i < n; i++) {
     PyObject* item = va_arg(vargs, PyObject*);
-    tuple.atPut(i, ApiHandle::fromPyObject(item)->asObject());
+    tuple.atPut(i, ApiHandle::asObject(ApiHandle::fromPyObject(item)));
   }
   va_end(vargs);
   return ApiHandle::newReferenceWithManaged(runtime, tuple.becomeImmutable());
@@ -151,7 +151,7 @@ PY_EXPORT PyObject* PyTuple_GetSlice(PyObject* pytuple, Py_ssize_t low,
   }
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
-  Object tuple_obj(&scope, ApiHandle::fromPyObject(pytuple)->asObject());
+  Object tuple_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pytuple)));
   if (!runtime->isInstanceOfTuple(*tuple_obj)) {
     thread->raiseBadInternalCall();
     return nullptr;

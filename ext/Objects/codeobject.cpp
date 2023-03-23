@@ -38,7 +38,7 @@ static_assert(RawCode::Flags::kFutureGeneratorStop == CO_FUTURE_GENERATOR_STOP,
               "");
 
 PY_EXPORT int PyCode_Check_Func(PyObject* obj) {
-  return ApiHandle::fromPyObject(obj)->asObject().isCode();
+  return ApiHandle::asObject(ApiHandle::fromPyObject(obj)).isCode();
 }
 
 PY_EXPORT PyCodeObject* PyCode_NewWithPosOnlyArgs(
@@ -55,15 +55,15 @@ PY_EXPORT PyCodeObject* PyCode_NewWithPosOnlyArgs(
     return nullptr;
   }
   HandleScope scope(thread);
-  Object consts_obj(&scope, ApiHandle::fromPyObject(consts)->asObject());
-  Object names_obj(&scope, ApiHandle::fromPyObject(names)->asObject());
-  Object varnames_obj(&scope, ApiHandle::fromPyObject(varnames)->asObject());
-  Object freevars_obj(&scope, ApiHandle::fromPyObject(freevars)->asObject());
-  Object cellvars_obj(&scope, ApiHandle::fromPyObject(cellvars)->asObject());
-  Object name_obj(&scope, ApiHandle::fromPyObject(name)->asObject());
-  Object filename_obj(&scope, ApiHandle::fromPyObject(filename)->asObject());
-  Object lnotab_obj(&scope, ApiHandle::fromPyObject(lnotab)->asObject());
-  Object code_obj(&scope, ApiHandle::fromPyObject(code)->asObject());
+  Object consts_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(consts)));
+  Object names_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(names)));
+  Object varnames_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(varnames)));
+  Object freevars_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(freevars)));
+  Object cellvars_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(cellvars)));
+  Object name_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(name)));
+  Object filename_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(filename)));
+  Object lnotab_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(lnotab)));
+  Object code_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(code)));
   Runtime* runtime = thread->runtime();
   // Check argument types
   // TODO(emacs): Call equivalent of PyObject_CheckReadBuffer(code) instead of
@@ -140,7 +140,7 @@ PY_EXPORT Py_ssize_t PyCode_GetNumFree_Func(PyObject* code) {
   DCHECK(code != nullptr, "code must not be null");
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object code_obj(&scope, ApiHandle::fromPyObject(code)->asObject());
+  Object code_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(code)));
   DCHECK(code_obj.isCode(), "code must be a code object");
   Code code_code(&scope, *code_obj);
   Tuple freevars(&scope, code_code.freevars());
@@ -239,7 +239,7 @@ PY_EXPORT PyObject* _PyCode_ConstantKey(PyObject* op) {
   DCHECK(op != nullptr, "op must not be null");
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object obj(&scope, ApiHandle::fromPyObject(op)->asObject());
+  Object obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(op)));
   Object result(&scope, constantKey(thread, obj));
   if (result.isError()) {
     return nullptr;

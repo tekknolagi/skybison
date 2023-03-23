@@ -24,7 +24,7 @@ static RawObject callMethNoArgs(Thread* thread, const Function& function,
   PyObject* pyresult = (*method)(self_obj, nullptr);
   Object result(&scope, ApiHandle::checkFunctionResult(thread, pyresult));
   if (self_obj != nullptr) {
-    ApiHandle::fromPyObject(self_obj)->decref();
+    ApiHandle::decref(ApiHandle::fromPyObject(self_obj));
   }
   return *result;
 }
@@ -145,9 +145,9 @@ static RawObject callMethOneArg(Thread* thread, const Function& function,
   PyObject* pyresult = (*method)(self_obj, arg_obj);
   Object result(&scope, ApiHandle::checkFunctionResult(thread, pyresult));
   if (self_obj != nullptr) {
-    ApiHandle::fromPyObject(self_obj)->decref();
+    ApiHandle::decref(ApiHandle::fromPyObject(self_obj));
   }
-  ApiHandle::fromPyObject(arg_obj)->decref();
+  ApiHandle::decref(ApiHandle::fromPyObject(arg_obj));
   return *result;
 }
 
@@ -228,9 +228,9 @@ static RawObject callMethVarArgs(Thread* thread, const Function& function,
   PyObject* pyresult = (*method)(self_obj, varargs_obj);
   Object result(&scope, ApiHandle::checkFunctionResult(thread, pyresult));
   if (self_obj != nullptr) {
-    ApiHandle::fromPyObject(self_obj)->decref();
+    ApiHandle::decref(ApiHandle::fromPyObject(self_obj));
   }
-  ApiHandle::fromPyObject(varargs_obj)->decref();
+  ApiHandle::decref(ApiHandle::fromPyObject(varargs_obj));
   return *result;
 }
 
@@ -338,11 +338,11 @@ static RawObject callMethKeywords(Thread* thread, const Function& function,
   PyObject* pyresult = (*method)(self_obj, args_obj, kwargs_obj);
   Object result(&scope, ApiHandle::checkFunctionResult(thread, pyresult));
   if (self_obj != nullptr) {
-    ApiHandle::fromPyObject(self_obj)->decref();
+    ApiHandle::decref(ApiHandle::fromPyObject(self_obj));
   }
-  ApiHandle::fromPyObject(args_obj)->decref();
+  ApiHandle::decref(ApiHandle::fromPyObject(args_obj));
   if (kwargs_obj != nullptr) {
-    ApiHandle::fromPyObject(kwargs_obj)->decref();
+    ApiHandle::decref(ApiHandle::fromPyObject(kwargs_obj));
   }
   return *result;
 }
@@ -447,7 +447,7 @@ static RawObject callMethFast(Thread* thread, const Function& function,
   PyObject* pyresult = (*method)(self_obj, args, num_args);
   RawObject result = ApiHandle::checkFunctionResult(thread, pyresult);
   if (self_obj != nullptr) {
-    ApiHandle::fromPyObject(self_obj)->decref();
+    ApiHandle::decref(ApiHandle::fromPyObject(self_obj));
   }
   return result;
 }
@@ -479,7 +479,7 @@ RawObject methodTrampolineFast(Thread* thread, word nargs) {
   Object result(&scope,
                 callMethFast(thread, function, self, args, num_positional));
   for (word i = 0; i < num_positional; i++) {
-    ApiHandle::fromPyObject(args[nargs - i - 2])->decref();
+    ApiHandle::decref(ApiHandle::fromPyObject(args[nargs - i - 2]));
   }
   thread->stackDrop(nargs + 1);
   if (args != small_array) {
@@ -520,7 +520,7 @@ RawObject methodTrampolineFastKw(Thread* thread, word nargs) {
   }
   Object result(&scope, callMethFast(thread, function, self, args, nargs - 1));
   for (word i = 0; i < num_positional; i++) {
-    ApiHandle::fromPyObject(args[i])->decref();
+    ApiHandle::decref(ApiHandle::fromPyObject(args[i]));
   }
   thread->stackDrop(nargs + 2);
   if (args != small_array) {
@@ -574,7 +574,7 @@ RawObject methodTrampolineFastEx(Thread* thread, word flags) {
   Object result(&scope,
                 callMethFast(thread, function, self, args, num_positional));
   for (word i = 0; i < num_positional; i++) {
-    ApiHandle::fromPyObject(args[i])->decref();
+    ApiHandle::decref(ApiHandle::fromPyObject(args[i]));
   }
   thread->stackDrop(has_varkeywords + 2);
   if (args != small_array) {
@@ -594,9 +594,9 @@ static RawObject callMethFastWithKeywordsWithKwargs(
   ApiHandle* kw_names_obj = ApiHandle::newReference(runtime, *kw_names);
   PyObject* pyresult = (*method)(self_obj, args, num_args, kw_names_obj);
   RawObject result = ApiHandle::checkFunctionResult(thread, pyresult);
-  kw_names_obj->decref();
+  ApiHandle::decref(kw_names_obj);
   if (self_obj != nullptr) {
-    ApiHandle::fromPyObject(self_obj)->decref();
+    ApiHandle::decref(ApiHandle::fromPyObject(self_obj));
   }
   return result;
 }
@@ -614,7 +614,7 @@ static RawObject callMethFastWithKeywords(Thread* thread,
   PyObject* pyresult = (*method)(self_obj, args, num_args, nullptr);
   RawObject result = ApiHandle::checkFunctionResult(thread, pyresult);
   if (self_obj != nullptr) {
-    ApiHandle::fromPyObject(self_obj)->decref();
+    ApiHandle::decref(ApiHandle::fromPyObject(self_obj));
   }
   return result;
 }
@@ -640,7 +640,7 @@ RawObject methodTrampolineFastWithKeywords(Thread* thread, word nargs) {
                 callMethFastWithKeywords(thread, function, self,
                                          fastcall_args.get(), num_positional));
   for (word i = 0; i < nargs - 1; i++) {
-    ApiHandle::fromPyObject(fastcall_args[nargs - i - 2])->decref();
+    ApiHandle::decref(ApiHandle::fromPyObject(fastcall_args[nargs - i - 2]));
   }
   thread->stackDrop(nargs + 1);
   return *result;
@@ -668,7 +668,7 @@ RawObject methodTrampolineFastWithKeywordsKw(Thread* thread, word nargs) {
                             thread, function, self, fastcall_args.get(),
                             num_positional, kw_names));
   for (word i = 0; i < nargs - 1; i++) {
-    ApiHandle::fromPyObject(fastcall_args[i])->decref();
+    ApiHandle::decref(ApiHandle::fromPyObject(fastcall_args[i]));
   }
   thread->stackDrop(nargs + 2);
   return *result;
@@ -734,7 +734,7 @@ RawObject methodTrampolineFastWithKeywordsEx(Thread* thread, word flags) {
         thread, function, self, fastcall_args.get(), num_positional, kw_names);
   }
   for (word i = 0; i < num_positional + num_keywords; i++) {
-    ApiHandle::fromPyObject(fastcall_args[i])->decref();
+    ApiHandle::decref(ApiHandle::fromPyObject(fastcall_args[i]));
   }
   thread->stackDrop(has_varkeywords + 2);
   return *result;

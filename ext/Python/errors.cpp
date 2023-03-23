@@ -161,8 +161,8 @@ PY_EXPORT int PyErr_GivenExceptionMatches(PyObject* given, PyObject* exc) {
   }
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object given_obj(&scope, ApiHandle::fromPyObject(given)->asObject());
-  Object exc_obj(&scope, ApiHandle::fromPyObject(exc)->asObject());
+  Object given_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(given)));
+  Object exc_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(exc)));
   return givenExceptionMatches(thread, given_obj, exc_obj) ? 1 : 0;
 }
 
@@ -185,10 +185,10 @@ PY_EXPORT PyObject* PyErr_NewException(const char* name, PyObject* base_or_null,
   Object exc_name(&scope, runtime->newStrFromCStr(dot + 1));
   Object base(&scope, base_or_null == nullptr
                           ? runtime->typeAt(LayoutId::kException)
-                          : ApiHandle::fromPyObject(base_or_null)->asObject());
+                          : ApiHandle::asObject(ApiHandle::fromPyObject(base_or_null)));
   Object dict(&scope, dict_or_null == nullptr
                           ? runtime->newDict()
-                          : ApiHandle::fromPyObject(dict_or_null)->asObject());
+                          : ApiHandle::asObject(ApiHandle::fromPyObject(dict_or_null)));
   Object type(&scope, thread->invokeFunction4(ID(builtins), ID(_exception_new),
                                               mod_name, exc_name, base, dict));
   if (type.isError()) {
@@ -207,7 +207,7 @@ PY_EXPORT PyObject* PyErr_NewExceptionWithDoc(const char* name, const char* doc,
   Object dict_obj(&scope,
                   dict_or_null == nullptr
                       ? runtime->newDict()
-                      : ApiHandle::fromPyObject(dict_or_null)->asObject());
+                      : ApiHandle::asObject(ApiHandle::fromPyObject(dict_or_null)));
   if (doc != nullptr) {
     if (!runtime->isInstanceOfDict(*dict_obj)) {
       thread->raiseBadInternalCall();
@@ -232,7 +232,7 @@ PY_EXPORT PyObject* PyErr_NewExceptionWithDoc(const char* name, const char* doc,
   Object exc_name(&scope, runtime->newStrFromCStr(dot + 1));
   Object base(&scope, base_or_null == nullptr
                           ? runtime->typeAt(LayoutId::kException)
-                          : ApiHandle::fromPyObject(base_or_null)->asObject());
+                          : ApiHandle::asObject(ApiHandle::fromPyObject(base_or_null)));
   Object type(&scope,
               thread->invokeFunction4(ID(builtins), ID(_exception_new),
                                       mod_name, exc_name, base, dict_obj));
@@ -248,13 +248,13 @@ PY_EXPORT void PyErr_NormalizeException(PyObject** exc, PyObject** val,
   Thread* thread = Thread::current();
   HandleScope scope(thread);
 
-  Object exc_obj(&scope, *exc ? ApiHandle::fromPyObject(*exc)->asObject()
+  Object exc_obj(&scope, *exc ? ApiHandle::asObject(ApiHandle::fromPyObject(*exc))
                               : NoneType::object());
   Object exc_orig(&scope, *exc_obj);
-  Object val_obj(&scope, *val ? ApiHandle::fromPyObject(*val)->asObject()
+  Object val_obj(&scope, *val ? ApiHandle::asObject(ApiHandle::fromPyObject(*val))
                               : NoneType::object());
   Object val_orig(&scope, *val_obj);
-  Object tb_obj(&scope, *tb ? ApiHandle::fromPyObject(*tb)->asObject()
+  Object tb_obj(&scope, *tb ? ApiHandle::asObject(ApiHandle::fromPyObject(*tb))
                             : NoneType::object());
   Object tb_orig(&scope, *tb_obj);
   normalizeException(thread, &exc_obj, &val_obj, &tb_obj);
@@ -319,7 +319,7 @@ PY_EXPORT PyObject* PyErr_SetFromErrno(PyObject* type) {
   int errno_value = errno;
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object type_obj(&scope, ApiHandle::fromPyObject(type)->asObject());
+  Object type_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(type)));
   Object none(&scope, NoneType::object());
   thread->raiseFromErrnoWithFilenames(type_obj, errno_value, none, none);
   return nullptr;
@@ -330,7 +330,7 @@ PY_EXPORT PyObject* PyErr_SetFromErrnoWithFilename(PyObject* type,
   int errno_value = errno;
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object type_obj(&scope, ApiHandle::fromPyObject(type)->asObject());
+  Object type_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(type)));
   Object filename_obj(&scope, thread->runtime()->newStrFromCStr(filename));
   Object none(&scope, NoneType::object());
   thread->raiseFromErrnoWithFilenames(type_obj, errno_value, filename_obj,
@@ -343,8 +343,8 @@ PY_EXPORT PyObject* PyErr_SetFromErrnoWithFilenameObject(PyObject* type,
   int errno_value = errno;
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object type_obj(&scope, ApiHandle::fromPyObject(type)->asObject());
-  Object filename_obj(&scope, ApiHandle::fromPyObject(filename)->asObject());
+  Object type_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(type)));
+  Object filename_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(filename)));
   Object none(&scope, NoneType::object());
   thread->raiseFromErrnoWithFilenames(type_obj, errno_value, filename_obj,
                                       none);
@@ -357,9 +357,9 @@ PY_EXPORT PyObject* PyErr_SetFromErrnoWithFilenameObjects(PyObject* type,
   int errno_value = errno;
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object type_obj(&scope, ApiHandle::fromPyObject(type)->asObject());
-  Object filename0_obj(&scope, ApiHandle::fromPyObject(filename0)->asObject());
-  Object filename1_obj(&scope, ApiHandle::fromPyObject(filename1)->asObject());
+  Object type_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(type)));
+  Object filename0_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(filename0)));
+  Object filename1_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(filename1)));
   thread->raiseFromErrnoWithFilenames(type_obj, errno_value, filename0_obj,
                                       filename1_obj);
   return nullptr;
@@ -397,7 +397,7 @@ PY_EXPORT void PyErr_SetObject(PyObject* exc, PyObject* val) {
   }
 
   HandleScope scope(thread);
-  Object exc_obj(&scope, ApiHandle::fromPyObject(exc)->asObject());
+  Object exc_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(exc)));
 
   Runtime* runtime = thread->runtime();
   if (!runtime->isInstanceOfType(*exc_obj) ||
@@ -414,7 +414,7 @@ PY_EXPORT void PyErr_SetObject(PyObject* exc, PyObject* val) {
   Type exc_type(&scope, *exc_obj);
   Object val_obj(&scope, val == nullptr
                              ? NoneType::object()
-                             : ApiHandle::fromPyObject(val)->asObject());
+                             : ApiHandle::asObject(ApiHandle::fromPyObject(val)));
   val_obj = thread->chainExceptionContext(exc_type, val_obj);
   if (val_obj.isError()) return;
   thread->setPendingExceptionType(*exc_obj);
@@ -558,7 +558,7 @@ PY_EXPORT void PyErr_WriteUnraisable(PyObject* obj) {
             .isError()) {
       return;
     }
-    Object object(&scope, ApiHandle::fromPyObject(obj)->asObject());
+    Object object(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
     if (fileWriteObjectReprUnraisable(thread, sys_stderr, object).isError()) {
       if (fileWriteCStrUnraisable(thread, sys_stderr, "<object repr() failed>")
               .isError()) {
@@ -649,7 +649,7 @@ PY_EXPORT PyObject* PyErr_ProgramTextObject(PyObject* filename, int lineno) {
   }
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object filename_obj(&scope, ApiHandle::fromPyObject(filename)->asObject());
+  Object filename_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(filename)));
   Object lineno_obj(&scope, SmallInt::fromWord(lineno));
   Object result(&scope,
                 thread->invokeFunction2(ID(builtins), ID(_err_program_text),
@@ -670,21 +670,21 @@ PY_EXPORT void PyErr_Restore(PyObject* type, PyObject* value,
   if (type == nullptr) {
     thread->setPendingExceptionType(NoneType::object());
   } else {
-    thread->setPendingExceptionType(ApiHandle::fromPyObject(type)->asObject());
+    thread->setPendingExceptionType(ApiHandle::asObject(ApiHandle::fromPyObject(type)));
     // This is a stolen reference, decrement the reference count
-    ApiHandle::fromPyObject(type)->decref();
+    ApiHandle::decref(ApiHandle::fromPyObject(type));
   }
   if (value == nullptr) {
     thread->setPendingExceptionValue(NoneType::object());
   } else {
     thread->setPendingExceptionValue(
-        ApiHandle::fromPyObject(value)->asObject());
+        ApiHandle::asObject(ApiHandle::fromPyObject(value)));
     // This is a stolen reference, decrement the reference count
-    ApiHandle::fromPyObject(value)->decref();
+    ApiHandle::decref(ApiHandle::fromPyObject(value));
   }
   if (traceback != nullptr &&
-      !ApiHandle::fromPyObject(traceback)->asObject().isTraceback()) {
-    ApiHandle::fromPyObject(traceback)->decref();
+      !ApiHandle::asObject(ApiHandle::fromPyObject(traceback)).isTraceback()) {
+    ApiHandle::decref(ApiHandle::fromPyObject(traceback));
     // Can only store traceback instances as the traceback
     traceback = nullptr;
   }
@@ -692,9 +692,9 @@ PY_EXPORT void PyErr_Restore(PyObject* type, PyObject* value,
     thread->setPendingExceptionTraceback(NoneType::object());
   } else {
     thread->setPendingExceptionTraceback(
-        ApiHandle::fromPyObject(traceback)->asObject());
+        ApiHandle::asObject(ApiHandle::fromPyObject(traceback)));
     // This is a stolen reference, decrement the reference count
-    ApiHandle::fromPyObject(traceback)->decref();
+    ApiHandle::decref(ApiHandle::fromPyObject(traceback));
   }
 }
 

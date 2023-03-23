@@ -20,7 +20,7 @@ PY_EXPORT int PyModule_AddObject(PyObject* pymodule, const char* name,
   HandleScope scope(thread);
   Runtime* runtime = thread->runtime();
 
-  Object module_obj(&scope, ApiHandle::fromPyObject(pymodule)->asObject());
+  Object module_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pymodule)));
   if (!runtime->isInstanceOfModule(*module_obj)) {
     thread->raiseWithFmt(LayoutId::kTypeError,
                          "PyModule_AddObject() needs module as first arg");

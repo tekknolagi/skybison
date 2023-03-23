@@ -41,9 +41,9 @@ PY_EXPORT PyObject* _Py_Mangle(PyObject* privateobj, PyObject* ident) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
   Object privateobj_obj(&scope,
-                        ApiHandle::fromPyObject(privateobj)->asObject());
+                        ApiHandle::asObject(ApiHandle::fromPyObject(privateobj)));
   Runtime* runtime = thread->runtime();
-  Object ident_obj(&scope, ApiHandle::fromPyObject(ident)->asObject());
+  Object ident_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(ident)));
   Str ident_str(&scope, strUnderlying(*ident_obj));
   Object mangled(&scope, mangle(thread, privateobj_obj, ident_str));
   if (mangled == ident_str) {
@@ -88,8 +88,8 @@ PY_EXPORT PyCodeObject* PyAST_CompileObject(_mod* mod, PyObject* pyfilename,
   HandleScope scope(thread);
   PyObject* pyast = PyAST_mod2obj(mod);
   if (pyast == nullptr) return nullptr;
-  Object ast(&scope, ApiHandle::fromPyObject(pyast)->asObject());
-  Object filename(&scope, ApiHandle::fromPyObject(pyfilename)->asObject());
+  Object ast(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pyast)));
+  Object filename(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pyfilename)));
   SymbolId mode_id;
   switch (mod->kind) {
     case Module_kind:

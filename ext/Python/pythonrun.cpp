@@ -115,7 +115,7 @@ static PyObject* runPycFile(FILE* fp, const char* filename, Module& module,
 static PyObject* moduleProxy(PyObject* module_obj) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Module module(&scope, ApiHandle::fromPyObject(module_obj)->asObject());
+  Module module(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(module_obj)));
   return ApiHandle::borrowedReference(thread->runtime(), module.moduleProxy());
 }
 
@@ -341,8 +341,8 @@ PY_EXPORT void PyErr_Display(PyObject* /* exc */, PyObject* value,
   HandleScope scope(thread);
 
   DCHECK(value != nullptr, "value must be given");
-  Object value_obj(&scope, ApiHandle::fromPyObject(value)->asObject());
-  Object tb_obj(&scope, tb ? ApiHandle::fromPyObject(tb)->asObject()
+  Object value_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(value)));
+  Object tb_obj(&scope, tb ? ApiHandle::asObject(ApiHandle::fromPyObject(tb))
                            : NoneType::object());
   if (displayException(thread, value_obj, tb_obj).isError()) {
     // Don't propagate any exceptions that happened during printing. This isn't
@@ -415,7 +415,7 @@ PY_EXPORT PyObject* PyRun_FileExFlags(FILE* fp, const char* filename_cstr,
     return nullptr;
   }
   Code code_code(&scope, code);
-  Object globals_obj(&scope, ApiHandle::fromPyObject(globals)->asObject());
+  Object globals_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(globals)));
   Object module_obj(&scope, NoneType::object());
   if (globals_obj.isModuleProxy()) {
     module_obj = ModuleProxy::cast(*globals_obj).module();
@@ -427,7 +427,7 @@ PY_EXPORT PyObject* PyRun_FileExFlags(FILE* fp, const char* filename_cstr,
   }
   Object implicit_globals(&scope, NoneType::object());
   if (locals != nullptr && globals != locals) {
-    implicit_globals = ApiHandle::fromPyObject(locals)->asObject();
+    implicit_globals = ApiHandle::asObject(ApiHandle::fromPyObject(locals));
     if (!runtime->isMapping(thread, implicit_globals)) {
       thread->raiseBadInternalCall();
       return nullptr;

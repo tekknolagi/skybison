@@ -14,13 +14,13 @@ PY_EXPORT PyTypeObject* PyByteArrayIter_Type_Ptr() {
 
 char* bytearrayAsString(Runtime* runtime, ApiHandle* handle,
                         const Bytearray& array) {
-  if (void* cache = handle->cache(runtime)) std::free(cache);
+  if (void* cache = ApiHandle::cache(runtime, handle)) std::free(cache);
   word len = array.numItems();
   auto buffer = static_cast<byte*>(std::malloc(len + 1));
   array.copyTo(buffer, len);
   buffer[len] = '\0';
-  handle->setCache(runtime, buffer);
-  handle->setBorrowedNoImmediate();
+  ApiHandle::setCache(runtime, handle, buffer);
+  ApiHandle::setBorrowedNoImmediate(handle);
   return reinterpret_cast<char*>(buffer);
 }
 
@@ -29,7 +29,7 @@ PY_EXPORT char* PyByteArray_AsString(PyObject* pyobj) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
   ApiHandle* handle = ApiHandle::fromPyObject(pyobj);
-  Object obj(&scope, handle->asObject());
+  Object obj(&scope, ApiHandle::asObject(handle));
   Runtime* runtime = thread->runtime();
   DCHECK(runtime->isInstanceOfBytearray(*obj),
          "argument to PyByteArray_AsString is not a bytearray");
@@ -38,12 +38,12 @@ PY_EXPORT char* PyByteArray_AsString(PyObject* pyobj) {
 }
 
 PY_EXPORT int PyByteArray_CheckExact_Func(PyObject* pyobj) {
-  return ApiHandle::fromPyObject(pyobj)->asObject().isBytearray();
+  return ApiHandle::asObject(ApiHandle::fromPyObject(pyobj)).isBytearray();
 }
 
 PY_EXPORT int PyByteArray_Check_Func(PyObject* pyobj) {
   return Thread::current()->runtime()->isInstanceOfBytearray(
-      ApiHandle::fromPyObject(pyobj)->asObject());
+      ApiHandle::asObject(ApiHandle::fromPyObject(pyobj)));
 }
 
 PY_EXPORT PyObject* PyByteArray_Concat(PyObject* a, PyObject* b) {
@@ -51,8 +51,8 @@ PY_EXPORT PyObject* PyByteArray_Concat(PyObject* a, PyObject* b) {
   DCHECK(b != nullptr, "null argument to PyByteArray_Concat");
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object left(&scope, ApiHandle::fromPyObject(a)->asObject());
-  Object right(&scope, ApiHandle::fromPyObject(b)->asObject());
+  Object left(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(a)));
+  Object right(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(b)));
   Runtime* runtime = thread->runtime();
   if (!runtime->isByteslike(*left) || !runtime->isByteslike(*right)) {
     thread->raiseWithFmt(LayoutId::kTypeError, "can't concat %T to %T", &left,
@@ -101,7 +101,7 @@ PY_EXPORT PyObject* PyByteArray_FromObject(PyObject* obj) {
     return ApiHandle::newReferenceWithManaged(runtime, runtime->newBytearray());
   }
   HandleScope scope(thread);
-  Object src(&scope, ApiHandle::fromPyObject(obj)->asObject());
+  Object src(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
   Object result(&scope,
                 thread->invokeFunction1(ID(builtins), ID(bytearray), src));
   return result.isError() ? nullptr : ApiHandle::newReference(runtime, *result);
@@ -112,7 +112,7 @@ PY_EXPORT int PyByteArray_Resize(PyObject* pyobj, Py_ssize_t newsize) {
   DCHECK(newsize >= 0, "negative size");
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object obj(&scope, ApiHandle::fromPyObject(pyobj)->asObject());
+  Object obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pyobj)));
   Runtime* runtime = thread->runtime();
   DCHECK(runtime->isInstanceOfBytearray(*obj),
          "argument to PyByteArray_Resize is not a bytearray");
@@ -133,7 +133,7 @@ PY_EXPORT Py_ssize_t PyByteArray_Size(PyObject* pyobj) {
   DCHECK(pyobj != nullptr, "null argument to PyByteArray_Size");
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object obj(&scope, ApiHandle::fromPyObject(pyobj)->asObject());
+  Object obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pyobj)));
   DCHECK(thread->runtime()->isInstanceOfBytearray(*obj),
          "argument to PyByteArray_Size is not a bytearray");
   return static_cast<Py_ssize_t>(Bytearray::cast(*obj).numItems());

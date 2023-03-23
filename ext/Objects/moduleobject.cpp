@@ -21,12 +21,12 @@ extern struct _inittab _PyImport_Inittab[];
 struct _inittab* PyImport_Inittab = _PyImport_Inittab;
 
 PY_EXPORT int PyModule_CheckExact_Func(PyObject* obj) {
-  return ApiHandle::fromPyObject(obj)->asObject().isModule();
+  return ApiHandle::asObject(ApiHandle::fromPyObject(obj)).isModule();
 }
 
 PY_EXPORT int PyModule_Check_Func(PyObject* obj) {
   return Thread::current()->runtime()->isInstanceOfModule(
-      ApiHandle::fromPyObject(obj)->asObject());
+      ApiHandle::asObject(ApiHandle::fromPyObject(obj)));
 }
 
 static void moduleDefInit(PyModuleDef* def) {
@@ -85,7 +85,7 @@ PY_EXPORT PyObject* PyModule_Create2(PyModuleDef* def, int) {
 PY_EXPORT PyModuleDef* PyModule_GetDef(PyObject* pymodule) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object module_obj(&scope, ApiHandle::fromPyObject(pymodule)->asObject());
+  Object module_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pymodule)));
   if (!thread->runtime()->isInstanceOfModule(*module_obj)) {
     thread->raiseBadArgument();
     return nullptr;
@@ -101,7 +101,7 @@ PY_EXPORT PyObject* PyModule_GetDict(PyObject* pymodule) {
   // does work with PyEval_EvalCode.
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object module_obj(&scope, ApiHandle::fromPyObject(pymodule)->asObject());
+  Object module_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pymodule)));
   Runtime* runtime = thread->runtime();
   if (!runtime->isInstanceOfModule(*module_obj)) {
     thread->raiseBadArgument();
@@ -116,7 +116,7 @@ PY_EXPORT PyObject* PyModule_GetNameObject(PyObject* mod) {
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
 
-  Object module_obj(&scope, ApiHandle::fromPyObject(mod)->asObject());
+  Object module_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(mod)));
   if (!runtime->isInstanceOfModule(*module_obj)) {
     thread->raiseBadArgument();
     return nullptr;
@@ -132,7 +132,7 @@ PY_EXPORT PyObject* PyModule_GetNameObject(PyObject* mod) {
 
 PY_EXPORT void* PyModule_GetState(PyObject* mod) {
   Thread* thread = Thread::current();
-  RawObject module_obj = ApiHandle::fromPyObject(mod)->asObject();
+  RawObject module_obj = ApiHandle::asObject(ApiHandle::fromPyObject(mod));
   if (!thread->runtime()->isInstanceOfModule(module_obj)) {
     thread->raiseBadArgument();
     return nullptr;
@@ -161,10 +161,10 @@ word moduleExecDef(Thread* thread, const Module& module, PyModuleDef* def) {
 
   ApiHandle* handle = ApiHandle::borrowedReference(runtime, *module);
   if (def->m_size >= 0) {
-    if (handle->cache(runtime) == nullptr) {
-      DCHECK(handle->isBorrowedNoImmediate(), "handle must be marked borrowed");
-      handle->setCache(runtime, std::calloc(def->m_size, 1));
-      if (!handle->cache(runtime)) {
+    if (ApiHandle::cache(runtime, handle) == nullptr) {
+      DCHECK(ApiHandle::isBorrowedNoImmediate(handle), "handle must be marked borrowed");
+      ApiHandle::setCache(runtime, handle, std::calloc(def->m_size, 1));
+      if (!ApiHandle::cache(runtime, handle)) {
         thread->raiseMemoryError();
         return -1;
       }
@@ -217,7 +217,7 @@ word moduleExecDef(Thread* thread, const Module& module, PyModuleDef* def) {
 PY_EXPORT int PyModule_ExecDef(PyObject* pymodule, PyModuleDef* def) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object module_obj(&scope, ApiHandle::fromPyObject(pymodule)->asObject());
+  Object module_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pymodule)));
   if (!thread->runtime()->isInstanceOfModule(*module_obj)) {
     return -1;
   }
@@ -239,7 +239,7 @@ PY_EXPORT PyObject* PyModule_GetFilenameObject(PyObject* pymodule) {
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
 
-  Object module_obj(&scope, ApiHandle::fromPyObject(pymodule)->asObject());
+  Object module_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(pymodule)));
   if (!runtime->isInstanceOfModule(*module_obj)) {
     thread->raiseBadArgument();
     return nullptr;
@@ -274,7 +274,7 @@ PY_EXPORT PyObject* PyModule_New(const char* c_name) {
 PY_EXPORT PyObject* PyModule_NewObject(PyObject* name) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
-  Object name_obj(&scope, ApiHandle::fromPyObject(name)->asObject());
+  Object name_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(name)));
   Runtime* runtime = thread->runtime();
   return ApiHandle::newReference(runtime, runtime->newModule(name_obj));
 }
@@ -283,7 +283,7 @@ PY_EXPORT int PyModule_SetDocString(PyObject* m, const char* doc) {
   Thread* thread = Thread::current();
   Runtime* runtime = thread->runtime();
   HandleScope scope(thread);
-  Object module(&scope, ApiHandle::fromPyObject(m)->asObject());
+  Object module(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(m)));
   Object uni(&scope, runtime->newStrFromCStr(doc));
   if (!uni.isStr()) {
     return -1;
@@ -315,7 +315,7 @@ static RawObject initializeModule(Thread* thread, ExtensionModuleInitFunc init,
   }
   HandleScope scope(thread);
   Runtime* runtime = thread->runtime();
-  Object module_obj(&scope, ApiHandle::fromPyObject(module_or_def)->asObject());
+  Object module_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(module_or_def)));
   if (!runtime->isInstanceOfModule(*module_obj)) {
     // TODO(T39542987): Enable multi-phase module initialization
     UNIMPLEMENTED("Multi-phase module initialization");

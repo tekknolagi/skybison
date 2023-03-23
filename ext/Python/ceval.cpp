@@ -42,9 +42,9 @@ PY_EXPORT PyObject* PyEval_EvalCode(PyObject* code, PyObject* globals,
     return nullptr;
   }
   HandleScope scope(thread);
-  Code code_code(&scope, ApiHandle::fromPyObject(code)->asObject());
+  Code code_code(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(code)));
   Runtime* runtime = thread->runtime();
-  Object globals_obj(&scope, ApiHandle::fromPyObject(globals)->asObject());
+  Object globals_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(globals)));
   Object module_obj(&scope, NoneType::object());
   bool must_update_globals = false;
   if (globals_obj.isModuleProxy()) {
@@ -72,7 +72,7 @@ PY_EXPORT PyObject* PyEval_EvalCode(PyObject* code, PyObject* globals,
 
   Object implicit_globals(&scope, NoneType::object());
   if (locals != nullptr && globals != locals) {
-    implicit_globals = ApiHandle::fromPyObject(locals)->asObject();
+    implicit_globals = ApiHandle::asObject(ApiHandle::fromPyObject(locals));
     if (!runtime->isMapping(thread, implicit_globals)) {
       thread->raiseBadInternalCall();
       return nullptr;
@@ -206,11 +206,11 @@ PY_EXPORT PyObject* PyEval_CallObjectWithKeywords(PyObject* callable,
 
   HandleScope scope(thread);
   word flags = 0;
-  thread->stackPush(ApiHandle::fromPyObject(callable)->asObject());
+  thread->stackPush(ApiHandle::asObject(ApiHandle::fromPyObject(callable)));
 
   Runtime* runtime = thread->runtime();
   if (args != nullptr) {
-    Object args_obj(&scope, ApiHandle::fromPyObject(args)->asObject());
+    Object args_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(args)));
     if (!runtime->isInstanceOfTuple(*args_obj)) {
       thread->raiseWithFmt(LayoutId::kTypeError,
                            "argument list must be a tuple");
@@ -222,7 +222,7 @@ PY_EXPORT PyObject* PyEval_CallObjectWithKeywords(PyObject* callable,
   }
 
   if (kwargs != nullptr) {
-    Object kwargs_obj(&scope, ApiHandle::fromPyObject(kwargs)->asObject());
+    Object kwargs_obj(&scope, ApiHandle::asObject(ApiHandle::fromPyObject(kwargs)));
     if (!runtime->isInstanceOfDict(*kwargs_obj)) {
       thread->raiseWithFmt(LayoutId::kTypeError,
                            "keyword list must be a dictionary");
