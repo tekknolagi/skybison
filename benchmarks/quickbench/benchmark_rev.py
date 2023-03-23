@@ -27,7 +27,7 @@ def benchmark(repo_root, revision, binary, resultsdir, args):
             "--json",
             "--callgrind",
         ]
-        proc = run(cmd, cwd="/", stdout=subprocess.PIPE, log_level=logging.INFO)
+        proc = run(cmd, cwd="/", log_level=logging.INFO)
         results += json.loads(proc.stdout)
 
     if args.run_benchmarks:
@@ -43,7 +43,7 @@ def benchmark(repo_root, revision, binary, resultsdir, args):
             "--callgrind-out-dir",
             cgoutdir,
         ]
-        proc = run(cmd, cwd="/", stdout=subprocess.PIPE, log_level=logging.INFO)
+        proc = run(cmd, cwd="/", log_level=logging.INFO)
         results += json.loads(proc.stdout)
 
     for result in results:
@@ -107,7 +107,7 @@ if __name__ == "__main__":
         if args.verbose:
             cmd += ["--verbose"]
         cmd += [revision]
-        p = run(cmd, stdout=subprocess.PIPE)
+        p = run(cmd)
         binary = p.stdout.strip()
         if not binary.startswith("/"):
             logging.critical(f"Build script did not produce a path. Output: {binary}")

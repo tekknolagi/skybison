@@ -36,12 +36,10 @@ def build(repo_root, builddir, sourcedir):
     ]
     run(
         ["cmake", "-GNinja"] + cmake_flags,
-        stdout=subprocess.DEVNULL,
         log_level=logging.INFO,
     )
     run(
         ["ninja", "-C", builddir, "python"],
-        stdout=subprocess.DEVNULL,
         log_level=logging.INFO,
     )
 
@@ -58,13 +56,12 @@ def checkout_and_build(repo_root, revision, builddir):
         run(
             ["git", "worktree", "add", "--detach", workdir, revision],
             cwd=repo_root,
-            stdout=subprocess.DEVNULL,
         )
         try:
             run(["mkdir", "-p", builddir], log_level=logging.DEBUG)
             return build(repo_root, builddir, workdir)
         finally:
-            run(["git", "worktree", "remove", "-f", workdir], stdout=subprocess.DEVNULL)
+            run(["git", "worktree", "remove", "-f", workdir])
 
 
 def clean_old_builds():
