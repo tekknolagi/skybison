@@ -142,8 +142,8 @@ jobs:
       working-directory: ${{github.workspace}}
       run: |
         ./benchmarks/run.py --tool callgrind --json \
-          --interpreter prev-build/bin/python --interpreter-name python_base --path benchmarks/benchmarks \
-          --interpreter curr-build/bin/python --interpreter-name python_new --path benchmarks/benchmarks \
+          --interpreter prev-build/bin/python --interpreter-name python_base --path $(pwd)/curr-build/benchmarks/benchmarks \
+          --interpreter curr-build/bin/python --interpreter-name python_new --path $(pwd)/curr-build/benchmarks/benchmarks \
           --interpreter $(which python3.8) --interpreter-name fbcode-cpython --path $(pwd)/curr-build/benchmarks/benchmarks \
           > benchmark-results.json
 
