@@ -279,9 +279,8 @@ static const word kMaxCaches = 65536;
 
 class BytecodeSlice {
  public:
-  BytecodeSlice(Thread* thread, const MutableBytes& rewritten_bytecode,
-                word start, word end)
-      : thread_(thread), start_(start), end_(end) {
+  BytecodeSlice(const MutableBytes& rewritten_bytecode, word start, word end)
+      : start_(start), end_(end) {
     word num_opcodes = rewrittenBytecodeLength(rewritten_bytecode);
     bytecode_.reserve(num_opcodes);
     // TODO(max): Remove this gross loop
@@ -313,8 +312,7 @@ class BytecodeSlice {
   const Vector<BytecodeOp>& bytecode() const { return bytecode_; }
 
  private:
-  Thread* thread_{nullptr};
-  // Expanded but not yet rewritten.
+  //  Expanded but not yet rewritten.
   Vector<BytecodeOp> bytecode_;
   word start_{0};
   word end_{0};
@@ -456,7 +454,7 @@ static void computePredsAndSuccs(BlockMap* block_map) {
   }
 }
 
-static BlockMap* createBlocks(Thread* thread, const MutableBytes& bytecode,
+static BlockMap* createBlocks(const MutableBytes& bytecode,
                               BytecodeSlice instrs) {
   std::set<word> block_starts;
   block_starts.insert(0);
@@ -495,7 +493,7 @@ static BlockMap* createBlocks(Thread* thread, const MutableBytes& bytecode,
     uword start_idx = block_starts_ordered[i];
     uword end_idx =
         i + 1 < num_blocks ? block_starts_ordered[i + 1] : num_instrs;
-    BytecodeSlice slice(thread, bytecode, start_idx, end_idx);
+    BytecodeSlice slice(bytecode, start_idx, end_idx);
     Block* block = new Block(i, slice);
     block_map->addBlock(start_idx, block);
   }
@@ -623,9 +621,8 @@ void rewriteBytecode(Thread* thread, const Function& function) {
     return;
   }
   // Scan bytecode to figure out which locals are live at each opcode
-  BytecodeSlice bytecode_slice(thread, bytecode, 0,
-                               bytecode.length() / kCodeUnitSize);
-  BlockMap* block_map = createBlocks(thread, bytecode, bytecode_slice);
+  BytecodeSlice bytecode_slice(bytecode, 0, bytecode.length() / kCodeUnitSize);
+  BlockMap* block_map = createBlocks(bytecode, bytecode_slice);
   std::map<word, bool> live_at_idx;
   if (block_map != nullptr) {
     live_at_idx = computeLiveSets(
