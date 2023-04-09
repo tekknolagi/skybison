@@ -654,8 +654,10 @@ void rewriteBytecode(Thread* thread, const Function& function) {
   for (word i = 0; i < num_opcodes;) {
     BytecodeOp op = nextBytecodeOp(bytecode, &i);
     word previous_index = i - 1;
-    bool definitely_assigned = block_map != nullptr && op.bc == LOAD_FAST &&
-                               map_get_strict(live_at_idx, previous_index);
+    bool definitely_assigned =
+        block_map != nullptr && op.bc == LOAD_FAST &&
+        // Default to false; a dead block might not be in the map.
+        map_get_default(live_at_idx, previous_index, false);
     RewrittenOp rewritten = rewriteOperation(function, op, definitely_assigned);
     if (rewritten.bc == UNUSED_BYTECODE_0) continue;
     if (rewritten.needs_inline_cache) {
