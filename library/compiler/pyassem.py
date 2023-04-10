@@ -630,7 +630,7 @@ class PyFlowGraph(FlowGraph):
                 elif instr.opname == "STORE_FAST":
                     currently_alive.add(instr.oparg)
                 elif instr.opname == "DELETE_FAST":
-                    currently_alive.remove(instr.oparg)
+                    currently_alive.discard(instr.oparg)
             live_out[block] = currently_alive
             for succ in succs[block]:
                 queue.append(succ)
