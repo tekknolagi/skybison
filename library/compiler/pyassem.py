@@ -649,6 +649,7 @@ class PyFlowGraph(FlowGraph):
             instrs = block.getInstructions()
             for instr in instrs:
                 if instr in definitely_assigned:
+                    assert instr.opname == "LOAD_FAST"
                     instr.opname = "LOAD_FAST_UNCHECKED"
 
     def flattenGraph(self):
