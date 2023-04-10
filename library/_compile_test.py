@@ -625,7 +625,7 @@ JUMP_ABSOLUTE 6
 RETURN_VALUE
 
 # 0:code object <lambda>
-LOAD_FAST _gen$x
+LOAD_FAST_UNCHECKED _gen$x
 RETURN_VALUE
 """,
         )
