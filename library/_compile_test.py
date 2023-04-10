@@ -83,6 +83,14 @@ def test_compile(source, filename="<test>", mode="eval", flags=0, optimize=True)
     return compile(source, filename, mode, flags, None, optimize)
 
 
+def compile_function(source, func_name):
+    module_code = test_compile(source, mode="exec")
+    globals = {}
+    locals = {}
+    module = exec(module_code, globals, locals)
+    return locals[func_name]
+
+
 def dis(code):
     return simpledis(opcode, code)
 
@@ -696,6 +704,135 @@ RETURN_VALUE
         iterable = [1]
         result = tuple(locals().keys() for item in iterable)[0]
         self.assertEqual(sorted(result), [".0", "item"])
+
+
+class DefiniteAsssignmentAnalysisTests(unittest.TestCase):
+    def test_load_parameter_is_unchecked(self):
+        source = """
+def foo(x):
+    return x
+"""
+        self.assertEqual(
+            dis(compile_function(source, "foo").__code__),
+            """\
+LOAD_FAST_UNCHECKED x
+RETURN_VALUE
+""",
+        )
+
+    def test_load_parameter_with_del_is_checked(self):
+        source = """
+def foo(x):
+    del x
+    return x
+"""
+        self.assertEqual(
+            dis(compile_function(source, "foo").__code__),
+            """\
+DELETE_FAST x
+LOAD_FAST x
+RETURN_VALUE
+""",
+        )
+
+    def test_load_parameter_with_del_after_is_unchecked(self):
+        source = """
+def foo(x):
+    y = x
+    del x
+    return y
+"""
+        self.assertEqual(
+            dis(compile_function(source, "foo").__code__),
+            """\
+LOAD_FAST_UNCHECKED x
+STORE_FAST y
+DELETE_FAST x
+LOAD_FAST_UNCHECKED y
+RETURN_VALUE
+""",
+        )
+
+    def test_variable_defined_in_local_is_unchecked(self):
+        source = """
+def foo():
+    x = 3
+    return x
+"""
+        self.assertEqual(
+            dis(compile_function(source, "foo").__code__),
+            """\
+LOAD_CONST 3
+STORE_FAST x
+LOAD_FAST_UNCHECKED x
+RETURN_VALUE
+""",
+        )
+
+    def test_variable_defined_in_one_branch_is_checked(self):
+        source = """
+def foo(cond):
+    if cond:
+        x = 3
+    return x
+"""
+        self.assertEqual(
+            dis(compile_function(source, "foo").__code__),
+            """\
+LOAD_FAST_UNCHECKED cond
+POP_JUMP_IF_FALSE 8
+LOAD_CONST 3
+STORE_FAST x
+LOAD_FAST x
+RETURN_VALUE
+""",
+        )
+
+    def test_variable_defined_in_one_branch_if_else_is_checked(self):
+        source = """
+def foo(cond):
+    if cond:
+        x = 3
+    else:
+        pass
+    return x
+"""
+        self.assertEqual(
+            dis(compile_function(source, "foo").__code__),
+            """\
+LOAD_FAST_UNCHECKED cond
+POP_JUMP_IF_FALSE 10
+LOAD_CONST 3
+STORE_FAST x
+JUMP_FORWARD 0
+LOAD_FAST x
+RETURN_VALUE
+""",
+        )
+
+    def test_variable_defined_in_both_branches_if_else_is_unchecked(self):
+        source = """
+def foo(cond):
+    if cond:
+        x = 3
+    else:
+        x = 4
+    return x
+"""
+        self.assertEqual(
+            dis(compile_function(source, "foo").__code__),
+            """\
+LOAD_FAST_UNCHECKED cond
+POP_JUMP_IF_FALSE 10
+LOAD_CONST 3
+STORE_FAST x
+JUMP_FORWARD 4
+LOAD_CONST 4
+STORE_FAST x
+LOAD_FAST_UNCHECKED x
+RETURN_VALUE
+""",
+        )
 
 
 if __name__ == "__main__":
