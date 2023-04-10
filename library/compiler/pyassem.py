@@ -586,23 +586,61 @@ class PyFlowGraph(FlowGraph):
                 self.stacksize = self.stackdepth_walk(block)
                 break
 
-    def totalArgs(self):
-        # TODO(emacs): Figure out how to replicate RawCode::totalArgs here.
-        # Right now this is missing varargs and kwargs.
-        return len(self.args) + len(self.kwonlyargs)
-
-    def isFormalParameter(self, varname):
-        return self.varnames.get_index(varname) < self.totalArgs()
-
     def computeDefinitelyAssigned(self):
+        blocks = self.getBlocksInOrder()
+        preds = {block: set() for block in blocks}
+        succs = {}
+        for block in blocks:
+            children = set(block for block in block.get_children() if block is not None)
+            succs[block] = children
+            for child in children:
+                preds[child].add(block)
+
+        entry = blocks[0]
+        queue = [entry]
+        processed = set()
+        live_in = {}  # map of block -> set of names
+        live_out = {}  # map of block -> set of names
         definitely_assigned = set()
-        for block in self.getBlocksInOrder():
-            instrs = block.getInstructions()
-            for instr in instrs:
-                if instr.opname == "DELETE_FAST":
-                    return set()
-                if instr.opname == "LOAD_FAST" and self.isFormalParameter(instr.oparg):
+
+        def process_one_block(block):
+            if block in processed:
+                return
+            processed.add(block)
+            if block is entry:
+                # No preds; all parameters are live-in
+                argcount = len(self.args)
+                currently_alive = set((*self.varnames,)[:argcount])
+            elif len(preds[block]) == 1:
+                # Copy live-in from pred's live-out
+                pred, = preds[block]
+                currently_alive = live_out.get(pred, set())
+            else:
+                # Intersect the live-out sets of all predecessors
+                first_pred, *other_preds = preds[block]
+                currently_alive = live_out.get(first_pred, set())
+                live_outs = [live_out.get(pred, ()) for pred in other_preds]
+                currently_alive.intersection_update(
+                    *[live_out.get(pred, ()) for pred in other_preds]
+                )
+            live_in[block] = currently_alive.copy()
+            for instr in block.getInstructions():
+                if instr.opname == "LOAD_FAST" and instr.oparg in currently_alive:
                     definitely_assigned.add(instr)
+                elif instr.opname == "STORE_FAST":
+                    currently_alive.add(instr.oparg)
+                elif instr.opname == "DELETE_FAST":
+                    currently_alive.remove(instr.oparg)
+            live_out[block] = currently_alive
+            for succ in succs[block]:
+                queue.append(succ)
+
+        while queue:
+            block = queue.pop(0)
+            for pred in preds[block]:
+                process_one_block(pred)
+            process_one_block(block)
+
         return definitely_assigned
 
     def optimizeLoadFast(self):
