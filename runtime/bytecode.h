@@ -116,7 +116,7 @@ namespace py {
   V(DELETE_ATTR, 96, doDeleteAttr)                                             \
   V(STORE_GLOBAL, 97, doStoreGlobal)                                           \
   V(DELETE_GLOBAL, 98, doDeleteGlobal)                                         \
-  V(UNUSED_BYTECODE_99, 99, doInvalidBytecode)                                 \
+  V(LOAD_FAST_UNCHECKED, 99, doLoadFastUnchecked)                              \
   V(LOAD_CONST, 100, doLoadConst)                                              \
   V(LOAD_NAME, 101, doLoadName)                                                \
   V(BUILD_TUPLE, 102, doBuildTuple)                                            \
@@ -350,9 +350,7 @@ struct BytecodeOp {
     }
   }
 
-  bool isRelativeBranch() const {
-    return bc == FOR_ITER || bc == JUMP_FORWARD;
-  }
+  bool isRelativeBranch() const { return bc == FOR_ITER || bc == JUMP_FORWARD; }
 
   bool isUnconditionalBranch() const {
     DCHECK(isBranch(), "must be branch");
@@ -367,9 +365,9 @@ struct BytecodeOp {
   word jumpTargetIdx(word next_instr_idx) const {
     DCHECK(isBranch(), "must be branch");
     if (isRelativeBranch()) {
-      return next_instr_idx + arg/kCompilerCodeUnitSize;
+      return next_instr_idx + arg / kCompilerCodeUnitSize;
     } else {
-      return arg/kCompilerCodeUnitSize;
+      return arg / kCompilerCodeUnitSize;
     }
   }
 };

@@ -203,6 +203,21 @@ static RewrittenOp rewriteOperation(const Function& function, BytecodeOp op,
           definitely_assigned ? LOAD_FAST_REVERSE_UNCHECKED : LOAD_FAST_REVERSE,
           reverse_arg, false};
     }
+    case LOAD_FAST_UNCHECKED: {
+      CHECK(op.arg < Code::cast(function.code()).nlocals(),
+            "unexpected local number");
+      word total_locals = function.totalLocals();
+      // Check if the original opcode uses an extended arg
+      if (op.arg > kMaxByte) {
+        break;
+      }
+      int32_t reverse_arg = total_locals - op.arg - 1;
+      // Check that the new value fits in a byte
+      if (reverse_arg > kMaxByte) {
+        break;
+      }
+      return RewrittenOp{LOAD_FAST_REVERSE_UNCHECKED, reverse_arg, false};
+    }
     case LOAD_METHOD:
       return RewrittenOp{LOAD_METHOD_ANAMORPHIC, op.arg, true};
     case STORE_ATTR:
