@@ -7032,7 +7032,7 @@ def foo():
   EXPECT_EQ(*result, NoneType::object());
 }
 
-TEST_F(JitTest, LoadFastReverseUncheckedLoadsLocal) {
+TEST_F(JitTest, LoadFastReverseLoadsLocal) {
   if (useCppInterpreter()) {
     GTEST_SKIP();
   }
@@ -7045,7 +7045,7 @@ def foo():
 
   HandleScope scope(thread_);
   Function function(&scope, mainModuleAt(runtime_, "foo"));
-  EXPECT_TRUE(containsBytecode(function, LOAD_FAST_REVERSE_UNCHECKED));
+  EXPECT_TRUE(containsBytecode(function, LOAD_FAST_REVERSE));
   Object result(&scope, compileAndCallJITFunction(thread_, function));
   EXPECT_TRUE(isIntEqualsWord(*result, 5));
 }
