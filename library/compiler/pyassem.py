@@ -614,12 +614,11 @@ class PyFlowGraph(FlowGraph):
             elif len(preds[block]) == 1:
                 # Copy live-in from pred's live-out
                 pred, = preds[block]
-                currently_alive = live_out.get(pred, set())
+                currently_alive = live_out.get(pred, set()).copy()
             else:
                 # Intersect the live-out sets of all predecessors
                 first_pred, *other_preds = preds[block]
-                currently_alive = live_out.get(first_pred, set())
-                live_outs = [live_out.get(pred, ()) for pred in other_preds]
+                currently_alive = live_out.get(first_pred, set()).copy()
                 currently_alive.intersection_update(
                     *[live_out.get(pred, ()) for pred in other_preds]
                 )
