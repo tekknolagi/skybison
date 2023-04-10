@@ -4288,6 +4288,13 @@ HANDLER_INLINE Continue Interpreter::doLoadFast(Thread* thread, word arg) {
   return Continue::NEXT;
 }
 
+HANDLER_INLINE Continue Interpreter::doLoadFastUnchecked(Thread* thread, word arg) {
+  Frame* frame = thread->currentFrame();
+  RawObject value = frame->local(arg);
+  thread->stackPush(value);
+  return Continue::NEXT;
+}
+
 HANDLER_INLINE Continue Interpreter::doLoadFastReverse(Thread* thread,
                                                        word arg) {
   Frame* frame = thread->currentFrame();

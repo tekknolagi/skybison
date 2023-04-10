@@ -502,6 +502,7 @@ class PyFlowGraph(FlowGraph):
     def getCode(self):
         """Get a Python code object"""
         assert self.stage == ACTIVE, self.stage
+        self.optimizeLoadFast()
         self.stage = CLOSED
         self.computeStackDepth()
         self.flattenGraph()
@@ -584,6 +585,33 @@ class PyFlowGraph(FlowGraph):
             if block.getInstructions():
                 self.stacksize = self.stackdepth_walk(block)
                 break
+
+    def totalArgs(self):
+        # TODO(emacs): Figure out how to replicate RawCode::totalArgs here.
+        # Right now this is missing varargs and kwargs.
+        return len(self.args) + len(self.kwonlyargs)
+
+    def isFormalParameter(self, varname):
+        return self.varnames.get_index(varname) < self.totalArgs()
+
+    def computeDefinitelyAssigned(self):
+        definitely_assigned = set()
+        for block in self.getBlocksInOrder():
+            instrs = block.getInstructions()
+            for instr in instrs:
+                if instr.opname == "DELETE_FAST":
+                    return set()
+                if instr.opname == "LOAD_FAST" and self.isFormalParameter(instr.oparg):
+                    definitely_assigned.add(instr)
+        return definitely_assigned
+
+    def optimizeLoadFast(self):
+        definitely_assigned = self.computeDefinitelyAssigned()
+        for block in self.getBlocksInOrder():
+            instrs = block.getInstructions()
+            for instr in instrs:
+                if instr in definitely_assigned:
+                    instr.opname = "LOAD_FAST_UNCHECKED"
 
     def flattenGraph(self):
         """Arrange the blocks in order and resolve jumps"""
