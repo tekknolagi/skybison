@@ -643,7 +643,7 @@ class PyFlowGraph(FlowGraph):
         while changed:
             changed = False
             for block in blocks:
-                changed = process_one_block(block)
+                changed |= process_one_block(block)
 
         return definitely_assigned
 
