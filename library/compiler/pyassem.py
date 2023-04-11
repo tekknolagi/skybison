@@ -619,7 +619,7 @@ class PyFlowGraph(FlowGraph):
                 result = meet_one(result, arg)
             return result
 
-        def process_one_block(block):
+        def process_one_block(block, modify=False):
             if block is entry:
                 # No preds; all parameters are live-in
                 argcount = len(self.args)
@@ -628,7 +628,7 @@ class PyFlowGraph(FlowGraph):
                 # Meet the live-out sets of all predecessors
                 currently_alive = meet(*(live_out[pred] for pred in preds[block]))
             for instr in block.getInstructions():
-                if instr.opname == "LOAD_FAST" and instr.oparg in currently_alive:
+                if instr.opname == "LOAD_FAST" and instr.oparg in currently_alive and modify:
                     definitely_assigned.add(instr)
                 elif instr.opname == "STORE_FAST":
                     currently_alive.add(instr.oparg)
@@ -644,6 +644,9 @@ class PyFlowGraph(FlowGraph):
             changed = False
             for block in blocks:
                 changed |= process_one_block(block)
+
+        for block in blocks:
+            process_one_block(block, modify=True)
 
         return definitely_assigned
 
