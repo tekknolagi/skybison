@@ -598,13 +598,11 @@ class PyFlowGraph(FlowGraph):
 
         entry = blocks[0]
         queue = [entry]
-        live_in = {}  # map of block -> set of names
         live_out = {}  # map of block -> set of names
         definitely_assigned = set()
 
         def process_one_block(block):
-            if block in live_in:
-                assert block in live_out
+            if block in live_out:
                 return
             if block is entry:
                 # No preds; all parameters are live-in
@@ -621,7 +619,6 @@ class PyFlowGraph(FlowGraph):
                 currently_alive.intersection_update(
                     *[live_out.get(pred, ()) for pred in other_preds]
                 )
-            live_in[block] = currently_alive.copy()
             for instr in block.getInstructions():
                 if instr.opname == "LOAD_FAST" and instr.oparg in currently_alive:
                     definitely_assigned.add(instr)
