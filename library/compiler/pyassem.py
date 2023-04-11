@@ -597,7 +597,6 @@ class PyFlowGraph(FlowGraph):
                 preds[child].add(block)
 
         Top = object()
-
         entry = self.entry
         queue = [entry]
         live_out = {block: Top for block in blocks}  # map of block -> frozenset of names
