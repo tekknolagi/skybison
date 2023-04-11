@@ -720,6 +720,45 @@ RETURN_VALUE
 """,
         )
 
+    def test_load_kwonly_parameter_is_unchecked(self):
+        source = """
+def foo(*, x):
+    return x
+"""
+        self.assertEqual(
+            dis(compile_function(source, "foo").__code__),
+            """\
+LOAD_FAST_UNCHECKED x
+RETURN_VALUE
+""",
+        )
+
+    def test_load_varargs_parameter_is_unchecked(self):
+        source = """
+def foo(*x):
+    return x
+"""
+        self.assertEqual(
+            dis(compile_function(source, "foo").__code__),
+            """\
+LOAD_FAST_UNCHECKED x
+RETURN_VALUE
+""",
+        )
+
+    def test_load_varkeyargs_parameter_is_unchecked(self):
+        source = """
+def foo(**x):
+    return x
+"""
+        self.assertEqual(
+            dis(compile_function(source, "foo").__code__),
+            """\
+LOAD_FAST_UNCHECKED x
+RETURN_VALUE
+""",
+        )
+
     def test_load_parameter_with_del_is_checked(self):
         source = """
 def foo(x):

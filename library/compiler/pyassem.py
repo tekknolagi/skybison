@@ -9,7 +9,7 @@ from types import CodeType
 from typing import Generator, List, Optional
 
 from . import opcode36, opcode37, opcode38, opcode38cinder
-from .consts import CO_NEWLOCALS, CO_OPTIMIZED
+from .consts import CO_NEWLOCALS, CO_OPTIMIZED, CO_VARARGS, CO_VARKEYWORDS
 from .consts38 import CO_SUPPRESS_JIT
 from .peephole import Optimizer
 from .py38.peephole import Optimizer38
@@ -618,8 +618,9 @@ class PyFlowGraph(FlowGraph):
         def process_one_block(block, modify=False):
             if block is entry:
                 # No preds; all parameters are live-in
-                # TODO(emacs): Make this equivalent to RawCode::totalArgs
-                argcount = len(self.args)
+                argcount = len(self.args) + len(self.kwonlyargs) + \
+                        (self.flags & CO_VARARGS) + \
+                        (self.flags & CO_VARKEYWORDS)
                 currently_alive = set((*self.varnames,)[:argcount])
             else:
                 # Meet the live-out sets of all predecessors
