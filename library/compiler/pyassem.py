@@ -591,7 +591,7 @@ class PyFlowGraph(FlowGraph):
         preds = {block: set() for block in blocks}
         succs = {}
         for block in blocks:
-            children = set(block for block in block.get_children() if block is not None)
+            children = frozenset(block for block in block.get_children() if block is not None)
             succs[block] = children
             for child in children:
                 preds[child].add(block)
@@ -600,17 +600,14 @@ class PyFlowGraph(FlowGraph):
 
         entry = self.entry
         queue = [entry]
-        live_out = {block: Top for block in blocks}  # map of block -> set of names
+        live_out = {block: Top for block in blocks}  # map of block -> frozenset of names
         definitely_assigned = set()
 
         def meet_one(left, right):
-            # Guaranteed to return a fresh set
-            if left is Top and right is Top:
-                return Top
             if left is Top:
-                return right.copy()
+                return right
             if right is Top:
-                return left.copy()
+                return left
             return left.intersection(right)
 
         def meet(*args):
@@ -622,11 +619,12 @@ class PyFlowGraph(FlowGraph):
         def process_one_block(block, modify=False):
             if block is entry:
                 # No preds; all parameters are live-in
+                # TODO(emacs): Make this equivalent to RawCode::totalArgs
                 argcount = len(self.args)
                 currently_alive = set((*self.varnames,)[:argcount])
             else:
                 # Meet the live-out sets of all predecessors
-                currently_alive = meet(*(live_out[pred] for pred in preds[block]))
+                currently_alive = set(meet(*(live_out[pred] for pred in preds[block])))
             for instr in block.getInstructions():
                 if instr.opname == "LOAD_FAST" and instr.oparg in currently_alive and modify:
                     definitely_assigned.add(instr)
