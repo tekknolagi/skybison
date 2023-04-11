@@ -834,6 +834,46 @@ RETURN_VALUE
 """,
         )
 
+    def test_loop_is_unchecked(self):
+        source = """
+def foo(cond):
+    while True:
+        print(cond)
+"""
+        self.assertEqual(
+            dis(compile_function(source, "foo").__code__),
+            """\
+LOAD_GLOBAL print
+LOAD_FAST_UNCHECKED cond
+CALL_FUNCTION 1
+POP_TOP
+JUMP_ABSOLUTE 0
+LOAD_CONST None
+RETURN_VALUE
+""",
+        )
+
+    def test_loop_with_del_is_checked(self):
+        source = """
+def foo(cond):
+    while True:
+        print(cond)
+        del cond
+"""
+        self.assertEqual(
+            dis(compile_function(source, "foo").__code__),
+            """\
+LOAD_GLOBAL print
+LOAD_FAST cond
+CALL_FUNCTION 1
+POP_TOP
+DELETE_FAST cond
+JUMP_ABSOLUTE 0
+LOAD_CONST None
+RETURN_VALUE
+""",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
