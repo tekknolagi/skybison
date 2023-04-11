@@ -596,29 +596,37 @@ class PyFlowGraph(FlowGraph):
             for child in children:
                 preds[child].add(block)
 
-        entry = blocks[0]
+        Top = object()
+
+        entry = self.entry
         queue = [entry]
-        live_out = {}  # map of block -> set of names
+        live_out = {block: Top for block in blocks}  # map of block -> set of names
         definitely_assigned = set()
 
+        def meet_one(left, right):
+            # Guaranteed to return a fresh set
+            if left is Top and right is Top:
+                return Top
+            if left is Top:
+                return right.copy()
+            if right is Top:
+                return left.copy()
+            return left.intersection(right)
+
+        def meet(*args):
+            result = Top
+            for arg in args:
+                result = meet_one(result, arg)
+            return result
+
         def process_one_block(block):
-            if block in live_out:
-                return
             if block is entry:
                 # No preds; all parameters are live-in
                 argcount = len(self.args)
                 currently_alive = set((*self.varnames,)[:argcount])
-            elif len(preds[block]) == 1:
-                # Copy live-in from pred's live-out
-                pred, = preds[block]
-                currently_alive = live_out.get(pred, set()).copy()
             else:
-                # Intersect the live-out sets of all predecessors
-                first_pred, *other_preds = preds[block]
-                currently_alive = live_out.get(first_pred, set()).copy()
-                currently_alive.intersection_update(
-                    *[live_out.get(pred, ()) for pred in other_preds]
-                )
+                # Meet the live-out sets of all predecessors
+                currently_alive = meet(*(live_out[pred] for pred in preds[block]))
             for instr in block.getInstructions():
                 if instr.opname == "LOAD_FAST" and instr.oparg in currently_alive:
                     definitely_assigned.add(instr)
@@ -626,15 +634,16 @@ class PyFlowGraph(FlowGraph):
                     currently_alive.add(instr.oparg)
                 elif instr.opname == "DELETE_FAST":
                     currently_alive.discard(instr.oparg)
+            if currently_alive == live_out[block]:
+                return False
             live_out[block] = currently_alive
-            for succ in succs[block]:
-                queue.append(succ)
+            return True
 
-        while queue:
-            block = queue.pop(0)
-            for pred in preds[block]:
-                process_one_block(pred)
-            process_one_block(block)
+        changed = True
+        while changed:
+            changed = False
+            for block in blocks:
+                changed = process_one_block(block)
 
         return definitely_assigned
 
