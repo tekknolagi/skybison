@@ -706,6 +706,7 @@ RETURN_VALUE
         self.assertEqual(sorted(result), [".0", "item"])
 
 
+@pyro_only
 class DefiniteAsssignmentAnalysisTests(unittest.TestCase):
     def test_load_parameter_is_unchecked(self):
         source = """
