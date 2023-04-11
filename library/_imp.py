@@ -55,7 +55,7 @@ def exec_dynamic(mod):
 
 
 def extension_suffixes():
-    return [".skybison.so", ".abi3.so", ".so"]
+    return [".pyro.so", ".abi3.so", ".so"]
 
 
 def _code_update_filenames_recursive(code, old_name, new_name):
