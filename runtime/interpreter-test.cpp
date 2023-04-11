@@ -7045,7 +7045,7 @@ def foo():
 
   HandleScope scope(thread_);
   Function function(&scope, mainModuleAt(runtime_, "foo"));
-  EXPECT_TRUE(containsBytecode(function, LOAD_FAST_REVERSE));
+  EXPECT_TRUE(containsBytecode(function, LOAD_FAST_REVERSE_UNCHECKED));
   Object result(&scope, compileAndCallJITFunction(thread_, function));
   EXPECT_TRUE(isIntEqualsWord(*result, 5));
 }
