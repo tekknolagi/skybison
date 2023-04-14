@@ -218,7 +218,7 @@ class SSA:
         preds = {block: set() for block in blocks}
         succs = {}
         for block in blocks:
-            children = [child for child in block.get_children() if child]
+            children = frozenset(child for child in block.get_children() if child)
             succs[block] = children
             for child in children:
                 preds[child].add(block)
