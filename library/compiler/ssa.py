@@ -146,21 +146,67 @@ class Interpreter:
     def do_DELETE_FAST(self, instr):
         self.delete_variable(instr.oparg, self.block)
 
+    def targets(self):
+        return tuple(self.cfg.block_at(target) for target in self.succs[self.block])
+
     def do_any_jump(self, instr):
         # TODO(max): Sort targets depending on opcode (e.g. POP_JUMP_IF_FALSE,
         # POP_JUMP_IF_TRUE)
-        cond = self.stack.pop()
-        ssa_instr = self.clone(instr, (cond,))
-        ssa_instr.targets = tuple(
-            self.cfg.block_at(target) for target in self.succs[self.block]
-        )
+        if "IF" in instr.opname:
+            cond = self.stack.pop()
+            ssa_instr = self.clone(instr, (cond,))
+        else:
+            ssa_instr = self.clone(instr, ())
+        ssa_instr.targets = self.targets()
 
     do_POP_JUMP_IF_FALSE = do_any_jump
+
+    do_JUMP_ABSOLUTE = do_any_jump
 
     def do_RETURN_VALUE(self, instr):
         assert len(self.stack) == 1
         result = self.stack.pop()
         self.clone(instr, (result,))
+
+    def do_BUILD_LIST(self, instr):
+        operands = reversed([self.stack.pop() for i in range(instr.oparg)])
+        result = self.clone(instr, (*operands,))
+        self.stack.append(result)
+
+    def do_GET_ITER(self, instr):
+        iterable = self.stack.pop()
+        result = self.clone(instr, (iterable,))
+        self.stack.append(result)
+
+    def do_FOR_ITER(self, instr):
+        iterator = self.stack[-1]
+        result = self.clone(instr, (iterator,))
+        self.stack.append(result)
+        self.emit(
+            SSAInstruction(
+                "CondBranchIterNotDone", (result,), instr, targets=self.targets()
+            )
+        )
+
+    def do_LOAD_METHOD(self, instr):
+        receiver = self.stack.pop()
+        result = self.clone(instr, (receiver,))
+        method = SSAInstruction("GetSecondOutput", (result,), instr)
+        self.emit(method)
+        self.stack.append(method)
+
+    def do_CALL_METHOD(self, instr):
+        # one for receiver and one for method
+        # operands = []
+        # for i in range(instr.oparg + 2):
+        #     operands.append(self.stack.pop())
+        # result = self.clone(instr, (*reversed(operands),))
+        operands = reversed([self.stack.pop() for i in range(instr.oparg + 2)])
+        result = self.clone(instr, (*operands,))
+        self.stack.append(result)
+
+    def do_POP_TOP(self, instr):
+        self.stack.pop()
 
 
 class SSA:
