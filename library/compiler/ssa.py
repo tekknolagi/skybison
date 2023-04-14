@@ -189,4 +189,9 @@ class SSA:
                     # CPython blocks keep dead code at the end. Terminate
                     # early.
                     break
+            term = instrs[-1].opname
+            if "JUMP" not in term and term not in ("RETURN_VALUE", "RAISE_VARARGS"):
+                succ, = succs[block]
+                target = cfg.block_at(succ)
+                ssa_block.emit(SSAInstruction("Branch", (), None, (target,)))
         print(cfg)
