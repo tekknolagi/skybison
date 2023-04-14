@@ -87,10 +87,11 @@ class SSA:
     def run(self):
         blocks = self.graph.getBlocksInOrder()
         preds = {block: set() for block in blocks}
+        succs = {}
         for block in blocks:
-            for child in block.get_children():
-                if not child:
-                    continue
+            children = [child for child in block.get_children() if child]
+            succs[block] = children
+            for child in children:
                 preds[child].add(block)
 
         current_def = {}
@@ -174,9 +175,10 @@ class SSA:
                     stack.append(ssa_instr)
                     ssa_block.emit(ssa_instr)
                 elif opcode in opcode38.opcode.hasjrel or opcode in opcode38.opcode.hasjabs:
-                    # TODO(max): Add other target
-                    target = cfg.block_at(instr.target)
-                    ssa_instr = SSAInstruction(instr.opname, (operands[0],), instr, (target,))
+                    # TODO(max): Sort depending on opcode (e.g.
+                    # POP_JUMP_IF_FALSE, POP_JUMP_IF_TRUE)
+                    targets = tuple(cfg.block_at(target) for target in succs[block])
+                    ssa_instr = SSAInstruction(instr.opname, (operands[0],), instr, targets)
                     ssa_block.emit(ssa_instr)
                 else:
                     ssa_instr = copy_instr(instr, operands)
