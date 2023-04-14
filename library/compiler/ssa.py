@@ -197,10 +197,6 @@ class Interpreter:
 
     def do_CALL_METHOD(self, instr):
         # one for receiver and one for method
-        # operands = []
-        # for i in range(instr.oparg + 2):
-        #     operands.append(self.stack.pop())
-        # result = self.clone(instr, (*reversed(operands),))
         operands = reversed([self.stack.pop() for i in range(instr.oparg + 2)])
         result = self.clone(instr, (*operands,))
         self.stack.append(result)
