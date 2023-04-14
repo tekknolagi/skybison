@@ -164,7 +164,6 @@ class Interpreter:
     do_JUMP_ABSOLUTE = do_any_jump
 
     def do_RETURN_VALUE(self, instr):
-        assert len(self.stack) == 1
         result = self.stack.pop()
         self.clone(instr, (result,))
 
@@ -191,6 +190,7 @@ class Interpreter:
     def do_LOAD_METHOD(self, instr):
         receiver = self.stack.pop()
         result = self.clone(instr, (receiver,))
+        self.stack.append(result)
         method = SSAInstruction("GetSecondOutput", (result,), instr)
         self.emit(method)
         self.stack.append(method)
