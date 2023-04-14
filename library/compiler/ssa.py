@@ -66,18 +66,101 @@ class SSABlock:
         return f"bb{self.id}"
 
 
-OPCODE_INFO = {
-    # (input, output)
-    "LOAD_FAST": (0, 1),
-    "LOAD_FAST_UNCHECKED": (0, 1),
-    "BINARY_MULTIPLY": (2, 1),
-    "BINARY_ADD": (2, 1),
-    "STORE_FAST": (1, 0),
-    "LOAD_CONST": (0, 1),
-    "DELETE_FAST": (0, 0),
-    "RETURN_VALUE": (1, 0),
-    "POP_JUMP_IF_FALSE": (1, 0),
-}
+class Interpreter:
+    def __init__(self, cfg, entry, succs, preds):
+        self.cfg = cfg
+        self.stack = []
+        self.block = None
+        self.entry = entry
+        self.succs = succs
+        self.preds = preds
+        self.current_def = {}
+
+    def emit(self, ssa_instr):
+        self.cfg.block_at(self.block).emit(ssa_instr)
+
+    def clone(self, instr, operands):
+        ssa_instr = SSAInstruction(instr.opname, operands, instr)
+        self.emit(ssa_instr)
+        return ssa_instr
+
+    def write_variable(self, variable, block, value):
+        if variable not in self.current_def:
+            self.current_def[variable] = {}
+        self.current_def[variable][block] = value
+
+    def delete_variable(self, variable, block):
+        if variable not in self.current_def:
+            self.current_def[variable] = {}
+        del self.current_def[variable][block]
+
+    def read_variable_recursive(self, variable, block):
+        assert len(self.preds[block]) != 0, f"cannot find {block}"
+        if len(self.preds[block]) == 1:
+            (pred,) = self.preds[block]
+            return self.read_variable(variable, pred)
+        phi = SSAInstruction("Phi", [], None)
+        self.cfg.block_at(block).emit(phi)
+        self.write_variable(variable, block, phi)
+        for pred in self.preds[block]:
+            defn = self.read_variable(variable, pred)
+            phi.args.append(defn)
+        return phi
+
+    def read_variable(self, variable, block):
+        if variable not in self.current_def:
+            ssa_instr = SSAInstruction("Undef", (), None)
+            self.write_variable(variable, self.entry, ssa_instr)
+            self.cfg.block_at(self.entry).emit(ssa_instr)
+        result = self.current_def[variable].get(block)
+        if result:
+            return result
+        return self.read_variable_recursive(variable, block)
+
+    def do_SET_LINENO(self, instr):
+        pass
+
+    def do_LOAD_FAST(self, instr):
+        result = self.read_variable(instr.oparg, self.block)
+        self.stack.append(result)
+
+    do_LOAD_FAST_UNCHECKED = do_LOAD_FAST
+
+    def do_LOAD_CONST(self, instr):
+        value = SSAInstruction(f"LOAD_CONST<{instr.oparg}>", (), instr)
+        self.stack.append(value)
+        self.emit(value)
+
+    def do_BINARY_MULTIPLY(self, instr):
+        rhs = self.stack.pop()
+        lhs = self.stack.pop()
+        result = self.clone(instr, (lhs, rhs))
+        self.stack.append(result)
+
+    do_BINARY_ADD = do_BINARY_MULTIPLY
+
+    def do_STORE_FAST(self, instr):
+        value = self.stack.pop()
+        self.write_variable(instr.oparg, self.block, value)
+
+    def do_DELETE_FAST(self, instr):
+        self.delete_variable(instr.oparg, self.block)
+
+    def do_any_jump(self, instr):
+        # TODO(max): Sort targets depending on opcode (e.g. POP_JUMP_IF_FALSE,
+        # POP_JUMP_IF_TRUE)
+        cond = self.stack.pop()
+        ssa_instr = self.clone(instr, (cond,))
+        ssa_instr.targets = tuple(
+            self.cfg.block_at(target) for target in self.succs[self.block]
+        )
+
+    do_POP_JUMP_IF_FALSE = do_any_jump
+
+    def do_RETURN_VALUE(self, instr):
+        assert len(self.stack) == 1
+        result = self.stack.pop()
+        self.clone(instr, (result,))
 
 
 class SSA:
@@ -94,46 +177,7 @@ class SSA:
             for child in children:
                 preds[child].add(block)
 
-        current_def = {}
-
-        def write_variable(variable, block, value):
-            if variable not in current_def:
-                current_def[variable] = {}
-            current_def[variable][block] = value
-
-        def delete_variable(variable, block):
-            if variable not in current_def:
-                current_def[variable] = {}
-            del current_def[variable][block]
-
-        def read_variable_recursive(variable, block):
-            assert len(preds[block]) != 0
-            if len(preds[block]) == 1:
-                (pred,) = preds[block]
-                return read_variable(variable, pred)
-            phi = SSAInstruction("Phi", [], None)
-            cfg.block_at(block).emit(phi)
-            write_variable(variable, block, phi)
-            for pred in preds[block]:
-                defn = read_variable(variable, pred)
-                phi.args.append(defn)
-            return phi
-
-        def read_variable(variable, block):
-            if variable not in current_def:
-                ssa_instr = SSAInstruction("Undef", (), None)
-                write_variable(variable, entry, ssa_instr)
-                entry.emit(ssa_instr)
-            result = current_def[variable].get(block)
-            if result:
-                return result
-            return read_variable_recursive(variable, block)
-
-        def copy_instr(instr, operands):
-            return SSAInstruction(instr.opname, operands, instr)
-
         cfg = SSACFG()
-
         entry = blocks[0]
         assert len(preds[entry]) == 0
         argcount = (
@@ -144,59 +188,29 @@ class SSA:
         )
         argnames = (*self.graph.varnames,)[:argcount]
         ssa_entry = cfg.block_at(entry)
+        interpreter = Interpreter(cfg, entry, succs, preds)
         for idx, argname in enumerate(argnames):
             ssa_instr = SSAInstruction(f"LoadArg<{idx}; {argname}>", (), None)
             ssa_entry.emit(ssa_instr)
-            write_variable(argname, entry, ssa_instr)
+            interpreter.write_variable(argname, entry, ssa_instr)
 
         for block in blocks:
-            ssa_block = cfg.block_at(block)
+            interpreter.block = block
             instrs = block.getInstructions()
             stack = []
+            found_term = False
             for instr in instrs:
-                if instr.opname == "SET_LINENO":
-                    continue
-                num_operands, num_outputs = OPCODE_INFO[instr.opname]
-                assert num_outputs <= 1
-                assert len(stack) >= num_operands
-                operands = stack[-num_operands:]
-                for i in range(num_operands):
-                    stack.pop()
-                opcode = opcode38.opcode.opmap[instr.opname]
-                if instr.opname == "STORE_FAST":
-                    write_variable(instr.oparg, block, operands[0])
-                elif instr.opname == "DELETE_FAST":
-                    delete_variable(instr.oparg, block)
-                elif instr.opname in ("LOAD_FAST", "LOAD_FAST_UNCHECKED"):
-                    ssa_instr = read_variable(instr.oparg, block)
-                    stack.append(ssa_instr)
-                elif instr.opname == "LOAD_CONST":
-                    ssa_instr = SSAInstruction(f"LOAD_CONST<{instr.oparg}>", (), instr)
-                    stack.append(ssa_instr)
-                    ssa_block.emit(ssa_instr)
-                elif (
-                    opcode in opcode38.opcode.hasjrel
-                    or opcode in opcode38.opcode.hasjabs
+                getattr(interpreter, f"do_{instr.opname}")(instr)
+                if (
+                    instr.opname in ("RETURN_VALUE", "RAISE_VARARGS")
+                    or "JUMP" in instr.opname
                 ):
-                    # TODO(max): Sort depending on opcode (e.g.
-                    # POP_JUMP_IF_FALSE, POP_JUMP_IF_TRUE)
-                    targets = tuple(cfg.block_at(target) for target in succs[block])
-                    ssa_instr = SSAInstruction(
-                        instr.opname, (operands[0],), instr, targets
-                    )
-                    ssa_block.emit(ssa_instr)
-                else:
-                    ssa_instr = copy_instr(instr, operands)
-                    ssa_block.emit(ssa_instr)
-                    if num_outputs:
-                        stack.append(ssa_instr)
-                if instr.opname in ("RETURN_VALUE", "RAISE_VARARGS"):
                     # CPython blocks keep dead code at the end. Terminate
                     # early.
+                    found_term = True
                     break
-            term = instrs[-1].opname
-            if "JUMP" not in term and term not in ("RETURN_VALUE", "RAISE_VARARGS"):
+            if not found_term:
                 (succ,) = succs[block]
                 target = cfg.block_at(succ)
-                ssa_block.emit(SSAInstruction("Branch", (), None, (target,)))
+                cfg.block_at(block).emit(SSAInstruction("Branch", (), None, (target,)))
         print(cfg)
