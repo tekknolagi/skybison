@@ -144,8 +144,8 @@ class SSA:
         )
         argnames = (*self.graph.varnames,)[:argcount]
         ssa_entry = cfg.block_at(entry)
-        for argname in argnames:
-            ssa_instr = SSAInstruction(f"LoadArg<{argname}>", (), None)
+        for idx, argname in enumerate(argnames):
+            ssa_instr = SSAInstruction(f"LoadArg<{idx}; {argname}>", (), None)
             ssa_entry.emit(ssa_instr)
             write_variable(argname, entry, ssa_instr)
 
