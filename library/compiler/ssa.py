@@ -178,6 +178,8 @@ class Interpreter:
         self.stack.append(result)
 
     def do_FOR_ITER(self, instr):
+        # TODO(max): Split the block. This will require multiple SSA blocks per
+        # block, so we can't use block_at anymore.
         iterator = self.stack[-1]
         result = self.clone(instr, (iterator,))
         self.stack.append(result)
@@ -251,6 +253,8 @@ class SSA:
                     # early.
                     found_term = True
                     break
+            # TODO(max): Handle opcodes that only touch the stack on one branch
+            # FOR_ITER, JUMP_IF_FALSE_OR_POP, JUMP_IF_TRUE_OR_POP, YIELD_FROM
             if not found_term:
                 (succ,) = succs[block]
                 target = cfg.block_at(succ)
