@@ -1,5 +1,5 @@
-# Copyright (c) Facebook, Inc. and its affiliates. (http://www.facebook.com)
 #!/usr/bin/env python3
+# Copyright (c) Facebook, Inc. and its affiliates. (http://www.facebook.com)
 import glob
 import os
 from glob import glob
