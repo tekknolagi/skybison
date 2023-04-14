@@ -67,7 +67,7 @@ class SSABlock:
 
 
 OPCODE_INFO = {
-        # (input, output)
+    # (input, output)
     "LOAD_FAST": (0, 1),
     "LOAD_FAST_UNCHECKED": (0, 1),
     "BINARY_MULTIPLY": (2, 1),
@@ -174,11 +174,16 @@ class SSA:
                     ssa_instr = SSAInstruction(f"LOAD_CONST<{instr.oparg}>", (), instr)
                     stack.append(ssa_instr)
                     ssa_block.emit(ssa_instr)
-                elif opcode in opcode38.opcode.hasjrel or opcode in opcode38.opcode.hasjabs:
+                elif (
+                    opcode in opcode38.opcode.hasjrel
+                    or opcode in opcode38.opcode.hasjabs
+                ):
                     # TODO(max): Sort depending on opcode (e.g.
                     # POP_JUMP_IF_FALSE, POP_JUMP_IF_TRUE)
                     targets = tuple(cfg.block_at(target) for target in succs[block])
-                    ssa_instr = SSAInstruction(instr.opname, (operands[0],), instr, targets)
+                    ssa_instr = SSAInstruction(
+                        instr.opname, (operands[0],), instr, targets
+                    )
                     ssa_block.emit(ssa_instr)
                 else:
                     ssa_instr = copy_instr(instr, operands)
@@ -191,7 +196,7 @@ class SSA:
                     break
             term = instrs[-1].opname
             if "JUMP" not in term and term not in ("RETURN_VALUE", "RAISE_VARARGS"):
-                succ, = succs[block]
+                (succ,) = succs[block]
                 target = cfg.block_at(succ)
                 ssa_block.emit(SSAInstruction("Branch", (), None, (target,)))
         print(cfg)
