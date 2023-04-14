@@ -12,6 +12,8 @@ opcode.def_op("END_ASYNC_FOR", 54)
 opcode.def_op("BEGIN_FINALLY", 53)
 opcode.jrel_op("CALL_FINALLY", 162)
 opcode.def_op("POP_FINALLY", 163)
+opcode.def_op("LOAD_FAST_UNCHECKED", 99)
+opcode.haslocal.add("LOAD_FAST_UNCHECKED")
 
 opcode.stack_effects.update(
     # New opcodes
@@ -20,4 +22,5 @@ opcode.stack_effects.update(
     POP_FINALLY=-6,
     CALL_FINALLY=lambda oparg, jmp: 1 if jmp else 0,
     BEGIN_FINALLY=6,
+    LOAD_FAST_UNCHECKED=opcode.stack_effects["LOAD_FAST"],
 )

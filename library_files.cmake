@@ -82,6 +82,7 @@ compiler/py38/optimizer.py
 compiler/py38/peephole.py
 compiler/pyassem.py
 compiler/pycodegen.py
+compiler/ssa.py
 compiler/static.py
 compiler/symbols.py
 compiler/unparse.py

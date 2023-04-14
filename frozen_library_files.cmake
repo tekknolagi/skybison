@@ -48,6 +48,7 @@ library/compiler/py38/optimizer.py
 library/compiler/py38/peephole.py
 library/compiler/pyassem.py
 library/compiler/pycodegen.py
+library/compiler/ssa.py
 library/compiler/static.py
 library/compiler/symbols.py
 library/compiler/unparse.py
