@@ -1228,6 +1228,35 @@ void emitHandler<LOAD_ATTR_INSTANCE>(EmitEnv* env) {
 }
 
 template <>
+void emitHandler<LOAD_ATTR_INSTANCE_SLOT_DESCR>(EmitEnv* env) {
+  ScratchReg r_base(env);
+  ScratchReg r_layout_id(env);
+  ScratchReg r_offset(env);
+  ScratchReg r_caches(env);
+  ScratchReg r_result(env);
+  Label slow_path;
+  __ popq(r_base);
+  emitGetLayoutId(env, r_layout_id, r_base);
+  __ movq(r_caches, Address(env->frame, Frame::kCachesOffset));
+  emitIcLookupMonomorphic(env, &slow_path, r_offset, r_layout_id, r_caches);
+
+  emitConvertFromSmallInt(env, r_offset);
+  __ movq(r_result, Address(r_base, r_offset, TIMES_1, heapObjectDisp(0)));
+  __ cmpl(r_result, Immediate(Unbound::object().raw()));
+  __ jcc(EQUAL, &slow_path, Assembler::kNearJump);
+  __ pushq(r_result);
+  emitNextOpcode(env);
+
+  __ bind(&slow_path);
+  __ pushq(r_base);
+  if (env->in_jit) {
+    emitJumpToDeopt(env);
+    return;
+  }
+  emitJumpToGenericHandler(env);
+}
+
+template <>
 void emitHandler<LOAD_ATTR_INSTANCE_TYPE_BOUND_METHOD>(EmitEnv* env) {
   ScratchReg r_base(env);
   ScratchReg r_scratch(env);
