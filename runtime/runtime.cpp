@@ -2880,11 +2880,11 @@ void Runtime::collectAttributes(const Code& code, const Set& attributes) {
   Str name(&scope, Str::empty());
 
   word len = bc.length();
-  for (word i = 0; i < len - 3; i += 2) {
+  for (word i = 0; i < len - 3; i += kCompilerCodeUnitSize) {
     // If the current instruction is EXTENDED_ARG we must skip it and the next
     // instruction.
     if (bc.byteAt(i) == Bytecode::EXTENDED_ARG) {
-      i += 2;
+      i += kCompilerCodeUnitSize;
       continue;
     }
     // Check for LOAD_FAST 0 (self)
