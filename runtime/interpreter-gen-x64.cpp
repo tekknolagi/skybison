@@ -118,7 +118,15 @@ const word kHandlerSizeShift = 8;
 const word kHandlerSize = 1 << kHandlerSizeShift;
 
 const Interpreter::OpcodeHandler kCppHandlers[] = {
+#if DCHECK_IS_ON()
+#define OP(name, id, handler)                                                  \
+  [](Thread* thread, word arg) {                                               \
+    EVENT(InterpreterDeopt_##name);                                            \
+    return Interpreter::handler(thread, arg);                                  \
+  },
+#else
 #define OP(name, id, handler) Interpreter::handler,
+#endif
     FOREACH_BYTECODE(OP)
 #undef OP
 };
