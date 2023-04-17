@@ -1403,16 +1403,15 @@ TEST_F(RuntimeTest, CollectAttributes) {
   Code code0(&scope, newCodeWithBytesConstsNamesLocals(bytecode0, consts, names,
                                                        &locals));
 
-  Dict attributes(&scope, runtime_->newDict());
+  Set attributes(&scope, runtime_->newSet());
   runtime_->collectAttributes(code0, attributes);
 
   // We should have collected a single attribute: 'foo'
   EXPECT_EQ(attributes.numItems(), 1);
 
   // Check that we collected 'foo'
-  Object result(&scope, dictAtByStr(thread_, attributes, foo));
-  ASSERT_TRUE(result.isStr());
-  EXPECT_TRUE(Str::cast(*result).equals(*foo));
+  word hash = strHash(thread_, *foo);
+  EXPECT_TRUE(setIncludes(thread_, attributes, foo, hash));
 
   // Bytecode for the snippet:
   //
@@ -1430,14 +1429,12 @@ TEST_F(RuntimeTest, CollectAttributes) {
   EXPECT_EQ(attributes.numItems(), 3);
 
   // Check that we collected 'bar'
-  result = dictAtByStr(thread_, attributes, bar);
-  ASSERT_TRUE(result.isStr());
-  EXPECT_TRUE(Str::cast(*result).equals(*bar));
+  hash = strHash(thread_, *bar);
+  EXPECT_TRUE(setIncludes(thread_, attributes, bar, hash));
 
   // Check that we collected 'baz'
-  result = dictAtByStr(thread_, attributes, baz);
-  ASSERT_TRUE(result.isStr());
-  EXPECT_TRUE(Str::cast(*result).equals(*baz));
+  hash = strHash(thread_, *baz);
+  EXPECT_TRUE(setIncludes(thread_, attributes, baz, hash));
 }
 
 TEST_F(RuntimeTest, CollectAttributesWithExtendedArg) {
@@ -1467,16 +1464,15 @@ TEST_F(RuntimeTest, CollectAttributesWithExtendedArg) {
   Code code(&scope, newCodeWithBytesConstsNamesLocals(bytecode, consts, names,
                                                       &locals));
 
-  Dict attributes(&scope, runtime_->newDict());
+  Set attributes(&scope, runtime_->newSet());
   runtime_->collectAttributes(code, attributes);
 
   // We should have collected a single attribute: 'foo'
   EXPECT_EQ(attributes.numItems(), 1);
 
   // Check that we collected 'foo'
-  Object result(&scope, dictAtByStr(thread_, attributes, foo));
-  ASSERT_TRUE(result.isStr());
-  EXPECT_TRUE(Str::cast(*result).equals(*foo));
+  word hash = strHash(thread_, *foo);
+  EXPECT_TRUE(setIncludes(thread_, attributes, foo, hash));
 }
 
 TEST_F(RuntimeTest, GetTypeConstructor) {

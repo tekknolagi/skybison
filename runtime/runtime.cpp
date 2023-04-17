@@ -2872,7 +2872,7 @@ RawObject Runtime::newWeakRef(Thread* thread, const Object& referent) {
   return *ref;
 }
 
-void Runtime::collectAttributes(const Code& code, const Dict& attributes) {
+void Runtime::collectAttributes(const Code& code, const Set& attributes) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
   Bytes bc(&scope, code.code());
@@ -2897,7 +2897,8 @@ void Runtime::collectAttributes(const Code& code, const Dict& attributes) {
     }
     word name_index = bc.byteAt(i + 3);
     name = names.at(name_index);
-    dictAtPutByStr(thread, attributes, name, name);
+    word hash = strHash(thread, *name);
+    setAdd(thread, attributes, name, hash);
   }
 }
 
