@@ -269,6 +269,7 @@ class SSA:
                     #     previous_block.succs = (current_block,)
                 last_instr = instr
         for ssa_block in cfg.blocks.values():
+            pass
         print(cfg)
 
         # # Find predecessors and successors
