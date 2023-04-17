@@ -2877,6 +2877,7 @@ void Runtime::collectAttributes(const Code& code, const Dict& attributes) {
   HandleScope scope(thread);
   Bytes bc(&scope, code.code());
   Tuple names(&scope, code.names());
+  Str name(&scope, Str::empty());
 
   word len = bc.length();
   for (word i = 0; i < len - 3; i += 2) {
@@ -2895,7 +2896,7 @@ void Runtime::collectAttributes(const Code& code, const Dict& attributes) {
       continue;
     }
     word name_index = bc.byteAt(i + 3);
-    Str name(&scope, names.at(name_index));
+    name = names.at(name_index);
     dictAtPutByStr(thread, attributes, name, name);
   }
 }
