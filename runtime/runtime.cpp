@@ -2883,7 +2883,7 @@ void Runtime::collectAttributes(const Code& code, const Set& attributes) {
   for (word i = 0; i < len - 3; i += kCompilerCodeUnitSize) {
     // If the current instruction is EXTENDED_ARG we must skip it and the next
     // instruction.
-    if (bc.byteAt(i) == Bytecode::EXTENDED_ARG) {
+    while (bc.byteAt(i) == Bytecode::EXTENDED_ARG) {
       i += kCompilerCodeUnitSize;
       continue;
     }
