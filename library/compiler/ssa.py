@@ -6,25 +6,25 @@ class SSACFG:
     def __init__(self):
         self.blocks = {}
 
-    def block_at(self, block):
-        result = self.blocks.get(block)
+    def block_at(self, start_instr):
+        result = self.blocks.get(start_instr)
         if result:
             return result
-        return self.add_block(block)
+        return self.add_block(start_instr)
 
-    def add_block(self, block):
-        assert block not in self.blocks
+    def add_block(self, start_instr):
+        assert start_instr not in self.blocks
         result = SSABlock()
-        self.blocks[block] = result
+        self.blocks[start_instr] = result
         return result
 
     def __repr__(self):
         result = ""
-        for block, ssa_block in sorted(self.blocks.items(), key=lambda bs: bs[0].bid):
+        for _, ssa_block in self.blocks.items():
             result += f"{ssa_block.name()}:\n"
             for instr in ssa_block.instrs:
                 result += f"  {instr}\n"
-            result += "\n"
+            result += f"(succs {ssa_block.succs})\n"
         return result
 
 
@@ -53,11 +53,13 @@ class SSAInstruction:
 
 class SSABlock:
     counter = 0
+    __slots__ = ("id", "instrs", "succs")
 
     def __init__(self):
         self.id = SSABlock.counter
         SSABlock.counter += 1
         self.instrs = []
+        self.succs = ()
 
     def emit(self, instr):
         self.instrs.append(instr)
@@ -65,19 +67,22 @@ class SSABlock:
     def name(self):
         return f"bb{self.id}"
 
+    def __repr__(self):
+        return self.name()
+
 
 class Interpreter:
-    def __init__(self, cfg, entry, succs, preds):
+    def __init__(self, cfg, entry, preds):
         self.cfg = cfg
         self.stack = []
         self.block = None
+        self.ssa_block = None
         self.entry = entry
-        self.succs = succs
         self.preds = preds
         self.current_def = {}
 
     def emit(self, ssa_instr):
-        self.cfg.block_at(self.block).emit(ssa_instr)
+        self.ssa_block.emit(ssa_instr)
 
     def clone(self, instr, operands):
         ssa_instr = SSAInstruction(instr.opname, operands, instr)
@@ -100,7 +105,7 @@ class Interpreter:
             (pred,) = self.preds[block]
             return self.read_variable(variable, pred)
         phi = SSAInstruction("Phi", [], None)
-        self.cfg.block_at(block).emit(phi)
+        self.emit(phi)
         self.write_variable(variable, block, phi)
         for pred in self.preds[block]:
             defn = self.read_variable(variable, pred)
@@ -111,7 +116,7 @@ class Interpreter:
         if variable not in self.current_def:
             ssa_instr = SSAInstruction("Undef", (), None)
             self.write_variable(variable, self.entry, ssa_instr)
-            self.cfg.block_at(self.entry).emit(ssa_instr)
+            self.cfg.block_at(self.entry.getInstructions()[0]).emit(ssa_instr)
         result = self.current_def[variable].get(block)
         if result:
             return result
@@ -207,56 +212,118 @@ class Interpreter:
         self.stack.pop()
 
 
+def is_cond_branch(instr):
+    return instr.opname in frozenset(
+        {
+            "FOR_ITER",
+            "POP_JUMP_IF_FALSE",
+            "JUMP_IF_FALSE_OR_POP",
+            "JUMP_IF_TRUE_OR_POP",
+        }
+    )
+
+
+def is_branch(instr):
+    return instr.opname in frozenset(
+        {
+            "FOR_ITER",
+            "JUMP_ABSOLUTE",
+            "JUMP_FORWARD",
+            "JUMP_IF_FALSE_OR_POP",
+            "JUMP_IF_TRUE_OR_POP",
+            "JUMP_IF_NOT_EXC_MATCH",
+            "POP_JUMP_IF_FALSE",
+            "POP_JUMP_IF_TRUE",
+        }
+    )
+
+
+def is_other_block_terminator(instr):
+    return instr.opname in frozenset({"RETURN_VALUE", "RAISE_VARARGS", "RERAISE"})
+
+
+def is_terminator(instr):
+    return is_branch(instr) or is_other_block_terminator(instr)
+
+
 class SSA:
     def __init__(self, graph):
         self.graph = graph
 
     def run(self):
         blocks = self.graph.getBlocksInOrder()
-        preds = {block: set() for block in blocks}
-        succs = {}
-        for block in blocks:
-            children = frozenset(child for child in block.get_children() if child)
-            succs[block] = children
-            for child in children:
-                preds[child].add(block)
-
+        # Build SSA blocks at each terminator
         cfg = SSACFG()
         entry = blocks[0]
-        assert len(preds[entry]) == 0
-        argcount = (
-            len(self.graph.args)
-            + len(self.graph.kwonlyargs)
-            + (self.graph.flags & CO_VARARGS)
-            + (self.graph.flags & CO_VARKEYWORDS)
-        )
-        argnames = (*self.graph.varnames,)[:argcount]
-        ssa_entry = cfg.block_at(entry)
-        interpreter = Interpreter(cfg, entry, succs, preds)
-        for idx, argname in enumerate(argnames):
-            ssa_instr = SSAInstruction(f"LoadArg<{idx}; {argname}>", (), None)
-            ssa_entry.emit(ssa_instr)
-            interpreter.write_variable(argname, entry, ssa_instr)
-
+        current_block = cfg.block_at(entry.getInstructions()[0])
+        last_instr = None
         for block in blocks:
-            interpreter.block = block
-            instrs = block.getInstructions()
-            stack = []
-            found_term = False
-            for instr in instrs:
-                getattr(interpreter, f"do_{instr.opname}")(instr)
-                if (
-                    instr.opname in ("RETURN_VALUE", "RAISE_VARARGS")
-                    or "JUMP" in instr.opname
-                ):
-                    # CPython blocks keep dead code at the end. Terminate
-                    # early.
-                    found_term = True
-                    break
-            # TODO(max): Handle opcodes that only touch the stack on one branch
-            # FOR_ITER, JUMP_IF_FALSE_OR_POP, JUMP_IF_TRUE_OR_POP, YIELD_FROM
-            if not found_term:
-                (succ,) = succs[block]
-                target = cfg.block_at(succ)
-                cfg.block_at(block).emit(SSAInstruction("Branch", (), None, (target,)))
+            for instr in block.getInstructions():
+                if last_instr and is_terminator(last_instr):
+                    previous_block = current_block
+                    current_block = cfg.block_at(instr)
+                    # if is_cond_branch(last_instr):
+                    #     previous_block.succs = (current_block,
+                    #             last_instr.target.getInstructions()[0])
+                    # else:
+                    #     previous_block.succs = (current_block,)
+                last_instr = instr
+        for ssa_block in cfg.blocks.values():
         print(cfg)
+
+        # # Find predecessors and successors
+        # preds = {block: set() for block in cfg.blocks.values()}
+        # succs = {}
+        # for block in cfg.blocks.values():
+        #     children = frozenset(child for child in block.get_children() if child)
+        #     succs[block] = children
+        #     for child in children:
+        #         preds[child].add(block)
+
+        # assert len(preds[entry]) == 0
+        # argcount = (
+        #     len(self.graph.args)
+        #     + len(self.graph.kwonlyargs)
+        #     + (self.graph.flags & CO_VARARGS)
+        #     + (self.graph.flags & CO_VARKEYWORDS)
+        # )
+        # argnames = (*self.graph.varnames,)[:argcount]
+        # ssa_entry = cfg.block_at(entry)
+        # interpreter = Interpreter(cfg, entry, succs, preds)
+        # for idx, argname in enumerate(argnames):
+        #     ssa_instr = SSAInstruction(f"LoadArg<{idx}; {argname}>", (), None)
+        #     ssa_entry.emit(ssa_instr)
+        #     interpreter.write_variable(argname, entry, ssa_instr)
+
+        # interpreter.block = entry
+        # interpreter.ssa_block = cfg.block_at(entry)
+        # for block in blocks:
+        #     instrs = block.getInstructions()
+        #     stack = []
+        #     found_term = False
+        #     for instr in instrs:
+        #         if instr in cfg.blocks:
+        #             interpreter.ssa_block = cfg.blocks[instr]
+        #         getattr(interpreter, f"do_{instr.opname}")(instr)
+        #         if instr.opname in ("RETURN_VALUE", "RAISE_VARARGS"):
+        #             # CPython blocks keep dead code at the end. Terminate
+        #             # early.
+        #             found_term = True
+        #             break
+        #         if "JUMP" in instr.opname:
+        #             # CPython blocks keep dead code at the end. Terminate
+        #             # early.
+        #             found_term = True
+        #             break
+        #         if instr.opname == "FOR_ITER":
+        #             # CPython does not break up blocks after FOR_ITER
+        #             print("iter target is", instr.target)
+        #             interpreter.block = instr.target
+        #             interpreter.ssa_block = cfg.block_at(instr.target)
+        #     # TODO(max): Handle opcodes that only touch the stack on one branch
+        #     # FOR_ITER, JUMP_IF_FALSE_OR_POP, JUMP_IF_TRUE_OR_POP, YIELD_FROM
+        #     if not found_term:
+        #         (succ,) = succs[block]
+        #         target = cfg.block_at(succ)
+        #         cfg.block_at(block).emit(SSAInstruction("Branch", (), None, (target,)))
+        # print(cfg)
