@@ -602,6 +602,9 @@ class PyFlowGraph(FlowGraph):
         live_out = {block: Top for block in blocks}  # map of block -> frozenset of names
         definitely_assigned = set()
 
+        # TODO(max): Use integer as a bitset for local indices instead of full
+        # sets
+
         def meet_one(left, right):
             if left is Top:
                 return right
