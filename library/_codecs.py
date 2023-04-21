@@ -410,6 +410,7 @@ def _unicode_escape_decode_stateful(data: bytes, errors: str = "strict"):
     i = 0
     decoded = ""
     length = len(data)
+    first_invalid = -1
     while i < length:
         decoded, i, error_msg, first_invalid = _unicode_escape_decode(
             data, errors, i, result
