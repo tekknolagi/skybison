@@ -4288,7 +4288,8 @@ HANDLER_INLINE Continue Interpreter::doLoadFast(Thread* thread, word arg) {
   return Continue::NEXT;
 }
 
-HANDLER_INLINE Continue Interpreter::doLoadFastUnchecked(Thread* thread, word arg) {
+HANDLER_INLINE Continue Interpreter::doLoadFastUnchecked(Thread* thread,
+                                                         word arg) {
   Frame* frame = thread->currentFrame();
   RawObject value = frame->local(arg);
   thread->stackPush(value);
@@ -4333,6 +4334,13 @@ HANDLER_INLINE Continue Interpreter::doStoreFastReverse(Thread* thread,
   Frame* frame = thread->currentFrame();
   RawObject value = thread->stackPop();
   frame->setLocalWithReverseIndex(arg, value);
+  return Continue::NEXT;
+}
+
+HANDLER_INLINE Continue Interpreter::doDeleteFastUnchecked(Thread* thread,
+                                                           word arg) {
+  Frame* frame = thread->currentFrame();
+  frame->setLocal(arg, Error::notFound());
   return Continue::NEXT;
 }
 
