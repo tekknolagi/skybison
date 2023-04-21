@@ -377,7 +377,8 @@ class function(bootstrap=True):
     def __new__(cls, code, globals_dict, name=None, argdefs=None, closure=None):
         if _module_proxy_check(globals_dict):
             mod = globals_dict.__module_object__
-        elif _dict_check(globals_dict):
+        else:
+            _dict_guard(globals_dict)
             mod = module("")
             mod.__dict__.update(globals_dict)
         return _function_new(cls, code, mod, name, argdefs, closure)
