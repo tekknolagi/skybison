@@ -713,52 +713,60 @@ class DefiniteAsssignmentAnalysisTests(unittest.TestCase):
 def foo(x):
     return x
 """
+        func = compile_function(source, "foo")
         self.assertEqual(
-            dis(compile_function(source, "foo").__code__),
+            dis(func.__code__),
             """\
 LOAD_FAST_UNCHECKED x
 RETURN_VALUE
 """,
         )
+        self.assertEqual(func(123), 123)
 
     def test_load_kwonly_parameter_is_unchecked(self):
         source = """
 def foo(*, x):
     return x
 """
+        func = compile_function(source, "foo")
         self.assertEqual(
-            dis(compile_function(source, "foo").__code__),
+            dis(func.__code__),
             """\
 LOAD_FAST_UNCHECKED x
 RETURN_VALUE
 """,
         )
+        self.assertEqual(func(x=123), 123)
 
     def test_load_varargs_parameter_is_unchecked(self):
         source = """
 def foo(*x):
     return x
 """
+        func = compile_function(source, "foo")
         self.assertEqual(
-            dis(compile_function(source, "foo").__code__),
+            dis(func.__code__),
             """\
 LOAD_FAST_UNCHECKED x
 RETURN_VALUE
 """,
         )
+        self.assertEqual(func(123), (123,))
 
     def test_load_varkeyargs_parameter_is_unchecked(self):
         source = """
 def foo(**x):
     return x
 """
+        func = compile_function(source, "foo")
         self.assertEqual(
-            dis(compile_function(source, "foo").__code__),
+            dis(func.__code__),
             """\
 LOAD_FAST_UNCHECKED x
 RETURN_VALUE
 """,
         )
+        self.assertEqual(func(a=123), {"a": 123})
 
     def test_load_parameter_with_del_is_checked(self):
         source = """
@@ -766,14 +774,19 @@ def foo(x):
     del x
     return x
 """
+        func = compile_function(source, "foo")
         self.assertEqual(
-            dis(compile_function(source, "foo").__code__),
+            dis(func.__code__),
             """\
 DELETE_FAST x
 LOAD_FAST x
 RETURN_VALUE
 """,
         )
+        with self.assertRaisesRegex(
+            UnboundLocalError, "local variable 'x' referenced before assignment"
+        ):
+            func(123)
 
     def test_load_parameter_with_del_after_is_unchecked(self):
         source = """
@@ -782,8 +795,9 @@ def foo(x):
     del x
     return y
 """
+        func = compile_function(source, "foo")
         self.assertEqual(
-            dis(compile_function(source, "foo").__code__),
+            dis(func.__code__),
             """\
 LOAD_FAST_UNCHECKED x
 STORE_FAST y
@@ -792,6 +806,7 @@ LOAD_FAST_UNCHECKED y
 RETURN_VALUE
 """,
         )
+        self.assertEqual(func(123), 123)
 
     def test_variable_defined_in_local_is_unchecked(self):
         source = """
@@ -799,8 +814,9 @@ def foo():
     x = 3
     return x
 """
+        func = compile_function(source, "foo")
         self.assertEqual(
-            dis(compile_function(source, "foo").__code__),
+            dis(func.__code__),
             """\
 LOAD_CONST 3
 STORE_FAST x
@@ -808,6 +824,7 @@ LOAD_FAST_UNCHECKED x
 RETURN_VALUE
 """,
         )
+        self.assertEqual(func(), 3)
 
     def test_variable_defined_in_one_branch_is_checked(self):
         source = """
@@ -816,8 +833,9 @@ def foo(cond):
         x = 3
     return x
 """
+        func = compile_function(source, "foo")
         self.assertEqual(
-            dis(compile_function(source, "foo").__code__),
+            dis(func.__code__),
             """\
 LOAD_FAST_UNCHECKED cond
 POP_JUMP_IF_FALSE 8
@@ -827,6 +845,13 @@ LOAD_FAST x
 RETURN_VALUE
 """,
         )
+        self.assertEqual(func(True), 3)
+        return
+        # TODO(T66255738): Enable this assertRaisesRegex
+        with self.assertRaisesRegex(
+            UnboundLocalError, "local variable 'x' referenced before assignment"
+        ):
+            func(False)
 
     def test_variable_defined_in_one_branch_if_else_is_checked(self):
         source = """
@@ -837,8 +862,9 @@ def foo(cond):
         pass
     return x
 """
+        func = compile_function(source, "foo")
         self.assertEqual(
-            dis(compile_function(source, "foo").__code__),
+            dis(func.__code__),
             """\
 LOAD_FAST_UNCHECKED cond
 POP_JUMP_IF_FALSE 10
@@ -849,6 +875,13 @@ LOAD_FAST x
 RETURN_VALUE
 """,
         )
+        self.assertEqual(func(True), 3)
+        return
+        # TODO(T66255738): Enable this assertRaisesRegex
+        with self.assertRaisesRegex(
+            UnboundLocalError, "local variable 'x' referenced before assignment"
+        ):
+            func(False)
 
     def test_variable_defined_in_both_branches_if_else_is_unchecked(self):
         source = """
@@ -859,8 +892,9 @@ def foo(cond):
         x = 4
     return x
 """
+        func = compile_function(source, "foo")
         self.assertEqual(
-            dis(compile_function(source, "foo").__code__),
+            dis(func.__code__),
             """\
 LOAD_FAST_UNCHECKED cond
 POP_JUMP_IF_FALSE 10
@@ -873,6 +907,8 @@ LOAD_FAST_UNCHECKED x
 RETURN_VALUE
 """,
         )
+        self.assertEqual(func(True), 3)
+        self.assertEqual(func(False), 4)
 
     def test_loop_is_unchecked(self):
         source = """
