@@ -589,12 +589,10 @@ class PyFlowGraph(FlowGraph):
     def computeDefinitelyAssigned(self):
         blocks = self.getBlocksInOrder()
         preds = {block: set() for block in blocks}
-        succs = {}
         for block in blocks:
             children = frozenset(
                 block for block in block.get_children() if block is not None
             )
-            succs[block] = children
             for child in children:
                 preds[child].add(block)
 
