@@ -1083,7 +1083,88 @@ RETURN_VALUE
         )
         self.assertEqual(func(), None)
 
-    # TODO(max): Test finally
+    def test_try_with_use_in_finally_is_checked(self):
+        source = """
+def foo():
+    try:
+        x = 123
+    finally:
+        return x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+DELETE_FAST_UNCHECKED x
+LOAD_CONST None
+SETUP_FINALLY 8
+LOAD_CONST 123
+STORE_FAST x
+POP_BLOCK
+BEGIN_FINALLY
+LOAD_FAST x
+POP_FINALLY 1
+ROT_TWO
+POP_TOP
+RETURN_VALUE
+END_FINALLY
+POP_TOP
+""",
+        )
+        self.assertEqual(func(), 123)
+
+    def test_try_with_use_after_finally_is_unchecked(self):
+        source = """
+def foo():
+    try:
+        x = 123
+    finally:
+        x = 456
+    return x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+SETUP_FINALLY 8
+LOAD_CONST 123
+STORE_FAST x
+POP_BLOCK
+BEGIN_FINALLY
+LOAD_CONST 456
+STORE_FAST x
+END_FINALLY
+LOAD_FAST_UNCHECKED x
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(), 456)
+
+    def test_try_with_use_after_finally_is_unchecked_2(self):
+        source = """
+def foo():
+    try:
+        pass
+    finally:
+        x = 456
+    return x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+SETUP_FINALLY 4
+POP_BLOCK
+BEGIN_FINALLY
+LOAD_CONST 456
+STORE_FAST x
+END_FINALLY
+LOAD_FAST_UNCHECKED x
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(), 456)
+
     # TODO(max): Test with
 
 
