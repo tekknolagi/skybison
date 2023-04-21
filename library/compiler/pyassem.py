@@ -603,7 +603,7 @@ class PyFlowGraph(FlowGraph):
         live_out = {block: Top for block in blocks}  # map of block -> frozenset of names
         definitely_assigned = set()
 
-        def meet(*args):
+        def meet(args):
             result = Top
             for arg in args:
                 result &= arg
@@ -618,7 +618,7 @@ class PyFlowGraph(FlowGraph):
                 currently_alive = 2**argcount - 1
             else:
                 # Meet the live-out sets of all predecessors
-                currently_alive = meet(*(live_out[pred] for pred in preds[block]))
+                currently_alive = meet(live_out[pred] for pred in preds[block])
             for instr in block.getInstructions():
                 if modify and instr.opname == "LOAD_FAST" and \
                         (currently_alive & (1 << instr.ioparg)):
