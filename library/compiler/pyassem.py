@@ -598,9 +598,8 @@ class PyFlowGraph(FlowGraph):
         Top = 2**num_locals - 1
         entry = self.entry
         queue = [entry]
-        live_out = [
-            Top for i in range(self.block_count)
-        ]  # map of block id -> assignment state in lattice
+        # map of block id -> assignment state in lattice
+        live_out = [Top] * self.block_count
         definitely_assigned = set()
 
         def meet(args):
