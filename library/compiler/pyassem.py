@@ -592,15 +592,15 @@ class PyFlowGraph(FlowGraph):
         for block in blocks:
             for child in block.get_children():
                 if child is not None:
-                    preds[child.bid].add(block)
+                    preds[child.bid].add(block.bid)
 
         num_locals = len(self.varnames)
         Top = 2**num_locals - 1
         entry = self.entry
         queue = [entry]
-        live_out = {
-            block: Top for block in blocks
-        }  # map of block -> frozenset of names
+        live_out = [
+            Top for i in range(self.block_count)
+        ]  # map of block id -> assignment state in lattice
         definitely_assigned = set()
 
         def meet(args):
@@ -621,7 +621,8 @@ class PyFlowGraph(FlowGraph):
                 currently_alive = 2**argcount - 1
             else:
                 # Meet the live-out sets of all predecessors
-                currently_alive = meet(live_out[pred] for pred in preds[block.bid])
+                bid = block.bid
+                currently_alive = meet(live_out[pred] for pred in preds[bid])
             for instr in block.getInstructions():
                 if (
                     modify
@@ -633,9 +634,9 @@ class PyFlowGraph(FlowGraph):
                     currently_alive |= 1 << instr.ioparg
                 elif instr.opname == "DELETE_FAST":
                     currently_alive &= ~(1 << instr.ioparg)
-            if currently_alive == live_out[block]:
+            if currently_alive == live_out[block.bid]:
                 return False
-            live_out[block] = currently_alive
+            live_out[block.bid] = currently_alive
             return True
 
         changed = True
