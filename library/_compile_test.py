@@ -837,8 +837,9 @@ def foo(cond):
         self.assertEqual(
             dis(func.__code__),
             """\
+DELETE_FAST_UNCHECKED x
 LOAD_FAST_UNCHECKED cond
-POP_JUMP_IF_FALSE 8
+POP_JUMP_IF_FALSE 10
 LOAD_CONST 3
 STORE_FAST x
 LOAD_FAST x
@@ -846,8 +847,6 @@ RETURN_VALUE
 """,
         )
         self.assertEqual(func(True), 3)
-        return
-        # TODO(T66255738): Enable this assertRaisesRegex
         with self.assertRaisesRegex(
             UnboundLocalError, "local variable 'x' referenced before assignment"
         ):
@@ -866,8 +865,9 @@ def foo(cond):
         self.assertEqual(
             dis(func.__code__),
             """\
+DELETE_FAST_UNCHECKED x
 LOAD_FAST_UNCHECKED cond
-POP_JUMP_IF_FALSE 10
+POP_JUMP_IF_FALSE 12
 LOAD_CONST 3
 STORE_FAST x
 JUMP_FORWARD 0
@@ -876,8 +876,6 @@ RETURN_VALUE
 """,
         )
         self.assertEqual(func(True), 3)
-        return
-        # TODO(T66255738): Enable this assertRaisesRegex
         with self.assertRaisesRegex(
             UnboundLocalError, "local variable 'x' referenced before assignment"
         ):

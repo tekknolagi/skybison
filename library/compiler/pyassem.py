@@ -614,6 +614,13 @@ class PyFlowGraph(FlowGraph):
         # map of block id -> assignment state in lattice
         live_out = [Top] * self.block_count
         definitely_assigned = set()
+        conditionally_assigned = set()
+        argcount = (
+            len(self.args)
+            + len(self.kwonlyargs)
+            + (self.flags & CO_VARARGS)
+            + (self.flags & CO_VARKEYWORDS)
+        )
 
         def meet(args):
             result = Top
@@ -624,24 +631,21 @@ class PyFlowGraph(FlowGraph):
         def process_one_block(block, modify=False):
             if block is entry:
                 # No preds; all parameters are live-in
-                argcount = (
-                    len(self.args)
-                    + len(self.kwonlyargs)
-                    + (self.flags & CO_VARARGS)
-                    + (self.flags & CO_VARKEYWORDS)
-                )
                 currently_alive = 2**argcount - 1
             else:
                 # Meet the live-out sets of all predecessors
                 bid = block.bid
                 currently_alive = meet(live_out[pred] for pred in preds[bid])
             for instr in block.getInstructions():
-                if (
-                    modify
-                    and instr.opname == "LOAD_FAST"
-                    and (currently_alive & (1 << instr.ioparg))
-                ):
-                    definitely_assigned.add(instr)
+                if modify and instr.opname == "LOAD_FAST":
+                    if currently_alive & (1 << instr.ioparg):
+                        definitely_assigned.add(instr)
+                    else:
+                        if instr.ioparg >= argcount:
+                            # Exclude arguments because they come into the
+                            # function body live. Anything that makes them no
+                            # longer live will have to be DELETE_FAST.
+                            conditionally_assigned.add(instr.oparg)
                 elif instr.opname == "STORE_FAST":
                     currently_alive |= 1 << instr.ioparg
                 elif instr.opname == "DELETE_FAST":
@@ -660,6 +664,12 @@ class PyFlowGraph(FlowGraph):
         for block in blocks:
             process_one_block(block, modify=True)
 
+        if conditionally_assigned:
+            deletes = [
+                Instruction("DELETE_FAST_UNCHECKED", name, self.varnames.index(name))
+                for name in sorted(conditionally_assigned)
+            ]
+            entry.insts = deletes + entry.insts
         return definitely_assigned
 
     def optimizeLoadFast(self):
