@@ -1168,7 +1168,7 @@ RETURN_VALUE
     def test_use_in_with_is_unchecked(self):
         source = """
 class CM(object):
-    def __init__(self, file_name, method):
+    def __init__(self):
         self.state = "init"
     def __enter__(self):
         self.state = "enter"
@@ -1209,7 +1209,7 @@ RETURN_VALUE
     def test_use_after_with_is_unchecked(self):
         source = """
 class CM(object):
-    def __init__(self, file_name, method):
+    def __init__(self):
         self.state = "init"
     def __enter__(self):
         self.state = "enter"
