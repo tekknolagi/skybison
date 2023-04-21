@@ -587,6 +587,10 @@ class PyFlowGraph(FlowGraph):
                 break
 
     def computeDefinitelyAssigned(self):
+        # TODO(T66255738): Insert DELETE_FAST instructions at the top of the
+        # function for locals which are conditionally assigned. This lets us
+        # write a Error::notFound() to the Frame and therefore raise
+        # UnboundLocalError when expected. See D15705960 for more information.
         blocks = self.getBlocksInOrder()
         preds = tuple(set() for i in range(self.block_count))
         for block in blocks:
