@@ -597,7 +597,6 @@ class PyFlowGraph(FlowGraph):
         num_locals = len(self.varnames)
         Top = 2**num_locals - 1
         entry = self.entry
-        queue = [entry]
         # map of block id -> assignment state in lattice
         live_out = [Top] * self.block_count
         definitely_assigned = set()
