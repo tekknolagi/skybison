@@ -591,7 +591,9 @@ class PyFlowGraph(FlowGraph):
         preds = {block: set() for block in blocks}
         succs = {}
         for block in blocks:
-            children = frozenset(block for block in block.get_children() if block is not None)
+            children = frozenset(
+                block for block in block.get_children() if block is not None
+            )
             succs[block] = children
             for child in children:
                 preds[child].add(block)
@@ -600,7 +602,9 @@ class PyFlowGraph(FlowGraph):
         Top = 2**num_locals - 1
         entry = self.entry
         queue = [entry]
-        live_out = {block: Top for block in blocks}  # map of block -> frozenset of names
+        live_out = {
+            block: Top for block in blocks
+        }  # map of block -> frozenset of names
         definitely_assigned = set()
 
         def meet(args):
@@ -612,19 +616,25 @@ class PyFlowGraph(FlowGraph):
         def process_one_block(block, modify=False):
             if block is entry:
                 # No preds; all parameters are live-in
-                argcount = len(self.args) + len(self.kwonlyargs) + \
-                        (self.flags & CO_VARARGS) + \
-                        (self.flags & CO_VARKEYWORDS)
+                argcount = (
+                    len(self.args)
+                    + len(self.kwonlyargs)
+                    + (self.flags & CO_VARARGS)
+                    + (self.flags & CO_VARKEYWORDS)
+                )
                 currently_alive = 2**argcount - 1
             else:
                 # Meet the live-out sets of all predecessors
                 currently_alive = meet(live_out[pred] for pred in preds[block])
             for instr in block.getInstructions():
-                if modify and instr.opname == "LOAD_FAST" and \
-                        (currently_alive & (1 << instr.ioparg)):
+                if (
+                    modify
+                    and instr.opname == "LOAD_FAST"
+                    and (currently_alive & (1 << instr.ioparg))
+                ):
                     definitely_assigned.add(instr)
                 elif instr.opname == "STORE_FAST":
-                    currently_alive |= (1 << instr.ioparg)
+                    currently_alive |= 1 << instr.ioparg
                 elif instr.opname == "DELETE_FAST":
                     currently_alive &= ~(1 << instr.ioparg)
             if currently_alive == live_out[block]:
