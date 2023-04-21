@@ -1165,7 +1165,88 @@ RETURN_VALUE
         )
         self.assertEqual(func(), 456)
 
-    # TODO(max): Test with
+    def test_use_in_with_is_unchecked(self):
+        source = """
+class CM(object):
+    def __init__(self, file_name, method):
+        self.state = "init"
+    def __enter__(self):
+        self.state = "enter"
+    def __exit__(self, type, value, traceback):
+        self.state = "exit"
+
+def foo():
+    with CM() as cm:
+        return cm
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+LOAD_GLOBAL CM
+CALL_FUNCTION 0
+SETUP_WITH 18
+STORE_FAST cm
+LOAD_FAST_UNCHECKED cm
+POP_BLOCK
+ROT_TWO
+BEGIN_FINALLY
+WITH_CLEANUP_START
+WITH_CLEANUP_FINISH
+POP_FINALLY 0
+RETURN_VALUE
+WITH_CLEANUP_START
+WITH_CLEANUP_FINISH
+END_FINALLY
+LOAD_CONST None
+RETURN_VALUE
+""",
+        )
+        # TODO(max): Figure out how to get the NameError for CM to go away.
+        return
+        self.assertEqual(func(), 456)
+
+    def test_use_after_with_is_unchecked(self):
+        source = """
+class CM(object):
+    def __init__(self, file_name, method):
+        self.state = "init"
+    def __enter__(self):
+        self.state = "enter"
+    def __exit__(self, type, value, traceback):
+        self.state = "exit"
+
+def foo():
+    with CM() as cm:
+        pass
+    return cm
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+LOAD_GLOBAL CM
+CALL_FUNCTION 0
+SETUP_WITH 6
+STORE_FAST cm
+POP_BLOCK
+BEGIN_FINALLY
+WITH_CLEANUP_START
+WITH_CLEANUP_FINISH
+END_FINALLY
+LOAD_FAST_UNCHECKED cm
+RETURN_VALUE
+""",
+        )
+        # TODO(max): Figure out how to get the NameError for CM to go away.
+        return
+        self.assertEqual(func(), 456)
+
+    # TODO(max): Test with (multiple context managers)
+    # TODO(max): Test async with
+    # TODO(max): Test async loops
+    # TODO(max): Test generators
+    # TODO(max): Test async generators
 
 
 if __name__ == "__main__":

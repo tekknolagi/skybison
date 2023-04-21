@@ -592,6 +592,13 @@ class PyFlowGraph(FlowGraph):
         for block in blocks:
             for child in block.get_children():
                 if child is not None:
+                    if (
+                        block.insts
+                        and block.insts[-1].opname == "SETUP_WITH"
+                        and block.insts[-1].target is child
+                    ):
+                        # TODO(max): Is this correct? Explain it.
+                        continue
                     # TODO(max): Tail-duplicate finally blocks or upgrade to
                     # 3.10, which does this already. This avoids except blocks
                     # falling through into else blocks and mucking up
