@@ -948,6 +948,35 @@ RETURN_VALUE
 """,
         )
 
+    def test_try(self):
+        source = """
+def foo():
+    try:
+        x = 1
+    except:
+        pass
+    return x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+SETUP_FINALLY 8
+LOAD_CONST 1
+STORE_FAST x
+POP_BLOCK
+JUMP_FORWARD 12
+POP_TOP
+POP_TOP
+POP_TOP
+POP_EXCEPT
+JUMP_FORWARD 2
+END_FINALLY
+LOAD_FAST_UNCHECKED x
+RETURN_VALUE
+""",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
