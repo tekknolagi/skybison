@@ -931,15 +931,16 @@ RETURN_VALUE
         source = """
 def foo(cond):
     while True:
-        print(cond)
+        1 + cond  # use it
         del cond
 """
+        func = compile_function(source, "foo")
         self.assertEqual(
-            dis(compile_function(source, "foo").__code__),
+            dis(func.__code__),
             """\
-LOAD_GLOBAL print
+LOAD_CONST 1
 LOAD_FAST cond
-CALL_FUNCTION 1
+BINARY_ADD
 POP_TOP
 DELETE_FAST cond
 JUMP_ABSOLUTE 0
@@ -947,12 +948,83 @@ LOAD_CONST None
 RETURN_VALUE
 """,
         )
+        with self.assertRaisesRegex(
+            UnboundLocalError, "local variable 'cond' referenced before assignment"
+        ):
+            func(True)
 
-    def test_try(self):
+    def test_try_with_use_in_try_is_unchecked(self):
         source = """
 def foo():
     try:
-        x = 1
+        x = 123
+        return x
+    except:
+        pass
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+SETUP_FINALLY 10
+LOAD_CONST 123
+STORE_FAST x
+LOAD_FAST_UNCHECKED x
+POP_BLOCK
+RETURN_VALUE
+POP_TOP
+POP_TOP
+POP_TOP
+POP_EXCEPT
+JUMP_FORWARD 2
+END_FINALLY
+LOAD_CONST None
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(), 123)
+
+    @unittest.skip(
+        "TODO(max): This should be unchecked but we need to tail-duplicate finally blocks"
+    )
+    def test_try_with_use_in_else_is_unchecked(self):
+        source = """
+def foo():
+    try:
+        x = 123
+    except:
+        pass
+    else:
+        return x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+SETUP_FINALLY 8
+LOAD_CONST 123
+STORE_FAST x
+POP_BLOCK
+JUMP_FORWARD 12
+POP_TOP
+POP_TOP
+POP_TOP
+POP_EXCEPT
+JUMP_FORWARD 6
+END_FINALLY
+LOAD_FAST_UNCHECKED x
+RETURN_VALUE
+LOAD_CONST None
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(), 123)
+
+    def test_try_with_use_after_except_is_checked(self):
+        source = """
+def foo():
+    try:
+        x = 123
     except:
         pass
     return x
@@ -961,8 +1033,9 @@ def foo():
         self.assertEqual(
             dis(func.__code__),
             """\
+DELETE_FAST_UNCHECKED x
 SETUP_FINALLY 8
-LOAD_CONST 1
+LOAD_CONST 123
 STORE_FAST x
 POP_BLOCK
 JUMP_FORWARD 12
@@ -972,10 +1045,46 @@ POP_TOP
 POP_EXCEPT
 JUMP_FORWARD 2
 END_FINALLY
-LOAD_FAST_UNCHECKED x
+LOAD_FAST x
 RETURN_VALUE
 """,
         )
+        self.assertEqual(func(), 123)
+
+    def test_try_with_use_in_except_is_checked(self):
+        source = """
+def foo():
+    try:
+        x = 123
+    except:
+        return x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+DELETE_FAST_UNCHECKED x
+SETUP_FINALLY 8
+LOAD_CONST 123
+STORE_FAST x
+POP_BLOCK
+JUMP_FORWARD 16
+POP_TOP
+POP_TOP
+POP_TOP
+LOAD_FAST x
+ROT_FOUR
+POP_EXCEPT
+RETURN_VALUE
+END_FINALLY
+LOAD_CONST None
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(), None)
+
+    # TODO(max): Test finally
+    # TODO(max): Test with
 
 
 if __name__ == "__main__":

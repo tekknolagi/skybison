@@ -592,16 +592,13 @@ class PyFlowGraph(FlowGraph):
         for block in blocks:
             for child in block.get_children():
                 if child is not None:
-                    if (
-                        block.insts
-                        and block.insts[-1].opname == "SETUP_FINALLY"
-                        and block.insts[-1].target == child
-                    ):
-                        # The compiler puts the except handler in the target
-                        # for SETUP_FINALLY. The except handler block is not
-                        # actually a successor of this one, though; control
-                        # falls always into the next block.
-                        continue
+                    # TODO(max): Tail-duplicate finally blocks or upgrade to
+                    # 3.10, which does this already. This avoids except blocks
+                    # falling through into else blocks and mucking up
+                    # performance.
+                    # TODO(max): Figure out if we need to handle FOR_ITER
+                    # specially here since the compiler does not treat it as a
+                    # terminator.
                     preds[child.bid].add(block.bid)
 
         num_locals = len(self.varnames)
