@@ -588,13 +588,11 @@ class PyFlowGraph(FlowGraph):
 
     def computeDefinitelyAssigned(self):
         blocks = self.getBlocksInOrder()
-        preds = {block: set() for block in blocks}
+        preds = tuple(set() for i in range(self.block_count))
         for block in blocks:
-            children = frozenset(
-                block for block in block.get_children() if block is not None
-            )
-            for child in children:
-                preds[child].add(block)
+            for child in block.get_children():
+                if child is not None:
+                    preds[child.bid].add(block)
 
         num_locals = len(self.varnames)
         Top = 2**num_locals - 1
@@ -623,7 +621,7 @@ class PyFlowGraph(FlowGraph):
                 currently_alive = 2**argcount - 1
             else:
                 # Meet the live-out sets of all predecessors
-                currently_alive = meet(live_out[pred] for pred in preds[block])
+                currently_alive = meet(live_out[pred] for pred in preds[block.bid])
             for instr in block.getInstructions():
                 if (
                     modify
