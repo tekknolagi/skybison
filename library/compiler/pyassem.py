@@ -586,11 +586,7 @@ class PyFlowGraph(FlowGraph):
                 self.stacksize = self.stackdepth_walk(block)
                 break
 
-    def computeDefinitelyAssigned(self):
-        # TODO(T66255738): Insert DELETE_FAST instructions at the top of the
-        # function for locals which are conditionally assigned. This lets us
-        # write a Error::notFound() to the Frame and therefore raise
-        # UnboundLocalError when expected. See D15705960 for more information.
+    def optimizeLoadFast(self):
         blocks = self.getBlocksInOrder()
         preds = tuple(set() for i in range(self.block_count))
         for block in blocks:
@@ -613,7 +609,6 @@ class PyFlowGraph(FlowGraph):
         entry = self.entry
         # map of block id -> assignment state in lattice
         live_out = [Top] * self.block_count
-        definitely_assigned = set()
         conditionally_assigned = set()
         argcount = (
             len(self.args)
@@ -639,7 +634,7 @@ class PyFlowGraph(FlowGraph):
             for instr in block.getInstructions():
                 if modify and instr.opname == "LOAD_FAST":
                     if currently_alive & (1 << instr.ioparg):
-                        definitely_assigned.add(instr)
+                        instr.opname = "LOAD_FAST_UNCHECKED"
                     else:
                         if instr.ioparg >= argcount:
                             # Exclude arguments because they come into the
@@ -670,16 +665,6 @@ class PyFlowGraph(FlowGraph):
                 for name in sorted(conditionally_assigned)
             ]
             entry.insts = deletes + entry.insts
-        return definitely_assigned
-
-    def optimizeLoadFast(self):
-        definitely_assigned = self.computeDefinitelyAssigned()
-        for block in self.getBlocksInOrder():
-            instrs = block.getInstructions()
-            for instr in instrs:
-                if instr in definitely_assigned:
-                    assert instr.opname == "LOAD_FAST"
-                    instr.opname = "LOAD_FAST_UNCHECKED"
 
     def flattenGraph(self):
         """Arrange the blocks in order and resolve jumps"""
