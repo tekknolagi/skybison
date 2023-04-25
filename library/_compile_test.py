@@ -985,7 +985,7 @@ RETURN_VALUE
         self.assertEqual(func(), 123)
 
     @unittest.skip(
-        "TODO(max): This should be unchecked but we need to tail-duplicate finally blocks"
+        "TODO(emacs): This should be unchecked but we need to tail-duplicate finally blocks"
     )
     def test_try_with_use_in_else_is_unchecked(self):
         source = """
@@ -1202,7 +1202,7 @@ LOAD_CONST None
 RETURN_VALUE
 """,
         )
-        # TODO(max): Figure out how to get the NameError for CM to go away.
+        # TODO(emacs): Figure out how to get the NameError for CM to go away.
         return
         self.assertEqual(func(), 456)
 
@@ -1238,15 +1238,15 @@ LOAD_FAST_UNCHECKED cm
 RETURN_VALUE
 """,
         )
-        # TODO(max): Figure out how to get the NameError for CM to go away.
+        # TODO(emacs): Figure out how to get the NameError for CM to go away.
         return
         self.assertEqual(func(), 456)
 
-    # TODO(max): Test with (multiple context managers)
-    # TODO(max): Test async with
-    # TODO(max): Test async loops
-    # TODO(max): Test generators
-    # TODO(max): Test async generators
+    # TODO(emacs): Test with (multiple context managers)
+    # TODO(emacs): Test async with
+    # TODO(emacs): Test async loops
+    # TODO(emacs): Test generators
+    # TODO(emacs): Test async generators
 
 
 if __name__ == "__main__":

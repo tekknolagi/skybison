@@ -597,13 +597,13 @@ class PyFlowGraph(FlowGraph):
                         and block.insts[-1].opname == "SETUP_WITH"
                         and block.insts[-1].target is child
                     ):
-                        # TODO(max): Is this correct? Explain it.
+                        # TODO(emacs): Is this correct? Explain it.
                         continue
-                    # TODO(max): Tail-duplicate finally blocks or upgrade to
+                    # TODO(emacs): Tail-duplicate finally blocks or upgrade to
                     # 3.10, which does this already. This avoids except blocks
                     # falling through into else blocks and mucking up
                     # performance.
-                    # TODO(max): Figure out if we need to handle FOR_ITER
+                    # TODO(emacs): Figure out if we need to handle FOR_ITER
                     # specially here since the compiler does not treat it as a
                     # terminator.
                     preds[child.bid].add(block.bid)
