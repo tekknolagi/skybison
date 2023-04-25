@@ -953,6 +953,62 @@ RETURN_VALUE
         ):
             func(True)
 
+    def test_loop_variable_in_for_loop_is_unchecked(self):
+        source = """
+def foo(n):
+    result = []
+    for i in range(n):
+        result.append(i)
+    return result
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+BUILD_LIST 0
+STORE_FAST result
+LOAD_GLOBAL range
+LOAD_FAST_UNCHECKED n
+CALL_FUNCTION 1
+GET_ITER
+FOR_ITER 14
+STORE_FAST i
+LOAD_FAST_UNCHECKED result
+LOAD_METHOD append
+LOAD_FAST_UNCHECKED i
+CALL_METHOD 1
+POP_TOP
+JUMP_ABSOLUTE 12
+LOAD_FAST_UNCHECKED result
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(3), [0, 1, 2])
+
+    def test_loop_variable_after_for_loop_is_checked(self):
+        source = """
+def foo(n):
+    for i in range(n):
+        pass
+    return i
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+LOAD_GLOBAL range
+LOAD_FAST_UNCHECKED n
+CALL_FUNCTION 1
+GET_ITER
+FOR_ITER 4
+STORE_FAST i
+JUMP_ABSOLUTE 8
+LOAD_FAST i
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(3), 2)
+
     def test_try_with_use_in_try_is_unchecked(self):
         source = """
 def foo():
