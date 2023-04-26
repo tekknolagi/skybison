@@ -207,8 +207,194 @@ class AstOptimizerPyro(AstOptimizer38):
         return self.update_node(node, left=left, right=right)
 
 
+class Instruction:
+    def __init__(self, op: int, arg: int, idx: int) -> None:
+        self.op = op
+        self.arg = arg
+        self.idx = idx
+
+    def is_branch(self) -> bool:
+        return self.op in {
+            Op.FOR_ITER,
+            Op.JUMP_ABSOLUTE,
+            Op.JUMP_FORWARD,
+            Op.JUMP_IF_FALSE_OR_POP,
+            Op.JUMP_IF_TRUE_OR_POP,
+            Op.POP_JUMP_IF_FALSE,
+            Op.POP_JUMP_IF_TRUE,
+        }
+
+    def is_unconditional_branch(self) -> bool:
+        return self.op in {Op.JUMP_ABSOLUTE, Op.JUMP_FORWARD}
+
+    def is_relative_branch(self) -> bool:
+        return self.op in {Op.FOR_ITER, Op.JUMP_FORWARD}
+
+    def is_return(self) -> bool:
+        return self.op == Op.RETURN_VALUE
+
+    def is_raise(self) -> bool:
+        return self.op == Op.RAISE_VARARGS
+
+    def is_other_block_terminator(self):
+        return self.op in {
+            Op.RETURN_VALUE,
+            Op.RAISE_VARARGS,
+            # Op.RERAISE,
+        }
+
+    def is_terminator(self) -> bool:
+        return self.is_branch() or self.is_other_block_terminator()
+
+    def next_instr_offset(self) -> int:
+        return self.next_instr_idx() * CODEUNIT_SIZE
+
+    def next_instr_idx(self) -> int:
+        return self.idx + 1
+
+    def jump_target_offset(self) -> int:
+        return self.jump_target_idx() * CODEUNIT_SIZE
+
+    def jump_target_idx(self) -> int:
+        if self.is_relative_branch():
+            return self.next_instr_idx() + self.arg // CODEUNIT_SIZE
+        return self.arg // CODEUNIT_SIZE
+
+    def successor_indices(self) -> Tuple[int]:
+        if self.is_branch():
+            if self.is_unconditional_branch():
+                return (self.jump_target_idx(),)
+            return (self.next_instr_idx(), self.jump_target_idx())
+        if self.is_other_block_terminator():
+            # Return, raise, etc have no successors
+            return ()
+        # Other instructions have implicit fallthrough to the next block
+        return (self.next_instr_idx(),)
+
+    def __repr__(self) -> str:
+        return f"{opname(self.op)} {self.arg}"
+
+
+class BytecodeSlice:
+    """A slice of bytecode from [start, end)."""
+
+    def __init__(
+        self,
+        bytecode: List[BytecodeOp],
+        start: Optional[int] = None,
+        end: Optional[int] = None,
+    ) -> None:
+        self.bytecode = bytecode
+        self.start: int = 0 if start is None else start
+        self.end: int = len(bytecode) if end is None else end
+
+    def last(self) -> BytecodeOp:
+        return self.bytecode[self.end - 1]
+            self.bytecode[self.end - 1]
+
+    def successor_indices(self) -> Tuple[int]:
+        return self.last().successor_indices()
+
+    def size(self) -> int:
+        return self.end - self.start
+
+    def __iter__(self) -> Iterator[BytecodeOp]:
+        return iter(self.bytecode[self.start : self.end])
+
+    def __repr__(self) -> str:
+        return f"<BytecodeSlice start={self.start}, end={self.end}>"
+
+
+class BasicBlock:
+    def __init__(self, code: BytecodeSlice):
+        self.code = code
+        assert self.code.last().is_terminator()
+
+
+def optimize_load_fast(code):
+    opcode = opcodepyro.opcode
+    # TODO(emacs): Handle EXTENDED_ARG
+    blocks = find_blocks(code)
+    num_blocks = len(blocks)
+    preds = tuple(set() for i in range(num_blocks))
+    for block in blocks:
+        for block_id in block.get_succs():
+            preds[block_id].add(block.id)
+
+    num_locals = len(code.co_varnames)
+    Top = 2**num_locals - 1
+    entry = blocks[0]
+    # map of block id -> assignment state in lattice
+    live_out = [Top] * num_blocks
+    conditionally_assigned = set()
+    argcount = (
+        code.co_argcount
+        + code.co_kwonlyargcount
+        + (code.co_flags & CO_VARARGS)
+        + (code.co_flags & CO_VARKEYWORDS)
+    )
+
+    def meet(args):
+        result = Top
+        for arg in args:
+            result &= arg
+        return result
+
+    def process_one_block(block, modify=False):
+        if block is entry:
+            # No preds; all parameters are live-in
+            currently_alive = 2**argcount - 1
+        else:
+            # Meet the live-out sets of all predecessors
+            bid = block.bid
+            currently_alive = meet(live_out[pred] for pred in preds[bid])
+        for instr in block.instrs:
+            if modify and instr.opcode == opcode.LOAD_FAST:
+                if currently_alive & (1 << instr.ioparg):
+                    # TODO(emacs): What... generate into a new block?
+                    instr.opcode = opcode.LOAD_FAST_UNCHECKED
+                else:
+                    if instr.oparg >= argcount:
+                        # Exclude arguments because they come into the
+                        # function body live. Anything that makes them no
+                        # longer live will have to be DELETE_FAST.
+                        conditionally_assigned.add(instr.oparg)
+            elif instr.opcode == opcode.STORE_FAST:
+                currently_alive |= 1 << instr.oparg
+            elif instr.opcode == opcode.DELETE_FAST:
+                currently_alive &= ~(1 << instr.oparg)
+        if currently_alive == live_out[block.bid]:
+            return False
+        live_out[block.bid] = currently_alive
+        return True
+
+    changed = True
+    while changed:
+        changed = False
+        for block in blocks:
+            changed |= process_one_block(block)
+
+    for block in blocks:
+        process_one_block(block, modify=True)
+
+    if conditionally_assigned:
+        deletes = [
+            Instruction(opcode.DELETE_FAST_UNCHECKED, name_idx, idx)
+            for idx, name_idx in enumerate(sorted(conditionally_assigned))
+        ]
+        # TODO(max): Adjust all bytecode offsets? Re-emit CFG in topo order?
+        print(deletes)
+        # entry.insts = deletes + entry.insts
+    return code.replace(co_code=b"")
+
+
 class PyroFlowGraph(PyFlowGraph38):
     opcode = opcodepyro.opcode
+
+    def getCode(self):
+        result = super().getCode()
+        result = optimize_load_fast(result)
+        return result
 
 
 class ComprehensionRenamer(ASTVisitor):

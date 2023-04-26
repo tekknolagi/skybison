@@ -406,7 +406,6 @@ class IndexedSet:
 
 
 class PyFlowGraph(FlowGraph):
-
     super_init = FlowGraph.__init__
     opcode = opcode36.opcode
 
@@ -502,7 +501,6 @@ class PyFlowGraph(FlowGraph):
     def getCode(self):
         """Get a Python code object"""
         assert self.stage == ACTIVE, self.stage
-        self.optimizeLoadFast()
         self.stage = CLOSED
         self.computeStackDepth()
         self.flattenGraph()
@@ -590,6 +588,13 @@ class PyFlowGraph(FlowGraph):
         blocks = self.getBlocksInOrder()
         preds = tuple(set() for i in range(self.block_count))
         for block in blocks:
+            for instr in block.getInstructions():
+                if instr.opname == "FOR_ITER":
+                    print(block)
+                    print(instr)
+                    preds[instr.target.bid].add(block.bid)
+                    preds[block.bid].add(block.bid)
+                    # preds[instr.target.bid].add(block.next.bid)
             for child in block.get_children():
                 if child is not None:
                     if (
