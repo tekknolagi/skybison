@@ -8,8 +8,11 @@ from compiler.pyassem import PyFlowGraph38
 from compiler.pycodegen import Python38CodeGenerator
 from compiler.symbols import SymbolVisitor
 from compiler.visitor import ASTVisitor, walk
+from compiler.consts import CO_VARARGS, CO_VARKEYWORDS
 
 import _compiler_opcode as opcodepyro
+
+CODEUNIT_SIZE = opcodepyro.opcode.CODEUNIT_SIZE
 
 
 def should_rewrite_printf(node):
@@ -207,7 +210,7 @@ class AstOptimizerPyro(AstOptimizer38):
         return self.update_node(node, left=left, right=right)
 
 
-class Instruction:
+class BytecodeOp:
     def __init__(self, op: int, arg: int, idx: int) -> None:
         self.op = op
         self.arg = arg
@@ -215,32 +218,35 @@ class Instruction:
 
     def is_branch(self) -> bool:
         return self.op in {
-            Op.FOR_ITER,
-            Op.JUMP_ABSOLUTE,
-            Op.JUMP_FORWARD,
-            Op.JUMP_IF_FALSE_OR_POP,
-            Op.JUMP_IF_TRUE_OR_POP,
-            Op.POP_JUMP_IF_FALSE,
-            Op.POP_JUMP_IF_TRUE,
+            opcodepyro.opcode.FOR_ITER,
+            opcodepyro.opcode.JUMP_ABSOLUTE,
+            opcodepyro.opcode.JUMP_FORWARD,
+            opcodepyro.opcode.JUMP_IF_FALSE_OR_POP,
+            opcodepyro.opcode.JUMP_IF_TRUE_OR_POP,
+            opcodepyro.opcode.POP_JUMP_IF_FALSE,
+            opcodepyro.opcode.POP_JUMP_IF_TRUE,
         }
 
     def is_unconditional_branch(self) -> bool:
-        return self.op in {Op.JUMP_ABSOLUTE, Op.JUMP_FORWARD}
+        return self.op in {
+            opcodepyro.opcode.JUMP_ABSOLUTE,
+            opcodepyro.opcode.JUMP_FORWARD,
+        }
 
     def is_relative_branch(self) -> bool:
-        return self.op in {Op.FOR_ITER, Op.JUMP_FORWARD}
+        return self.op in {opcodepyro.opcode.FOR_ITER, opcodepyro.opcode.JUMP_FORWARD}
 
     def is_return(self) -> bool:
-        return self.op == Op.RETURN_VALUE
+        return self.op == opcodepyro.opcode.RETURN_VALUE
 
     def is_raise(self) -> bool:
-        return self.op == Op.RAISE_VARARGS
+        return self.op == opcodepyro.opcode.RAISE_VARARGS
 
     def is_other_block_terminator(self):
         return self.op in {
-            Op.RETURN_VALUE,
-            Op.RAISE_VARARGS,
-            # Op.RERAISE,
+            opcodepyro.opcode.RETURN_VALUE,
+            opcodepyro.opcode.RAISE_VARARGS,
+            # opcodepyro.opcode.RERAISE,
         }
 
     def is_terminator(self) -> bool:
@@ -260,7 +266,7 @@ class Instruction:
             return self.next_instr_idx() + self.arg // CODEUNIT_SIZE
         return self.arg // CODEUNIT_SIZE
 
-    def successor_indices(self) -> Tuple[int]:
+    def successor_indices(self) -> "Tuple[int]":
         if self.is_branch():
             if self.is_unconditional_branch():
                 return (self.jump_target_idx(),)
@@ -271,8 +277,11 @@ class Instruction:
         # Other instructions have implicit fallthrough to the next block
         return (self.next_instr_idx(),)
 
+    def opname(self) -> str:
+        return opcodepyro.opcode.opname[self.op]
+
     def __repr__(self) -> str:
-        return f"{opname(self.op)} {self.arg}"
+        return f"{self.opname()} {self.arg}"
 
 
 class BytecodeSlice:
@@ -280,9 +289,9 @@ class BytecodeSlice:
 
     def __init__(
         self,
-        bytecode: List[BytecodeOp],
-        start: Optional[int] = None,
-        end: Optional[int] = None,
+        bytecode: "List[BytecodeOp]",
+        start: "Optional[int]" = None,
+        end: "Optional[int]" = None,
     ) -> None:
         self.bytecode = bytecode
         self.start: int = 0 if start is None else start
@@ -290,15 +299,14 @@ class BytecodeSlice:
 
     def last(self) -> BytecodeOp:
         return self.bytecode[self.end - 1]
-            self.bytecode[self.end - 1]
 
-    def successor_indices(self) -> Tuple[int]:
+    def successor_indices(self) -> "Tuple[int]":
         return self.last().successor_indices()
 
     def size(self) -> int:
         return self.end - self.start
 
-    def __iter__(self) -> Iterator[BytecodeOp]:
+    def __iter__(self) -> "Iterator[BytecodeOp]":
         return iter(self.bytecode[self.start : self.end])
 
     def __repr__(self) -> str:
@@ -309,11 +317,14 @@ class BytecodeBlock:
     def __init__(self, id: int, bytecode: BytecodeSlice):
         self.id: int = id
         self.bytecode: BytecodeSlice = bytecode
-        self.succs: Tuple[BytecodeBlock] = ()
+        self.succs: "Tuple[BytecodeBlock]" = ()
         self.preds: Set[BytecodeBlock] = set()
 
     def name(self) -> str:
         return f"bb{self.id}"
+
+    def instrs(self):
+        return self.bytecode
 
     def __repr__(self) -> str:
         result = [f"{self.name()}:"]
@@ -332,6 +343,12 @@ class BlockMap:
     def entry(self):
         return self.idx_to_block[0]
 
+    def __len__(self):
+        return len(self.idx_to_block)
+
+    def __iter__(self):
+        return iter(self.idx_to_block.values())
+
     def __repr__(self) -> str:
         result = []
         for block in self.idx_to_block.values():
@@ -339,16 +356,17 @@ class BlockMap:
             for instr in block.bytecode:
                 if instr.is_branch():
                     succs = ", ".join(b.name() for b in block.succs)
-                    result.append(f"  {opname(instr.op)} {succs}")
+                    result.append(f"  {instr.opname()} {succs}")
                 else:
                     result.append(f"  {instr}")
         return "\n".join(result)
 
 
-def code_to_ops(code: CodeType) -> List[BytecodeOp]:
+def code_to_ops(code: "CodeType") -> "List[BytecodeOp]":
+    # TODO(emacs): Handle EXTENDED_ARG
     bytecode = code.co_code
     num_instrs = len(bytecode) // CODEUNIT_SIZE
-    result: List[BytecodeOp] = [None] * num_instrs
+    result: "List[BytecodeOp]" = [None] * num_instrs
     i = 0
     idx = 0
     while i < len(bytecode):
@@ -400,17 +418,17 @@ def create_blocks(instrs: BytecodeSlice) -> BlockMap:
 
 def optimize_load_fast(code):
     opcode = opcodepyro.opcode
-    # TODO(emacs): Handle EXTENDED_ARG
-    blocks = find_blocks(code)
+    ops = code_to_ops(code)
+    blocks = create_blocks(BytecodeSlice(ops))
     num_blocks = len(blocks)
     preds = tuple(set() for i in range(num_blocks))
     for block in blocks:
-        for block_id in block.get_succs():
-            preds[block_id].add(block.id)
+        for succ in block.succs:
+            preds[succ.id].add(block.id)
 
     num_locals = len(code.co_varnames)
     Top = 2**num_locals - 1
-    entry = blocks[0]
+    entry = blocks.entry()
     # map of block id -> assignment state in lattice
     live_out = [Top] * num_blocks
     conditionally_assigned = set()
@@ -420,6 +438,7 @@ def optimize_load_fast(code):
         + (code.co_flags & CO_VARARGS)
         + (code.co_flags & CO_VARKEYWORDS)
     )
+    alive = set()
 
     def meet(args):
         result = Top
@@ -428,31 +447,29 @@ def optimize_load_fast(code):
         return result
 
     def process_one_block(block, modify=False):
-        if block is entry:
-            # No preds; all parameters are live-in
-            currently_alive = 2**argcount - 1
-        else:
-            # Meet the live-out sets of all predecessors
-            bid = block.bid
-            currently_alive = meet(live_out[pred] for pred in preds[bid])
-        for instr in block.instrs:
-            if modify and instr.opcode == opcode.LOAD_FAST:
-                if currently_alive & (1 << instr.ioparg):
+        # Meet the live-out sets of all predecessors
+        # The entrypoint has no predecessors so it defaults to Top
+        bid = block.id
+        currently_alive = meet(live_out[pred] for pred in preds[bid])
+        for instr in block.instrs():
+            if modify and instr.op == opcode.LOAD_FAST:
+                if currently_alive & (1 << instr.arg):
                     # TODO(emacs): What... generate into a new block?
-                    instr.opcode = opcode.LOAD_FAST_UNCHECKED
+                    instr.op = opcode.LOAD_FAST_UNCHECKED
+                    alive.add(instr)
                 else:
-                    if instr.oparg >= argcount:
+                    if instr.arg >= argcount:
                         # Exclude arguments because they come into the
                         # function body live. Anything that makes them no
                         # longer live will have to be DELETE_FAST.
-                        conditionally_assigned.add(instr.oparg)
-            elif instr.opcode == opcode.STORE_FAST:
-                currently_alive |= 1 << instr.oparg
-            elif instr.opcode == opcode.DELETE_FAST:
-                currently_alive &= ~(1 << instr.oparg)
-        if currently_alive == live_out[block.bid]:
+                        conditionally_assigned.add(instr.arg)
+            elif instr.op == opcode.STORE_FAST:
+                currently_alive |= 1 << instr.arg
+            elif instr.op == opcode.DELETE_FAST:
+                currently_alive &= ~(1 << instr.arg)
+        if currently_alive == live_out[block.id]:
             return False
-        live_out[block.bid] = currently_alive
+        live_out[block.id] = currently_alive
         return True
 
     changed = True
@@ -466,13 +483,20 @@ def optimize_load_fast(code):
 
     if conditionally_assigned:
         deletes = [
-            Instruction(opcode.DELETE_FAST_UNCHECKED, name_idx, idx)
+            BytecodeOp(opcode.DELETE_FAST_UNCHECKED, name_idx, idx)
             for idx, name_idx in enumerate(sorted(conditionally_assigned))
         ]
         # TODO(max): Adjust all bytecode offsets? Re-emit CFG in topo order?
-        print(deletes)
+        # print(deletes)
         # entry.insts = deletes + entry.insts
-    return code.replace(co_code=b"")
+    optimized_bytecode = bytearray()
+    for instr in ops:
+        if instr in alive:
+            optimized_bytecode.append(opcodepyro.opcode.LOAD_FAST_UNCHECKED)
+        else:
+            optimized_bytecode.append(instr.op)
+        optimized_bytecode.append(instr.arg)
+    return code.replace(co_code=bytes(optimized_bytecode))
 
 
 class PyroFlowGraph(PyFlowGraph38):
