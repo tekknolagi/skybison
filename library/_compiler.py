@@ -305,10 +305,82 @@ class BytecodeSlice:
         return f"<BytecodeSlice start={self.start}, end={self.end}>"
 
 
-class BasicBlock:
-    def __init__(self, code: BytecodeSlice):
-        self.code = code
-        assert self.code.last().is_terminator()
+class BytecodeBlock:
+    def __init__(self, id: int, bytecode: BytecodeSlice):
+        self.id: int = id
+        self.bytecode: BytecodeSlice = bytecode
+        self.succs: Tuple[BytecodeBlock] = ()
+        self.preds: Set[BytecodeBlock] = set()
+
+    def name(self) -> str:
+        return f"bb{self.id}"
+
+    def __repr__(self) -> str:
+        result = [f"{self.name()}:"]
+        for instr in self.bytecode:
+            result.append(f"  {instr}")
+        return "\n".join(result)
+
+
+class BlockMap:
+    def __init__(self) -> None:
+        self.idx_to_block: Dict[int, BytecodeBlock] = {}
+
+    def add_block(self, idx, block):
+        self.idx_to_block[idx] = block
+
+    def entry(self):
+        return self.idx_to_block[0]
+
+    def __repr__(self) -> str:
+        result = []
+        for block in self.idx_to_block.values():
+            result.append(f"bb{block.id}:")
+            for instr in block.bytecode:
+                if instr.is_branch():
+                    succs = ", ".join(b.name() for b in block.succs)
+                    result.append(f"  {opname(instr.op)} {succs}")
+                else:
+                    result.append(f"  {instr}")
+        return "\n".join(result)
+
+
+def create_blocks(instrs: BytecodeSlice) -> BlockMap:
+    """Construct a map of instructions to basic blocks, and a map of blocks to
+    instruction ranges."""
+    block_starts = set([0])
+    num_instrs = instrs.size()
+    # Mark the beginning of each basic block in the bytecode
+    for instr in instrs:
+        if instr.is_branch():
+            for succ_idx in instr.successor_indices():
+                block_starts.add(succ_idx)
+        elif instr.is_other_block_terminator():
+            succ_idx = instr.next_instr_idx()
+            if succ_idx < num_instrs:
+                block_starts.add(succ_idx)
+    # Allocate basic blocks corresponding to bytecode slices
+    num_blocks = len(block_starts)
+    block_starts_ordered = sorted(block_starts)
+    block_map = BlockMap()
+    for i, start_idx in enumerate(block_starts_ordered):
+        # We may be making the last block, in which case there is not another
+        # start index in the list. Use the number of bytecode instructions as
+        # the end index.
+        end_idx = block_starts_ordered[i + 1] if i + 1 < num_blocks else num_instrs
+        block_instrs = BytecodeSlice(instrs.bytecode, start_idx, end_idx)
+        block = BytecodeBlock(i, block_instrs)
+        block_map.add_block(start_idx, block)
+    for block in block_map.idx_to_block.values():
+        succs = tuple(
+            block_map.idx_to_block[idx]
+            for idx in block.bytecode.successor_indices()
+            if idx < num_instrs
+        )
+        for succ in succs:
+            succ.preds.add(block)
+        block.succs = succs
+    return block_map
 
 
 def optimize_load_fast(code):
