@@ -345,6 +345,21 @@ class BlockMap:
         return "\n".join(result)
 
 
+def code_to_ops(code: CodeType) -> List[BytecodeOp]:
+    bytecode = code.co_code
+    num_instrs = len(bytecode) // CODEUNIT_SIZE
+    result: List[BytecodeOp] = [None] * num_instrs
+    i = 0
+    idx = 0
+    while i < len(bytecode):
+        op = bytecode[i]
+        arg = bytecode[i + 1]
+        result[idx] = BytecodeOp(op, arg, idx)
+        i += CODEUNIT_SIZE
+        idx += 1
+    return result
+
+
 def create_blocks(instrs: BytecodeSlice) -> BlockMap:
     """Construct a map of instructions to basic blocks, and a map of blocks to
     instruction ranges."""
