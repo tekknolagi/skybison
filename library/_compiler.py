@@ -462,14 +462,12 @@ def optimize_load_fast(code):
         for instr in block.instrs():
             if modify and instr.op == opcode.LOAD_FAST:
                 if currently_alive & (1 << instr.arg):
-                    # TODO(emacs): What... generate into a new block?
                     instr.op = opcode.LOAD_FAST_UNCHECKED
-                else:
-                    if instr.arg >= argcount:
-                        # Exclude arguments because they come into the
-                        # function body live. Anything that makes them no
-                        # longer live will have to be DELETE_FAST.
-                        conditionally_assigned.add(instr.arg)
+                elif instr.arg >= argcount:
+                    # Exclude arguments because they come into the function
+                    # body live. Anything that makes them no longer live will
+                    # have to be DELETE_FAST at the beginning of the function.
+                    conditionally_assigned.add(instr.arg)
             elif instr.op == opcode.STORE_FAST:
                 currently_alive |= 1 << instr.arg
             elif instr.op == opcode.DELETE_FAST:
