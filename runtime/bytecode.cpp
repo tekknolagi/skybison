@@ -245,7 +245,6 @@ static RewrittenOp rewriteOperation(const Function& function, BytecodeOp op) {
     case LOAD_FAST_REVERSE:
     case LOAD_METHOD_ANAMORPHIC:
     case STORE_ATTR_ANAMORPHIC:
-    case STORE_FAST_REVERSE:
       UNREACHABLE("should not have cached opcode in input");
     default:
       break;

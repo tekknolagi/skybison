@@ -613,6 +613,9 @@ class PyFlowGraph(FlowGraph):
         total_locals = num_locals + len(self.cellvars) + len(self.freevars)
         ArgsAssigned = 2**argcount - 1
 
+        def reverse_local_idx(idx):
+            return total_locals - idx - 1
+
         def meet(args):
             result = Top
             for arg in args:
@@ -631,7 +634,7 @@ class PyFlowGraph(FlowGraph):
                 if modify and instr.opname == "LOAD_FAST":
                     if currently_alive & (1 << instr.ioparg):
                         instr.opname = "LOAD_FAST_REVERSE_UNCHECKED"
-                        instr.ioparg = total_locals - instr.ioparg - 1
+                        instr.ioparg = reverse_local_idx(instr.ioparg)
                     elif instr.ioparg >= argcount:
                         # Exclude arguments because they come into the function
                         # body live. Anything that makes them no longer live
@@ -639,6 +642,9 @@ class PyFlowGraph(FlowGraph):
                         conditionally_assigned.add(instr.oparg)
                 elif instr.opname == "STORE_FAST":
                     currently_alive |= 1 << instr.ioparg
+                    if modify:
+                        instr.opname = "STORE_FAST_REVERSE"
+                        instr.ioparg = reverse_local_idx(instr.ioparg)
                 elif instr.opname == "DELETE_FAST":
                     currently_alive &= ~(1 << instr.ioparg)
             if currently_alive == live_out[block.bid]:
