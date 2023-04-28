@@ -604,9 +604,6 @@ class PyFlowGraph(FlowGraph):
                     # 3.10, which does this already. This avoids except blocks
                     # falling through into else blocks and mucking up
                     # performance.
-                    # TODO(emacs): Figure out if we need to handle FOR_ITER
-                    # specially here since the compiler does not treat it as a
-                    # terminator.
                     preds[child.bid].add(block.bid)
 
         num_locals = len(self.varnames)
