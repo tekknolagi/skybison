@@ -1299,22 +1299,6 @@ RETURN_VALUE
         return
         self.assertEqual(func(), 456)
 
-#     def test_use_in_yield_is_unchecked(self):
-#         source = """
-# async def foo():
-#     async for i in range(3):
-#         yield i
-# """
-#         func = compile_function(source, "foo")
-#         self.assertEqual(
-#             dis(func.__code__),
-#             """\
-# """,
-#         )
-#         # TODO(emacs): Figure out how to get the NameError for CM to go away.
-#         return
-#         self.assertEqual(list(func()), [0, 1, 2])
-
     # TODO(emacs): Test with (multiple context managers)
     # TODO(emacs): Test async with
     # TODO(emacs): Test async loops
