@@ -586,6 +586,8 @@ class PyFlowGraph(FlowGraph):
                 break
 
     def optimizeLoadFast(self):
+        # TODO(emacs): Emit the REVERSE versions. Needs cellvars + freevars for
+        # totalLocals equivalent.
         blocks = self.getBlocksInOrder()
         preds = tuple(set() for i in range(self.block_count))
         for block in blocks:
