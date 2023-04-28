@@ -617,6 +617,7 @@ class PyFlowGraph(FlowGraph):
             + bool(self.flags & CO_VARARGS)
             + bool(self.flags & CO_VARKEYWORDS)
         )
+        ArgsAssigned = 2**argcount - 1
 
         def meet(args):
             result = Top
@@ -628,7 +629,7 @@ class PyFlowGraph(FlowGraph):
             bid = block.bid
             if len(preds[bid]) == 0:
                 # No preds; all parameters are live-in
-                currently_alive = 2**argcount - 1
+                currently_alive = ArgsAssigned
             else:
                 # Meet the live-out sets of all predecessors
                 currently_alive = meet(live_out[pred] for pred in preds[bid])
