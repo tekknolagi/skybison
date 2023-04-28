@@ -13,7 +13,13 @@ from test_support import pyro_only
 
 def _dis_instruction(opcode, code: CodeType, op: int, oparg: int):  # noqa: C901
     result = opcode.opname[op]
-    if op < opcode.HAVE_ARGUMENT and oparg == 0:
+    if op == opcode.LOAD_FAST_REVERSE_UNCHECKED:
+        # TODO(emacs): Move LOAD_FAST_REVERSE_UNCHECKED above HAVE_ARGUMENT
+        total_locals = (
+            len(code.co_varnames) + len(code.co_cellvars) + len(code.co_freevars)
+        )
+        oparg_str = code.co_varnames[total_locals - oparg - 1]
+    elif op < opcode.HAVE_ARGUMENT and oparg == 0:
         oparg_str = None
     elif op in opcode.hasconst:
         cnst = code.co_consts[oparg]
@@ -633,7 +639,7 @@ JUMP_ABSOLUTE 6
 RETURN_VALUE
 
 # 0:code object <lambda>
-LOAD_FAST_UNCHECKED _gen$x
+LOAD_FAST_REVERSE_UNCHECKED _gen$x
 RETURN_VALUE
 """,
         )
@@ -717,7 +723,7 @@ def foo(x):
         self.assertEqual(
             dis(func.__code__),
             """\
-LOAD_FAST_UNCHECKED x
+LOAD_FAST_REVERSE_UNCHECKED x
 RETURN_VALUE
 """,
         )
@@ -732,7 +738,7 @@ def foo(*, x):
         self.assertEqual(
             dis(func.__code__),
             """\
-LOAD_FAST_UNCHECKED x
+LOAD_FAST_REVERSE_UNCHECKED x
 RETURN_VALUE
 """,
         )
@@ -747,7 +753,7 @@ def foo(*x):
         self.assertEqual(
             dis(func.__code__),
             """\
-LOAD_FAST_UNCHECKED x
+LOAD_FAST_REVERSE_UNCHECKED x
 RETURN_VALUE
 """,
         )
@@ -762,7 +768,7 @@ def foo(**x):
         self.assertEqual(
             dis(func.__code__),
             """\
-LOAD_FAST_UNCHECKED x
+LOAD_FAST_REVERSE_UNCHECKED x
 RETURN_VALUE
 """,
         )
@@ -799,10 +805,10 @@ def foo(x):
         self.assertEqual(
             dis(func.__code__),
             """\
-LOAD_FAST_UNCHECKED x
+LOAD_FAST_REVERSE_UNCHECKED x
 STORE_FAST y
 DELETE_FAST x
-LOAD_FAST_UNCHECKED y
+LOAD_FAST_REVERSE_UNCHECKED y
 RETURN_VALUE
 """,
         )
@@ -820,7 +826,7 @@ def foo():
             """\
 LOAD_CONST 3
 STORE_FAST x
-LOAD_FAST_UNCHECKED x
+LOAD_FAST_REVERSE_UNCHECKED x
 RETURN_VALUE
 """,
         )
@@ -838,7 +844,7 @@ def foo(cond):
             dis(func.__code__),
             """\
 DELETE_FAST_UNCHECKED x
-LOAD_FAST_UNCHECKED cond
+LOAD_FAST_REVERSE_UNCHECKED cond
 POP_JUMP_IF_FALSE 10
 LOAD_CONST 3
 STORE_FAST x
@@ -866,7 +872,7 @@ def foo(cond):
             dis(func.__code__),
             """\
 DELETE_FAST_UNCHECKED x
-LOAD_FAST_UNCHECKED cond
+LOAD_FAST_REVERSE_UNCHECKED cond
 POP_JUMP_IF_FALSE 12
 LOAD_CONST 3
 STORE_FAST x
@@ -894,14 +900,14 @@ def foo(cond):
         self.assertEqual(
             dis(func.__code__),
             """\
-LOAD_FAST_UNCHECKED cond
+LOAD_FAST_REVERSE_UNCHECKED cond
 POP_JUMP_IF_FALSE 10
 LOAD_CONST 3
 STORE_FAST x
 JUMP_FORWARD 4
 LOAD_CONST 4
 STORE_FAST x
-LOAD_FAST_UNCHECKED x
+LOAD_FAST_REVERSE_UNCHECKED x
 RETURN_VALUE
 """,
         )
@@ -918,7 +924,7 @@ def foo(cond):
             dis(compile_function(source, "foo").__code__),
             """\
 LOAD_GLOBAL print
-LOAD_FAST_UNCHECKED cond
+LOAD_FAST_REVERSE_UNCHECKED cond
 CALL_FUNCTION 1
 POP_TOP
 JUMP_ABSOLUTE 0
@@ -968,18 +974,18 @@ def foo(n):
 BUILD_LIST 0
 STORE_FAST result
 LOAD_GLOBAL range
-LOAD_FAST_UNCHECKED n
+LOAD_FAST_REVERSE_UNCHECKED n
 CALL_FUNCTION 1
 GET_ITER
 FOR_ITER 14
 STORE_FAST i
-LOAD_FAST_UNCHECKED result
+LOAD_FAST_REVERSE_UNCHECKED result
 LOAD_METHOD append
-LOAD_FAST_UNCHECKED i
+LOAD_FAST_REVERSE_UNCHECKED i
 CALL_METHOD 1
 POP_TOP
 JUMP_ABSOLUTE 12
-LOAD_FAST_UNCHECKED result
+LOAD_FAST_REVERSE_UNCHECKED result
 RETURN_VALUE
 """,
         )
@@ -998,7 +1004,7 @@ def foo(n):
             """\
 DELETE_FAST_UNCHECKED i
 LOAD_GLOBAL range
-LOAD_FAST_UNCHECKED n
+LOAD_FAST_REVERSE_UNCHECKED n
 CALL_FUNCTION 1
 GET_ITER
 FOR_ITER 4
@@ -1026,7 +1032,7 @@ def foo():
 SETUP_FINALLY 10
 LOAD_CONST 123
 STORE_FAST x
-LOAD_FAST_UNCHECKED x
+LOAD_FAST_REVERSE_UNCHECKED x
 POP_BLOCK
 RETURN_VALUE
 POP_TOP
@@ -1069,7 +1075,7 @@ POP_TOP
 POP_EXCEPT
 JUMP_FORWARD 6
 END_FINALLY
-LOAD_FAST_UNCHECKED x
+LOAD_FAST_REVERSE_UNCHECKED x
 RETURN_VALUE
 LOAD_CONST None
 RETURN_VALUE
@@ -1191,7 +1197,7 @@ BEGIN_FINALLY
 LOAD_CONST 456
 STORE_FAST x
 END_FINALLY
-LOAD_FAST_UNCHECKED x
+LOAD_FAST_REVERSE_UNCHECKED x
 RETURN_VALUE
 """,
         )
@@ -1216,7 +1222,7 @@ BEGIN_FINALLY
 LOAD_CONST 456
 STORE_FAST x
 END_FINALLY
-LOAD_FAST_UNCHECKED x
+LOAD_FAST_REVERSE_UNCHECKED x
 RETURN_VALUE
 """,
         )
@@ -1244,7 +1250,7 @@ LOAD_GLOBAL CM
 CALL_FUNCTION 0
 SETUP_WITH 18
 STORE_FAST cm
-LOAD_FAST_UNCHECKED cm
+LOAD_FAST_REVERSE_UNCHECKED cm
 POP_BLOCK
 ROT_TWO
 BEGIN_FINALLY
@@ -1326,7 +1332,7 @@ LOAD_CONST None
 YIELD_FROM
 SETUP_ASYNC_WITH 24
 STORE_FAST cm
-LOAD_FAST_UNCHECKED cm
+LOAD_FAST_REVERSE_UNCHECKED cm
 POP_BLOCK
 ROT_TWO
 BEGIN_FINALLY

@@ -610,6 +610,7 @@ class PyFlowGraph(FlowGraph):
             + bool(self.flags & CO_VARARGS)
             + bool(self.flags & CO_VARKEYWORDS)
         )
+        total_locals = num_locals + len(self.cellvars) + len(self.freevars)
         ArgsAssigned = 2**argcount - 1
 
         def meet(args):
@@ -629,7 +630,8 @@ class PyFlowGraph(FlowGraph):
             for instr in block.getInstructions():
                 if modify and instr.opname == "LOAD_FAST":
                     if currently_alive & (1 << instr.ioparg):
-                        instr.opname = "LOAD_FAST_UNCHECKED"
+                        instr.opname = "LOAD_FAST_REVERSE_UNCHECKED"
+                        instr.ioparg = total_locals - instr.ioparg - 1
                     elif instr.ioparg >= argcount:
                         # Exclude arguments because they come into the function
                         # body live. Anything that makes them no longer live
