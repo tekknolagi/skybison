@@ -434,10 +434,10 @@ def optimize_load_fast(code):
             preds[succ.id].add(block.id)
 
     num_locals = len(code.co_varnames)
-    Top = 2**num_locals - 1
+    AllAssigned = 2**num_locals - 1
     entry = blocks.entry()
     # map of block id -> assignment state in lattice
-    live_out = [Top] * num_blocks
+    live_out = [AllAssigned] * num_blocks
     conditionally_assigned = set()
     argcount = (
         code.co_argcount
@@ -445,9 +445,10 @@ def optimize_load_fast(code):
         + bool(code.co_flags & CO_VARARGS)
         + bool(code.co_flags & CO_VARKEYWORDS)
     )
+    ArgsAssigned = 2**argcount - 1
 
     def meet(args):
-        result = Top
+        result = AllAssigned
         for arg in args:
             result &= arg
         return result
@@ -455,7 +456,7 @@ def optimize_load_fast(code):
     def process_one_block(block, modify=False):
         bid = block.id
         if len(preds[bid]) == 0:
-            currently_alive = 2**argcount - 1
+            currently_alive = ArgsAssigned
         else:
             currently_alive = meet(live_out[pred] for pred in preds[bid])
         for instr in block.instrs():
