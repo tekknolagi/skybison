@@ -294,7 +294,7 @@ opcode.FVS_HAVE_SPEC = 0x4
 
 def add_synonym(old, new):
     opcode.stack_effects[new] = opcode.stack_effects[old]
-    setattr(opcode, new, opcode.opmap[old])
+    setattr(opcode, new, opcode.opmap[new])
 
 
 add_synonym("BINARY_ADD", "BINARY_OP_ANAMORPHIC")
