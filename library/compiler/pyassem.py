@@ -591,15 +591,6 @@ class PyFlowGraph(FlowGraph):
         for block in blocks:
             for child in block.get_children():
                 if child is not None:
-                    if (
-                        block.insts
-                        and block.insts[-1].opname == "SETUP_WITH"
-                        and block.insts[-1].target is child
-                    ):
-                        # These targets are set for blockstack/exception
-                        # handling metadata and don't actually matter for
-                        # control flow.
-                        continue
                     # TODO(emacs): Tail-duplicate finally blocks or upgrade to
                     # 3.10, which does this already. This avoids except blocks
                     # falling through into else blocks and mucking up
