@@ -652,6 +652,7 @@ class CodeGenerator(ASTVisitor):
 
         self.nextBlock(start)
         self.emit("FOR_ITER", anchor)
+        self.nextBlock()
         self.visit(node.target)
         self.visit(node.body)
         self.emit("JUMP_ABSOLUTE", start)
