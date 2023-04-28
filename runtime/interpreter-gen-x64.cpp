@@ -2228,6 +2228,13 @@ void emitHandler<STORE_FAST_REVERSE>(EmitEnv* env) {
 }
 
 template <>
+void emitHandler<DELETE_FAST_REVERSE_UNCHECKED>(EmitEnv* env) {
+  __ movq(Address(env->frame, env->oparg, TIMES_8, Frame::kSize),
+          Immediate(Error::notFound().raw()));
+  emitNextOpcodeFallthrough(env);
+}
+
+template <>
 void emitHandler<LOAD_IMMEDIATE>(EmitEnv* env) {
   ScratchReg r_scratch(env);
 
