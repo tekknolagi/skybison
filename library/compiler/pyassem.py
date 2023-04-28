@@ -665,7 +665,7 @@ class PyFlowGraph(FlowGraph):
                 Instruction("DELETE_FAST_UNCHECKED", name, self.varnames.index(name))
                 for name in sorted(conditionally_assigned)
             ]
-            entry.insts = deletes + entry.insts
+            self.entry.insts = deletes + self.entry.insts
 
     def flattenGraph(self):
         """Arrange the blocks in order and resolve jumps"""
