@@ -386,8 +386,8 @@ def create_blocks(instrs: BytecodeSlice) -> BlockMap:
     # Mark the beginning of each basic block in the bytecode
     for instr in instrs:
         if instr.is_branch():
-            for succ_idx in instr.successor_indices():
-                block_starts.add(succ_idx)
+            block_starts.add(instr.next_instr_idx())
+            block_starts.add(instr.jump_target_idx())
         elif instr.is_other_block_terminator():
             succ_idx = instr.next_instr_idx()
             if succ_idx < num_instrs:
