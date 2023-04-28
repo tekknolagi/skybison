@@ -2462,6 +2462,7 @@ class Python38CodeGenerator(Python37CodeGenerator):
 
         self.setups.push(Entry(FOR_LOOP, start, end))
         self.emit("SETUP_FINALLY", except_)
+        self.nextBlock()
         self.emit("GET_ANEXT")
         self.emit("LOAD_CONST", None)
         self.emit("YIELD_FROM")
@@ -2575,6 +2576,7 @@ class Python38CodeGenerator(Python37CodeGenerator):
 
         self.nextBlock(start)
         self.emit("SETUP_FINALLY", except_)
+        self.nextBlock()
         self.emit("GET_ANEXT")
         self.emit("LOAD_CONST", None)
         self.emit("YIELD_FROM")
