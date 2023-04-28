@@ -418,7 +418,6 @@ def create_blocks(instrs: BytecodeSlice) -> BlockMap:
 
 def optimize_load_fast(code):
     opcode = opcodepyro.opcode
-    ops = code_to_ops(code)
     i = 0
     while i < len(code.co_code):
         if code.co_code[i] == opcode.EXTENDED_ARG:
@@ -426,6 +425,7 @@ def optimize_load_fast(code):
             return code
         i += CODEUNIT_SIZE
 
+    ops = code_to_ops(code)
     blocks = create_blocks(BytecodeSlice(ops))
     num_blocks = len(blocks)
     preds = tuple(set() for i in range(num_blocks))
