@@ -438,7 +438,6 @@ def optimize_load_fast(code):
         + bool(code.co_flags & CO_VARARGS)
         + bool(code.co_flags & CO_VARKEYWORDS)
     )
-    alive = set()
 
     def meet(args):
         result = Top
@@ -456,7 +455,6 @@ def optimize_load_fast(code):
                 if currently_alive & (1 << instr.arg):
                     # TODO(emacs): What... generate into a new block?
                     instr.op = opcode.LOAD_FAST_UNCHECKED
-                    alive.add(instr)
                 else:
                     if instr.arg >= argcount:
                         # Exclude arguments because they come into the
@@ -491,10 +489,7 @@ def optimize_load_fast(code):
         # entry.insts = deletes + entry.insts
     optimized_bytecode = bytearray()
     for instr in ops:
-        if instr in alive:
-            optimized_bytecode.append(opcodepyro.opcode.LOAD_FAST_UNCHECKED)
-        else:
-            optimized_bytecode.append(instr.op)
+        optimized_bytecode.append(instr.op)
         optimized_bytecode.append(instr.arg)
     return code.replace(co_code=bytes(optimized_bytecode))
 
