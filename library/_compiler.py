@@ -508,7 +508,6 @@ class PyroFlowGraph(PyFlowGraph38):
 
     def getCode(self):
         result = super().getCode()
-        result = optimize_load_fast(result)
         return result
 
 
