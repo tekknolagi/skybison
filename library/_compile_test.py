@@ -707,7 +707,7 @@ RETURN_VALUE
 
 
 @pyro_only
-class DefiniteAsssignmentAnalysisTests(unittest.TestCase):
+class DefiniteAssignmentAnalysisTests(unittest.TestCase):
     def test_load_parameter_is_unchecked(self):
         source = """
 def foo(x):
