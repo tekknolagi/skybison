@@ -996,13 +996,14 @@ def foo(n):
         self.assertEqual(
             dis(func.__code__),
             """\
+DELETE_FAST_UNCHECKED i
 LOAD_GLOBAL range
 LOAD_FAST_UNCHECKED n
 CALL_FUNCTION 1
 GET_ITER
 FOR_ITER 4
 STORE_FAST i
-JUMP_ABSOLUTE 8
+JUMP_ABSOLUTE 10
 LOAD_FAST i
 RETURN_VALUE
 """,
@@ -1139,7 +1140,7 @@ RETURN_VALUE
         )
         self.assertEqual(func(), None)
 
-    def test_try_with_use_in_finally_is_checked(self):
+    def test_try_with_use_in_finally_is_unchecked(self):
         source = """
 def foo():
     try:
@@ -1151,14 +1152,13 @@ def foo():
         self.assertEqual(
             dis(func.__code__),
             """\
-DELETE_FAST_UNCHECKED x
 LOAD_CONST None
 SETUP_FINALLY 8
 LOAD_CONST 123
 STORE_FAST x
 POP_BLOCK
 BEGIN_FINALLY
-LOAD_FAST x
+LOAD_FAST_UNCHECKED x
 POP_FINALLY 1
 ROT_TWO
 POP_TOP

@@ -453,10 +453,11 @@ def optimize_load_fast(code):
         return result
 
     def process_one_block(block, modify=False):
-        # Meet the live-out sets of all predecessors
-        # The entrypoint has no predecessors so it defaults to Top
         bid = block.id
-        currently_alive = meet(live_out[pred] for pred in preds[bid])
+        if len(preds[bid]) == 0:
+            currently_alive = 2**argcount - 1
+        else:
+            currently_alive = meet(live_out[pred] for pred in preds[bid])
         for instr in block.instrs():
             if modify and instr.op == opcode.LOAD_FAST:
                 if currently_alive & (1 << instr.arg):
@@ -486,17 +487,19 @@ def optimize_load_fast(code):
     for block in blocks:
         process_one_block(block, modify=True)
 
-    if conditionally_assigned:
-        deletes = [
-            BytecodeOp(opcode.DELETE_FAST_UNCHECKED, name_idx, idx)
-            for idx, name_idx in enumerate(sorted(conditionally_assigned))
-        ]
-        # TODO(max): Adjust all bytecode offsets? Re-emit CFG in topo order?
-        # print(deletes)
-        # entry.insts = deletes + entry.insts
     optimized_bytecode = bytearray()
+    if conditionally_assigned:
+        for name_idx in sorted(conditionally_assigned):
+            optimized_bytecode.append(opcode.DELETE_FAST_UNCHECKED)
+            optimized_bytecode.append(name_idx)
     for instr in ops:
+        assert instr.op != opcode.EXTENDED_ARG
         optimized_bytecode.append(instr.op)
+        if conditionally_assigned and instr.op in opcode.hasjabs:
+            instr.arg += len(conditionally_assigned) * CODEUNIT_SIZE
+        if instr.arg >= 256:
+            # Bail out; don't want to reshuffle EXTENDED_ARG
+            return code
         optimized_bytecode.append(instr.arg)
     return code.replace(co_code=bytes(optimized_bytecode))
 
