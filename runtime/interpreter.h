@@ -499,7 +499,7 @@ class Interpreter {
   static Continue doBuildTuple(Thread* thread, word arg);
   static Continue doDeleteDeref(Thread* thread, word arg);
   static Continue doDeleteFast(Thread* thread, word arg);
-  static Continue doDeleteFastUnchecked(Thread* thread, word arg);
+  static Continue doDeleteFastReverseUnchecked(Thread* thread, word arg);
   static Continue doDeleteGlobal(Thread* thread, word arg);
   static Continue doDeleteName(Thread* thread, word arg);
   static Continue doDupTop(Thread* thread, word arg);

@@ -4335,10 +4335,10 @@ HANDLER_INLINE Continue Interpreter::doStoreFastReverse(Thread* thread,
   return Continue::NEXT;
 }
 
-HANDLER_INLINE Continue Interpreter::doDeleteFastUnchecked(Thread* thread,
-                                                           word arg) {
+HANDLER_INLINE Continue
+Interpreter::doDeleteFastReverseUnchecked(Thread* thread, word arg) {
   Frame* frame = thread->currentFrame();
-  frame->setLocal(arg, Error::notFound());
+  frame->setLocalWithReverseIndex(arg, Error::notFound());
   return Continue::NEXT;
 }
 

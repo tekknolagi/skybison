@@ -144,7 +144,7 @@ namespace py {
   V(LOAD_FAST, 124, doLoadFast)                                                \
   V(STORE_FAST, 125, doStoreFast)                                              \
   V(DELETE_FAST, 126, doDeleteFast)                                            \
-  V(DELETE_FAST_UNCHECKED, 127, doDeleteFastUnchecked)                         \
+  V(DELETE_FAST_REVERSE_UNCHECKED, 127, doDeleteFastReverseUnchecked)          \
   V(UNUSED_BYTECODE_128, 128, doInvalidBytecode)                               \
   V(UNUSED_BYTECODE_129, 129, doInvalidBytecode)                               \
   V(RAISE_VARARGS, 130, doRaiseVarargs)                                        \

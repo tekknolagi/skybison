@@ -663,7 +663,11 @@ class PyFlowGraph(FlowGraph):
 
         if conditionally_assigned:
             deletes = [
-                Instruction("DELETE_FAST_UNCHECKED", name, self.varnames.index(name))
+                Instruction(
+                    "DELETE_FAST_REVERSE_UNCHECKED",
+                    name,
+                    reverse_local_idx(self.varnames.index(name)),
+                )
                 for name in sorted(conditionally_assigned)
             ]
             self.entry.insts = deletes + self.entry.insts

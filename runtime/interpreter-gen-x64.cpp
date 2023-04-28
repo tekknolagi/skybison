@@ -2933,7 +2933,7 @@ bool isSupportedInJIT(Bytecode bc) {
     case COMPARE_OP:
     case DELETE_ATTR:
     case DELETE_FAST:
-    case DELETE_FAST_UNCHECKED:
+    case DELETE_FAST_REVERSE_UNCHECKED:
     case DELETE_NAME:
     case DELETE_SUBSCR:
     case DUP_TOP:

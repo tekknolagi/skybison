@@ -13,7 +13,11 @@ from test_support import pyro_only
 
 def _dis_instruction(opcode, code: CodeType, op: int, oparg: int):  # noqa: C901
     result = opcode.opname[op]
-    if op in (opcode.LOAD_FAST_REVERSE_UNCHECKED, opcode.STORE_FAST_REVERSE):
+    if op in (
+        opcode.LOAD_FAST_REVERSE_UNCHECKED,
+        opcode.STORE_FAST_REVERSE,
+        opcode.DELETE_FAST_REVERSE_UNCHECKED,
+    ):
         # TODO(emacs): Move LOAD_FAST_REVERSE_UNCHECKED above HAVE_ARGUMENT
         total_locals = (
             len(code.co_varnames) + len(code.co_cellvars) + len(code.co_freevars)
@@ -843,7 +847,7 @@ def foo(cond):
         self.assertEqual(
             dis(func.__code__),
             """\
-DELETE_FAST_UNCHECKED x
+DELETE_FAST_REVERSE_UNCHECKED x
 LOAD_FAST_REVERSE_UNCHECKED cond
 POP_JUMP_IF_FALSE 10
 LOAD_CONST 3
@@ -871,7 +875,7 @@ def foo(cond):
         self.assertEqual(
             dis(func.__code__),
             """\
-DELETE_FAST_UNCHECKED x
+DELETE_FAST_REVERSE_UNCHECKED x
 LOAD_FAST_REVERSE_UNCHECKED cond
 POP_JUMP_IF_FALSE 12
 LOAD_CONST 3
@@ -1002,7 +1006,7 @@ def foo(n):
         self.assertEqual(
             dis(func.__code__),
             """\
-DELETE_FAST_UNCHECKED i
+DELETE_FAST_REVERSE_UNCHECKED i
 LOAD_GLOBAL range
 LOAD_FAST_REVERSE_UNCHECKED n
 CALL_FUNCTION 1
@@ -1096,7 +1100,7 @@ def foo():
         self.assertEqual(
             dis(func.__code__),
             """\
-DELETE_FAST_UNCHECKED x
+DELETE_FAST_REVERSE_UNCHECKED x
 SETUP_FINALLY 8
 LOAD_CONST 123
 STORE_FAST_REVERSE x
@@ -1126,7 +1130,7 @@ def foo():
         self.assertEqual(
             dis(func.__code__),
             """\
-DELETE_FAST_UNCHECKED x
+DELETE_FAST_REVERSE_UNCHECKED x
 SETUP_FINALLY 8
 LOAD_CONST 123
 STORE_FAST_REVERSE x
@@ -1158,7 +1162,7 @@ def foo():
         self.assertEqual(
             dis(func.__code__),
             """\
-DELETE_FAST_UNCHECKED x
+DELETE_FAST_REVERSE_UNCHECKED x
 LOAD_CONST None
 SETUP_FINALLY 8
 LOAD_CONST 123
@@ -1288,7 +1292,7 @@ def foo():
         self.assertEqual(
             dis(func.__code__),
             """\
-DELETE_FAST_UNCHECKED cm
+DELETE_FAST_REVERSE_UNCHECKED cm
 LOAD_GLOBAL CM
 CALL_FUNCTION 0
 SETUP_WITH 6
@@ -1376,7 +1380,7 @@ async def foo():
         self.assertEqual(
             dis(func.__code__),
             """\
-DELETE_FAST_UNCHECKED cm
+DELETE_FAST_REVERSE_UNCHECKED cm
 LOAD_GLOBAL CM
 CALL_FUNCTION 0
 BEFORE_ASYNC_WITH
