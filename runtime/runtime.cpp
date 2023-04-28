@@ -2872,11 +2872,6 @@ RawObject Runtime::newWeakRef(Thread* thread, const Object& referent) {
   return *ref;
 }
 
-static bool isLoadFast(byte op) {
-  return op == Bytecode::LOAD_FAST ||
-         op == Bytecode::LOAD_FAST_REVERSE_UNCHECKED;
-}
-
 void Runtime::collectAttributes(const Code& code, const Dict& attributes) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
@@ -2893,8 +2888,11 @@ void Runtime::collectAttributes(const Code& code, const Dict& attributes) {
       op = bc.byteAt(i);
       arg = (arg << kBitsPerByte) | bc.byteAt(i + 1);
     }
-    // Check for LOAD_FAST 0 (self)
-    if (!isLoadFast(op) || arg != 0) {
+    // Check for LOAD_FAST 0 (self) or LOAD_FAST_REVERSE_UNCHECKED nlocals-1
+    bool is_load_self =
+        (op == LOAD_FAST && arg == self) ||
+        (op == LOAD_FAST_REVERSE_UNCHECKED && arg == reverse_self);
+    if (!is_load_self) {
       continue;
     }
     // Followed by a STORE_ATTR
