@@ -211,9 +211,10 @@ class AstOptimizerPyro(AstOptimizer38):
 
 
 class BytecodeOp:
-    def __init__(self, op: int, arg: int, idx: int) -> None:
+    def __init__(self, op: int, arg: int, extended_arg: int, idx: int) -> None:
         self.op = op
         self.arg = arg
+        self.extended_arg = extended_arg
         self.idx = idx
 
     def is_branch(self) -> bool:
@@ -370,9 +371,16 @@ def code_to_ops(code: "CodeType") -> "List[BytecodeOp]":
     i = 0
     idx = 0
     while i < len(bytecode):
-        op = bytecode[i]
+        extended_arg = 0
+        while (op := bytecode[i]) == opcodepyro.opcode.EXTENDED_ARG:
+            arg = bytecode[i + 1]
+            extended_arg = (extended_arg << 8) | arg
+            result[idx] = BytecodeOp(op, arg, 0, idx)
+            arg = bytecode[i + 1]
+            i += CODEUNIT_SIZE
+            idx += 1
         arg = bytecode[i + 1]
-        result[idx] = BytecodeOp(op, arg, idx)
+        result[idx] = BytecodeOp(op, arg, extended_arg, idx)
         i += CODEUNIT_SIZE
         idx += 1
     return result
@@ -418,13 +426,6 @@ def create_blocks(instrs: BytecodeSlice) -> BlockMap:
 
 def optimize_load_fast(code):
     opcode = opcodepyro.opcode
-    i = 0
-    while i < len(code.co_code):
-        if code.co_code[i] == opcode.EXTENDED_ARG:
-            # Bail out; don't want to reshuffle EXTENDED_ARG
-            return code
-        i += CODEUNIT_SIZE
-
     ops = code_to_ops(code)
     blocks = create_blocks(BytecodeSlice(ops))
     num_blocks = len(blocks)
@@ -492,13 +493,12 @@ def optimize_load_fast(code):
             optimized_bytecode.append(opcode.DELETE_FAST_UNCHECKED)
             optimized_bytecode.append(name_idx)
     for instr in ops:
-        assert instr.op != opcode.EXTENDED_ARG
         optimized_bytecode.append(instr.op)
         if conditionally_assigned and instr.op in opcode.hasjabs:
             instr.arg += len(conditionally_assigned) * CODEUNIT_SIZE
-        if instr.arg >= 256:
-            # Bail out; don't want to reshuffle EXTENDED_ARG
-            return code
+            if instr.arg > 255:
+                # Bail out; don't want to reshuffle EXTENDED_ARG
+                return code
         optimized_bytecode.append(instr.arg)
     return code.replace(co_code=bytes(optimized_bytecode))
 
