@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) Facebook, Inc. and its affiliates. (http://www.facebook.com)
+import asyncio
 import io
 import unittest
 from types import CodeType
@@ -1019,6 +1020,84 @@ RETURN_VALUE
         )
         self.assertEqual(func(3), 2)
 
+    def test_loop_variable_in_async_for_loop_is_unchecked(self):
+        source = """
+async def foo(n):
+    result = []
+    async for i in range(n):
+        result.append(i)
+    return result
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+BUILD_LIST 0
+STORE_FAST_REVERSE result
+LOAD_GLOBAL range
+LOAD_FAST_REVERSE_UNCHECKED n
+CALL_FUNCTION 1
+GET_AITER
+SETUP_FINALLY 22
+GET_ANEXT
+LOAD_CONST None
+YIELD_FROM
+POP_BLOCK
+STORE_FAST_REVERSE i
+LOAD_FAST_REVERSE_UNCHECKED result
+LOAD_METHOD append
+LOAD_FAST_REVERSE_UNCHECKED i
+CALL_METHOD 1
+POP_TOP
+JUMP_ABSOLUTE 12
+END_ASYNC_FOR
+LOAD_FAST_REVERSE_UNCHECKED result
+RETURN_VALUE
+""",
+        )
+        # TODO(emacs): Figure out how to get the NameError for CM to go away.
+        return
+        self.assertEqual(asyncio.run(func(3)), [0, 1, 2])
+
+    def test_loop_variable_after_async_for_loop_is_checked(self):
+        source = """
+import asyncio
+
+async def arange(n):
+    for i in range(n):
+        yield i
+        asyncio.sleep(0)
+
+async def foo(n):
+    async for i in arange(n):
+        pass
+    return i
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+DELETE_FAST_REVERSE_UNCHECKED i
+LOAD_GLOBAL arange
+LOAD_FAST_REVERSE_UNCHECKED n
+CALL_FUNCTION 1
+GET_AITER
+SETUP_FINALLY 12
+GET_ANEXT
+LOAD_CONST None
+YIELD_FROM
+POP_BLOCK
+STORE_FAST_REVERSE i
+JUMP_ABSOLUTE 10
+END_ASYNC_FOR
+LOAD_FAST i
+RETURN_VALUE
+""",
+        )
+        # TODO(emacs): Figure out how to get the NameError for CM to go away.
+        return
+        self.assertEqual(asyncio.run(func(3)), 2)
+
     def test_try_with_use_in_try_is_unchecked(self):
         source = """
 def foo():
@@ -1405,7 +1484,6 @@ RETURN_VALUE
         self.assertEqual(func(), 456)
 
     # TODO(emacs): Test with (multiple context managers)
-    # TODO(emacs): Test async loops
 
 
 if __name__ == "__main__":
