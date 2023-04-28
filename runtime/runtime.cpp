@@ -2874,7 +2874,7 @@ RawObject Runtime::newWeakRef(Thread* thread, const Object& referent) {
 
 static bool isLoadFast(byte op) {
   return op == Bytecode::LOAD_FAST ||
-         op == Bytecode::LOAD_FAST_UNCHECKED;
+         op == Bytecode::LOAD_FAST_REVERSE_UNCHECKED;
 }
 
 void Runtime::collectAttributes(const Code& code, const Dict& attributes) {

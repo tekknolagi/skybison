@@ -177,8 +177,7 @@ static RewrittenOp rewriteOperation(const Function& function, BytecodeOp op) {
       return cached_inplace(Interpreter::BinaryOp::XOR);
     case LOAD_ATTR:
       return RewrittenOp{LOAD_ATTR_ANAMORPHIC, op.arg, true};
-    case LOAD_FAST:
-    case LOAD_FAST_UNCHECKED: {
+    case LOAD_FAST: {
       CHECK(op.arg < Code::cast(function.code()).nlocals(),
             "unexpected local number");
       word total_locals = function.totalLocals();
@@ -191,10 +190,7 @@ static RewrittenOp rewriteOperation(const Function& function, BytecodeOp op) {
       if (reverse_arg > kMaxByte) {
         break;
       }
-      return RewrittenOp{op.bc == LOAD_FAST_UNCHECKED
-                             ? LOAD_FAST_REVERSE_UNCHECKED
-                             : LOAD_FAST_REVERSE,
-                         reverse_arg, false};
+      return RewrittenOp{LOAD_FAST_REVERSE, reverse_arg, false};
     }
     case LOAD_METHOD:
       return RewrittenOp{LOAD_METHOD_ANAMORPHIC, op.arg, true};

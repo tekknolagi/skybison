@@ -66,7 +66,7 @@ namespace py {
   V(UNUSED_BYTECODE_46, 46, doInvalidBytecode)                                 \
   V(UNUSED_BYTECODE_47, 47, doInvalidBytecode)                                 \
   V(LOAD_BOOL, 48, doLoadBool)                                                 \
-  V(LOAD_FAST_REVERSE_UNCHECKED, 49, doLoadFastReverseUnchecked)               \
+  V(UNUSED_BYTECODE_49, 49, doInvalidBytecode)                                 \
   V(GET_AITER, 50, doGetAiter)                                                 \
   V(GET_ANEXT, 51, doGetAnext)                                                 \
   V(BEFORE_ASYNC_WITH, 52, doBeforeAsyncWith)                                  \
@@ -116,7 +116,7 @@ namespace py {
   V(DELETE_ATTR, 96, doDeleteAttr)                                             \
   V(STORE_GLOBAL, 97, doStoreGlobal)                                           \
   V(DELETE_GLOBAL, 98, doDeleteGlobal)                                         \
-  V(LOAD_FAST_UNCHECKED, 99, doLoadFastUnchecked)                              \
+  V(LOAD_FAST_REVERSE_UNCHECKED, 99, doLoadFastReverseUnchecked)               \
   V(LOAD_CONST, 100, doLoadConst)                                              \
   V(LOAD_NAME, 101, doLoadName)                                                \
   V(BUILD_TUPLE, 102, doBuildTuple)                                            \

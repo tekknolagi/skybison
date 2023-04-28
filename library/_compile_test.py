@@ -13,17 +13,7 @@ from test_support import pyro_only
 
 def _dis_instruction(opcode, code: CodeType, op: int, oparg: int):  # noqa: C901
     result = opcode.opname[op]
-    if op in (
-        opcode.LOAD_FAST_REVERSE_UNCHECKED,
-        opcode.STORE_FAST_REVERSE,
-        opcode.DELETE_FAST_REVERSE_UNCHECKED,
-    ):
-        # TODO(emacs): Move LOAD_FAST_REVERSE_UNCHECKED above HAVE_ARGUMENT
-        total_locals = (
-            len(code.co_varnames) + len(code.co_cellvars) + len(code.co_freevars)
-        )
-        oparg_str = code.co_varnames[total_locals - oparg - 1]
-    elif op < opcode.HAVE_ARGUMENT and oparg == 0:
+    if op < opcode.HAVE_ARGUMENT and oparg == 0:
         oparg_str = None
     elif op in opcode.hasconst:
         cnst = code.co_consts[oparg]
@@ -34,6 +24,15 @@ def _dis_instruction(opcode, code: CodeType, op: int, oparg: int):  # noqa: C901
             oparg_str = repr(code.co_consts[oparg])
     elif op in opcode.hasname:
         oparg_str = code.co_names[oparg]
+    elif op in (
+        opcode.LOAD_FAST_REVERSE_UNCHECKED,
+        opcode.STORE_FAST_REVERSE,
+        opcode.DELETE_FAST_REVERSE_UNCHECKED,
+    ):
+        total_locals = (
+            len(code.co_varnames) + len(code.co_cellvars) + len(code.co_freevars)
+        )
+        oparg_str = code.co_varnames[total_locals - oparg - 1]
     elif op in opcode.haslocal:
         oparg_str = code.co_varnames[oparg]
     elif op in opcode.hascompare:
