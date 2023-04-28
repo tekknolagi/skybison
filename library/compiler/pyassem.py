@@ -608,15 +608,14 @@ class PyFlowGraph(FlowGraph):
 
         num_locals = len(self.varnames)
         Top = 2**num_locals - 1
-        entry = self.entry
         # map of block id -> assignment state in lattice
         live_out = [Top] * self.block_count
         conditionally_assigned = set()
         argcount = (
             len(self.args)
             + len(self.kwonlyargs)
-            + (self.flags & CO_VARARGS)
-            + (self.flags & CO_VARKEYWORDS)
+            + bool(self.flags & CO_VARARGS)
+            + bool(self.flags & CO_VARKEYWORDS)
         )
 
         def meet(args):
