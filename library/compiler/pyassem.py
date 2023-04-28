@@ -584,6 +584,97 @@ class PyFlowGraph(FlowGraph):
                 self.stacksize = self.stackdepth_walk(block)
                 break
 
+    def optimizeLoadFast(self):
+        blocks = self.getBlocksInOrder()
+        preds = tuple(set() for i in range(self.block_count))
+        for block in blocks:
+            for instr in block.getInstructions():
+                if instr.opname == "FOR_ITER":
+                    print(block)
+                    print(instr)
+                    preds[instr.target.bid].add(block.bid)
+                    preds[block.bid].add(block.bid)
+                    # preds[instr.target.bid].add(block.next.bid)
+            for child in block.get_children():
+                if child is not None:
+                    if (
+                        block.insts
+                        and block.insts[-1].opname == "SETUP_WITH"
+                        and block.insts[-1].target is child
+                    ):
+                        # TODO(emacs): Is this correct? Explain it.
+                        continue
+                    # TODO(emacs): Tail-duplicate finally blocks or upgrade to
+                    # 3.10, which does this already. This avoids except blocks
+                    # falling through into else blocks and mucking up
+                    # performance.
+                    # TODO(emacs): Figure out if we need to handle FOR_ITER
+                    # specially here since the compiler does not treat it as a
+                    # terminator.
+                    preds[child.bid].add(block.bid)
+
+        num_locals = len(self.varnames)
+        Top = 2**num_locals - 1
+        entry = self.entry
+        # map of block id -> assignment state in lattice
+        live_out = [Top] * self.block_count
+        conditionally_assigned = set()
+        argcount = (
+            len(self.args)
+            + len(self.kwonlyargs)
+            + (self.flags & CO_VARARGS)
+            + (self.flags & CO_VARKEYWORDS)
+        )
+
+        def meet(args):
+            result = Top
+            for arg in args:
+                result &= arg
+            return result
+
+        def process_one_block(block, modify=False):
+            if block is entry:
+                # No preds; all parameters are live-in
+                currently_alive = 2**argcount - 1
+            else:
+                # Meet the live-out sets of all predecessors
+                bid = block.bid
+                currently_alive = meet(live_out[pred] for pred in preds[bid])
+            for instr in block.getInstructions():
+                if modify and instr.opname == "LOAD_FAST":
+                    if currently_alive & (1 << instr.ioparg):
+                        instr.opname = "LOAD_FAST_UNCHECKED"
+                    else:
+                        if instr.ioparg >= argcount:
+                            # Exclude arguments because they come into the
+                            # function body live. Anything that makes them no
+                            # longer live will have to be DELETE_FAST.
+                            conditionally_assigned.add(instr.oparg)
+                elif instr.opname == "STORE_FAST":
+                    currently_alive |= 1 << instr.ioparg
+                elif instr.opname == "DELETE_FAST":
+                    currently_alive &= ~(1 << instr.ioparg)
+            if currently_alive == live_out[block.bid]:
+                return False
+            live_out[block.bid] = currently_alive
+            return True
+
+        changed = True
+        while changed:
+            changed = False
+            for block in blocks:
+                changed |= process_one_block(block)
+
+        for block in blocks:
+            process_one_block(block, modify=True)
+
+        if conditionally_assigned:
+            deletes = [
+                Instruction("DELETE_FAST_UNCHECKED", name, self.varnames.index(name))
+                for name in sorted(conditionally_assigned)
+            ]
+            entry.insts = deletes + entry.insts
+
     def flattenGraph(self):
         """Arrange the blocks in order and resolve jumps"""
         assert self.stage == CLOSED, self.stage
