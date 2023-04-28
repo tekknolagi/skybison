@@ -501,6 +501,7 @@ class PyFlowGraph(FlowGraph):
     def getCode(self):
         """Get a Python code object"""
         assert self.stage == ACTIVE, self.stage
+        self.optimizeLoadFast()
         self.stage = CLOSED
         self.computeStackDepth()
         self.flattenGraph()
@@ -588,13 +589,6 @@ class PyFlowGraph(FlowGraph):
         blocks = self.getBlocksInOrder()
         preds = tuple(set() for i in range(self.block_count))
         for block in blocks:
-            for instr in block.getInstructions():
-                if instr.opname == "FOR_ITER":
-                    print(block)
-                    print(instr)
-                    preds[instr.target.bid].add(block.bid)
-                    preds[block.bid].add(block.bid)
-                    # preds[instr.target.bid].add(block.next.bid)
             for child in block.get_children():
                 if child is not None:
                     if (
@@ -633,12 +627,13 @@ class PyFlowGraph(FlowGraph):
             return result
 
         def process_one_block(block, modify=False):
+            bid = block.bid
             if block is entry:
+                assert len(preds[bid]) == 0
                 # No preds; all parameters are live-in
                 currently_alive = 2**argcount - 1
             else:
                 # Meet the live-out sets of all predecessors
-                bid = block.bid
                 currently_alive = meet(live_out[pred] for pred in preds[bid])
             for instr in block.getInstructions():
                 if modify and instr.opname == "LOAD_FAST":
