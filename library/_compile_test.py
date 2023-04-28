@@ -1140,7 +1140,7 @@ RETURN_VALUE
         )
         self.assertEqual(func(), None)
 
-    def test_try_with_use_in_finally_is_unchecked(self):
+    def test_try_with_use_in_finally_is_checked(self):
         source = """
 def foo():
     try:
@@ -1152,13 +1152,14 @@ def foo():
         self.assertEqual(
             dis(func.__code__),
             """\
+DELETE_FAST_UNCHECKED x
 LOAD_CONST None
 SETUP_FINALLY 8
 LOAD_CONST 123
 STORE_FAST x
 POP_BLOCK
 BEGIN_FINALLY
-LOAD_FAST_UNCHECKED x
+LOAD_FAST x
 POP_FINALLY 1
 ROT_TWO
 POP_TOP

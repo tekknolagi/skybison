@@ -596,7 +596,9 @@ class PyFlowGraph(FlowGraph):
                         and block.insts[-1].opname == "SETUP_WITH"
                         and block.insts[-1].target is child
                     ):
-                        # TODO(emacs): Is this correct? Explain it.
+                        # These targets are set for blockstack/exception
+                        # handling metadata and don't actually matter for
+                        # control flow.
                         continue
                     # TODO(emacs): Tail-duplicate finally blocks or upgrade to
                     # 3.10, which does this already. This avoids except blocks
@@ -628,8 +630,7 @@ class PyFlowGraph(FlowGraph):
 
         def process_one_block(block, modify=False):
             bid = block.bid
-            if block is entry:
-                assert len(preds[bid]) == 0
+            if len(preds[bid]) == 0:
                 # No preds; all parameters are live-in
                 currently_alive = 2**argcount - 1
             else:
@@ -639,12 +640,11 @@ class PyFlowGraph(FlowGraph):
                 if modify and instr.opname == "LOAD_FAST":
                     if currently_alive & (1 << instr.ioparg):
                         instr.opname = "LOAD_FAST_UNCHECKED"
-                    else:
-                        if instr.ioparg >= argcount:
-                            # Exclude arguments because they come into the
-                            # function body live. Anything that makes them no
-                            # longer live will have to be DELETE_FAST.
-                            conditionally_assigned.add(instr.oparg)
+                    elif instr.ioparg >= argcount:
+                        # Exclude arguments because they come into the function
+                        # body live. Anything that makes them no longer live
+                        # will have to be DELETE_FAST.
+                        conditionally_assigned.add(instr.oparg)
                 elif instr.opname == "STORE_FAST":
                     currently_alive |= 1 << instr.ioparg
                 elif instr.opname == "DELETE_FAST":
