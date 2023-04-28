@@ -435,8 +435,8 @@ def optimize_load_fast(code):
     argcount = (
         code.co_argcount
         + code.co_kwonlyargcount
-        + (code.co_flags & CO_VARARGS)
-        + (code.co_flags & CO_VARKEYWORDS)
+        + bool(code.co_flags & CO_VARARGS)
+        + bool(code.co_flags & CO_VARKEYWORDS)
     )
     alive = set()
 
