@@ -8,14 +8,19 @@ from django.http import HttpResponse
 
 
 try:
-    from _valgrind import callgrind_dump_stats, callgrind_start_instrumentation
+    from valgrind import callgrind_dump_stats, callgrind_start_instrumentation
+    # CPython, with https://github.com/tekknolagi/valgrind
 except ImportError:
+    try:
+        from _valgrind import callgrind_dump_stats, callgrind_start_instrumentation
+        # Skybison, with runtime/under-valgrind-module.cpp
+    except ImportError:
 
-    def callgrind_dump_stats(description):
-        pass
+        def callgrind_dump_stats(description):
+            pass
 
-    def callgrind_start_instrumentation():
-        pass
+        def callgrind_start_instrumentation():
+            pass
 
 
 if os.environ.get("DJANGO_PROFILE"):
