@@ -1438,9 +1438,33 @@ TEST_F(RuntimeTest, CollectAttributes) {
   result = dictAtByStr(thread_, attributes, baz);
   ASSERT_TRUE(result.isStr());
   EXPECT_TRUE(Str::cast(*result).equals(*baz));
+
+  // Bytecode for the snippet:
+  //
+  //   def __init__(self):
+  //       self.foo = 100
+  //
+  // Manually add duplicate and useless EXTENDED_ARG intentionally to ensure
+  // that collectAttributes can handle it.
+  const byte bytecode2[] = {LOAD_CONST,   0, EXTENDED_ARG, 0, EXTENDED_ARG, 0,
+                            EXTENDED_ARG, 0, LOAD_FAST,    0, STORE_ATTR,   0,
+                            RETURN_VALUE, 0};
+  Code code2(&scope, newCodeWithBytesConstsNamesLocals(bytecode2, consts, names,
+                                                       &locals));
+
+  attributes = runtime_->newDict();
+  runtime_->collectAttributes(code2, attributes);
+
+  // We should have collected a single attribute: 'foo'
+  EXPECT_EQ(attributes.numItems(), 1);
+
+  // Check that we collected 'foo'
+  result = dictAtByStr(thread_, attributes, foo);
+  ASSERT_TRUE(result.isStr());
+  EXPECT_TRUE(Str::cast(*result).equals(*foo));
 }
 
-TEST_F(RuntimeTest, CollectAttributesWithExtendedArg) {
+TEST_F(RuntimeTest, CollectAttributesWithExtendedArgAccumulates) {
   HandleScope scope(thread_);
 
   Str foo(&scope, runtime_->newStrFromCStr("foo"));
@@ -1461,22 +1485,16 @@ TEST_F(RuntimeTest, CollectAttributesWithExtendedArg) {
   //
   // There is an additional LOAD_FAST that is preceded by an EXTENDED_ARG
   // that must be skipped.
-  const byte bytecode[] = {LOAD_CONST, 0, EXTENDED_ARG, 1, LOAD_FAST, 0,
-                           STORE_ATTR, 1, LOAD_CONST,   0, LOAD_FAST, 0,
-                           STORE_ATTR, 0, RETURN_VALUE, 0};
+  const byte bytecode[] = {LOAD_CONST, 0, EXTENDED_ARG, 1, LOAD_FAST,    0,
+                           STORE_ATTR, 1, LOAD_CONST,   0, RETURN_VALUE, 0};
   Code code(&scope, newCodeWithBytesConstsNamesLocals(bytecode, consts, names,
                                                       &locals));
 
   Dict attributes(&scope, runtime_->newDict());
   runtime_->collectAttributes(code, attributes);
 
-  // We should have collected a single attribute: 'foo'
-  EXPECT_EQ(attributes.numItems(), 1);
-
-  // Check that we collected 'foo'
-  Object result(&scope, dictAtByStr(thread_, attributes, foo));
-  ASSERT_TRUE(result.isStr());
-  EXPECT_TRUE(Str::cast(*result).equals(*foo));
+  // We should have collected no attributes because EXTENDED_ARG makes 0x0100
+  EXPECT_EQ(attributes.numItems(), 0);
 }
 
 TEST_F(RuntimeTest, GetTypeConstructor) {
