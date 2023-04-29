@@ -2880,9 +2880,11 @@ void Runtime::collectAttributes(const Code& code, const Dict& attributes) {
 
   word len = bc.length();
   word self = 0;
-  word reverse_self = code.nlocals() - 1;
+  word total_locals = code.nlocals() + code.numFreevars() + code.numCellvars();
+  word reverse_self = total_locals - self - 1;
   for (word i = 0; i < len - (kCompilerCodeUnitSize + 1);
        i += kCompilerCodeUnitSize) {
+    byte op = bc.byteAt(i);
     int32_t arg = bc.byteAt(i + 1);
     while (op == Bytecode::EXTENDED_ARG) {
       i += kCompilerCodeUnitSize;
