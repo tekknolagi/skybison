@@ -2881,16 +2881,16 @@ void Runtime::collectAttributes(const Code& code, const Dict& attributes) {
   word len = bc.length();
   for (word i = 0; i < len - (kCompilerCodeUnitSize + 1);
        i += kCompilerCodeUnitSize) {
-    byte op = bc.byteAt(i);
     int32_t arg = bc.byteAt(i + 1);
     while (op == Bytecode::EXTENDED_ARG) {
       i += kCompilerCodeUnitSize;
       op = bc.byteAt(i);
       arg = (arg << kBitsPerByte) | bc.byteAt(i + 1);
     }
-    // Check for LOAD_FAST 0 (self) or LOAD_FAST_REVERSE_UNCHECKED nlocals-1
+    // Check for LOAD_FAST 0 (self) or LOAD_FAST_REVERSE(_UNCHECKED) nlocals-1
     bool is_load_self =
         (op == LOAD_FAST && arg == self) ||
+        (op == LOAD_FAST_REVERSE && arg == reverse_self) ||
         (op == LOAD_FAST_REVERSE_UNCHECKED && arg == reverse_self);
     if (!is_load_self) {
       continue;
