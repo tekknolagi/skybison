@@ -1482,9 +1482,6 @@ TEST_F(RuntimeTest, CollectAttributesWithExtendedArgAccumulates) {
   //
   //   def __init__(self):
   //       self.foo = None
-  //
-  // There is an additional LOAD_FAST that is preceded by an EXTENDED_ARG
-  // that must be skipped.
   const byte bytecode[] = {LOAD_CONST, 0, EXTENDED_ARG, 1, LOAD_FAST,    0,
                            STORE_ATTR, 1, LOAD_CONST,   0, RETURN_VALUE, 0};
   Code code(&scope, newCodeWithBytesConstsNamesLocals(bytecode, consts, names,
