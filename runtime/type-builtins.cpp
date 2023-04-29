@@ -667,7 +667,7 @@ static word estimateNumAttributes(Thread* thread, const Type& type) {
   // each class in the MRO. This is used to determine the number of slots
   // allocated for in-object attributes when instances are created.
   Tuple mro(&scope, type.mro());
-  Dict attr_names(&scope, runtime->newDict());
+  Set attr_names(&scope, runtime->newSet());
   for (word i = 0; i < mro.length(); i++) {
     Type mro_type(&scope, mro.at(i));
     Object maybe_init(&scope, runtime->classConstructor(mro_type));

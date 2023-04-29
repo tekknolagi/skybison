@@ -2872,18 +2872,19 @@ RawObject Runtime::newWeakRef(Thread* thread, const Object& referent) {
   return *ref;
 }
 
-void Runtime::collectAttributes(const Code& code, const Dict& attributes) {
+void Runtime::collectAttributes(const Code& code, const Set& attributes) {
   Thread* thread = Thread::current();
   HandleScope scope(thread);
   Bytes bc(&scope, code.code());
   Tuple names(&scope, code.names());
+  Str name(&scope, Str::empty());
 
   word len = bc.length();
-  for (word i = 0; i < len - 3; i += 2) {
+  for (word i = 0; i < len - 3; i += kCompilerCodeUnitSize) {
     // If the current instruction is EXTENDED_ARG we must skip it and the next
     // instruction.
-    if (bc.byteAt(i) == Bytecode::EXTENDED_ARG) {
-      i += 2;
+    while (bc.byteAt(i) == Bytecode::EXTENDED_ARG) {
+      i += kCompilerCodeUnitSize;
       continue;
     }
     // Check for LOAD_FAST 0 (self)
@@ -2895,8 +2896,9 @@ void Runtime::collectAttributes(const Code& code, const Dict& attributes) {
       continue;
     }
     word name_index = bc.byteAt(i + 3);
-    Str name(&scope, names.at(name_index));
-    dictAtPutByStr(thread, attributes, name, name);
+    name = names.at(name_index);
+    word hash = strHash(thread, *name);
+    setAdd(thread, attributes, name, hash);
   }
 }
 

@@ -561,7 +561,7 @@ class Runtime {
 
   // Performs a simple scan of the bytecode and collects all attributes that
   // are set via `self.<attribute> =` into attributes.
-  void collectAttributes(const Code& code, const Dict& attributes);
+  void collectAttributes(const Code& code, const Set& attributes);
 
   // Returns type's __init__ method, or None
   RawObject classConstructor(const Type& type);
