@@ -201,6 +201,8 @@ if __name__ == "__main__":
         )
     )
     print()
+    print("<details><summary>Benchmark details</summary>")
+    print()  # A newline after </summary> is required for rendering
     print(
         generate_markdown_table(
             "Base vs. New",
@@ -228,3 +230,5 @@ if __name__ == "__main__":
     print(generate_markdown_table("New", METRICS_HEADER, variants[NEW_VARIANT]))
     print()
     print(generate_markdown_table("CPython", METRICS_HEADER, variants[CPYTHON_VARIANT]))
+    print()
+    print("</details>")
