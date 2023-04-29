@@ -2879,6 +2879,8 @@ void Runtime::collectAttributes(const Code& code, const Dict& attributes) {
   Tuple names(&scope, code.names());
 
   word len = bc.length();
+  word self = 0;
+  word reverse_self = code.nlocals() - 1;
   for (word i = 0; i < len - (kCompilerCodeUnitSize + 1);
        i += kCompilerCodeUnitSize) {
     int32_t arg = bc.byteAt(i + 1);
@@ -2889,9 +2891,9 @@ void Runtime::collectAttributes(const Code& code, const Dict& attributes) {
     }
     // Check for LOAD_FAST 0 (self) or LOAD_FAST_REVERSE(_UNCHECKED) nlocals-1
     bool is_load_self =
-        (op == LOAD_FAST && arg == self) ||
-        (op == LOAD_FAST_REVERSE && arg == reverse_self) ||
-        (op == LOAD_FAST_REVERSE_UNCHECKED && arg == reverse_self);
+        (op == Bytecode::LOAD_FAST && arg == self) ||
+        (op == Bytecode::LOAD_FAST_REVERSE && arg == reverse_self) ||
+        (op == Bytecode::LOAD_FAST_REVERSE_UNCHECKED && arg == reverse_self);
     if (!is_load_self) {
       continue;
     }
