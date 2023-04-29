@@ -2879,15 +2879,17 @@ void Runtime::collectAttributes(const Code& code, const Dict& attributes) {
   Tuple names(&scope, code.names());
 
   word len = bc.length();
-  for (word i = 0; i < len - 3; i += 2) {
-    // If the current instruction is EXTENDED_ARG we must skip it and the next
-    // instruction.
-    if (bc.byteAt(i) == Bytecode::EXTENDED_ARG) {
-      i += 2;
-      continue;
+  for (word i = 0; i < len - (kCompilerCodeUnitSize + 1);
+       i += kCompilerCodeUnitSize) {
+    byte op = bc.byteAt(i);
+    int32_t arg = bc.byteAt(i + 1);
+    while (op == Bytecode::EXTENDED_ARG) {
+      i += kCompilerCodeUnitSize;
+      op = bc.byteAt(i);
+      arg = (arg << kBitsPerByte) | bc.byteAt(i + 1);
     }
     // Check for LOAD_FAST 0 (self)
-    if (bc.byteAt(i) != Bytecode::LOAD_FAST || bc.byteAt(i + 1) != 0) {
+    if (op != Bytecode::LOAD_FAST || arg != 0) {
       continue;
     }
     // Followed by a STORE_ATTR
