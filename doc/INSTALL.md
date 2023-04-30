@@ -55,6 +55,7 @@ You can change build type by adding the one of the following to the `cmake` comm
 -DCMAKE_BUILD_TYPE=DebugOpt // -O2 -g with debug checks but faster
 -DCMAKE_BUILD_TYPE=RelWithDebInfo // like a release build but has debug symbols -- useful for callgrind
 ```
+
 To run tests with address sanitizer (ASAN), add
 
 ```
@@ -62,6 +63,14 @@ To run tests with address sanitizer (ASAN), add
 ```
 
 *before* the platform. Like `cmake -DSKYBISON_ASAN=1 ...`
+
+To run tests with the undefined behavior sanitizer (UBSAN), add
+
+```
+-DSKYBISON_UBSAN=1
+```
+
+*before* the platform. Like `cmake -DSKYBISON_UBSAN=1 ...`
 
 Since you will likely have several `build-XYZ` folders hanging around, and it's
 useful for those not to show up in `git status`, they should be ignored by
