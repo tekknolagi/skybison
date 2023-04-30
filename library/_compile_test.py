@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) Facebook, Inc. and its affiliates. (http://www.facebook.com)
+import asyncio
 import io
 import unittest
 from types import CodeType
@@ -24,6 +25,15 @@ def _dis_instruction(opcode, code: CodeType, op: int, oparg: int):  # noqa: C901
             oparg_str = repr(code.co_consts[oparg])
     elif op in opcode.hasname:
         oparg_str = code.co_names[oparg]
+    elif op in (
+        opcode.LOAD_FAST_REVERSE_UNCHECKED,
+        opcode.STORE_FAST_REVERSE,
+        opcode.DELETE_FAST_REVERSE_UNCHECKED,
+    ):
+        total_locals = (
+            len(code.co_varnames) + len(code.co_cellvars) + len(code.co_freevars)
+        )
+        oparg_str = code.co_varnames[total_locals - oparg - 1]
     elif op in opcode.haslocal:
         oparg_str = code.co_varnames[oparg]
     elif op in opcode.hascompare:
@@ -81,6 +91,14 @@ def simpledis(opcode, code: CodeType):
 
 def test_compile(source, filename="<test>", mode="eval", flags=0, optimize=True):
     return compile(source, filename, mode, flags, None, optimize)
+
+
+def compile_function(source, func_name):
+    module_code = test_compile(source, mode="exec")
+    globals = {}
+    locals = {}
+    exec(module_code, globals, locals)
+    return locals[func_name]
 
 
 def dis(code):
@@ -625,7 +643,7 @@ JUMP_ABSOLUTE 6
 RETURN_VALUE
 
 # 0:code object <lambda>
-LOAD_FAST _gen$x
+LOAD_FAST_REVERSE_UNCHECKED _gen$x
 RETURN_VALUE
 """,
         )
@@ -696,6 +714,776 @@ RETURN_VALUE
         iterable = [1]
         result = tuple(locals().keys() for item in iterable)[0]
         self.assertEqual(sorted(result), [".0", "item"])
+
+
+@pyro_only
+class DefiniteAssignmentAnalysisTests(unittest.TestCase):
+    def test_load_parameter_is_unchecked(self):
+        source = """
+def foo(x):
+    return x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+LOAD_FAST_REVERSE_UNCHECKED x
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(123), 123)
+
+    def test_load_kwonly_parameter_is_unchecked(self):
+        source = """
+def foo(*, x):
+    return x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+LOAD_FAST_REVERSE_UNCHECKED x
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(x=123), 123)
+
+    def test_load_varargs_parameter_is_unchecked(self):
+        source = """
+def foo(*x):
+    return x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+LOAD_FAST_REVERSE_UNCHECKED x
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(123), (123,))
+
+    def test_load_varkeyargs_parameter_is_unchecked(self):
+        source = """
+def foo(**x):
+    return x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+LOAD_FAST_REVERSE_UNCHECKED x
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(a=123), {"a": 123})
+
+    def test_load_parameter_with_del_is_checked(self):
+        source = """
+def foo(x):
+    del x
+    return x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+DELETE_FAST x
+LOAD_FAST x
+RETURN_VALUE
+""",
+        )
+        with self.assertRaisesRegex(
+            UnboundLocalError, "local variable 'x' referenced before assignment"
+        ):
+            func(123)
+
+    def test_load_parameter_with_del_after_is_unchecked(self):
+        source = """
+def foo(x):
+    y = x
+    del x
+    return y
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+LOAD_FAST_REVERSE_UNCHECKED x
+STORE_FAST_REVERSE y
+DELETE_FAST x
+LOAD_FAST_REVERSE_UNCHECKED y
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(123), 123)
+
+    def test_variable_defined_in_local_is_unchecked(self):
+        source = """
+def foo():
+    x = 3
+    return x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+LOAD_CONST 3
+STORE_FAST_REVERSE x
+LOAD_FAST_REVERSE_UNCHECKED x
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(), 3)
+
+    def test_variable_defined_in_one_branch_is_checked(self):
+        source = """
+def foo(cond):
+    if cond:
+        x = 3
+    return x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+DELETE_FAST_REVERSE_UNCHECKED x
+LOAD_FAST_REVERSE_UNCHECKED cond
+POP_JUMP_IF_FALSE 10
+LOAD_CONST 3
+STORE_FAST_REVERSE x
+LOAD_FAST x
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(True), 3)
+        with self.assertRaisesRegex(
+            UnboundLocalError, "local variable 'x' referenced before assignment"
+        ):
+            func(False)
+
+    def test_variable_defined_in_one_branch_if_else_is_checked(self):
+        source = """
+def foo(cond):
+    if cond:
+        x = 3
+    else:
+        pass
+    return x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+DELETE_FAST_REVERSE_UNCHECKED x
+LOAD_FAST_REVERSE_UNCHECKED cond
+POP_JUMP_IF_FALSE 12
+LOAD_CONST 3
+STORE_FAST_REVERSE x
+JUMP_FORWARD 0
+LOAD_FAST x
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(True), 3)
+        with self.assertRaisesRegex(
+            UnboundLocalError, "local variable 'x' referenced before assignment"
+        ):
+            func(False)
+
+    def test_variable_defined_in_both_branches_if_else_is_unchecked(self):
+        source = """
+def foo(cond):
+    if cond:
+        x = 3
+    else:
+        x = 4
+    return x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+LOAD_FAST_REVERSE_UNCHECKED cond
+POP_JUMP_IF_FALSE 10
+LOAD_CONST 3
+STORE_FAST_REVERSE x
+JUMP_FORWARD 4
+LOAD_CONST 4
+STORE_FAST_REVERSE x
+LOAD_FAST_REVERSE_UNCHECKED x
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(True), 3)
+        self.assertEqual(func(False), 4)
+
+    def test_loop_is_unchecked(self):
+        source = """
+def foo(cond):
+    while True:
+        print(cond)
+"""
+        self.assertEqual(
+            dis(compile_function(source, "foo").__code__),
+            """\
+LOAD_GLOBAL print
+LOAD_FAST_REVERSE_UNCHECKED cond
+CALL_FUNCTION 1
+POP_TOP
+JUMP_ABSOLUTE 0
+LOAD_CONST None
+RETURN_VALUE
+""",
+        )
+
+    def test_loop_with_del_is_checked(self):
+        source = """
+def foo(cond):
+    while True:
+        1 + cond  # use it
+        del cond
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+LOAD_CONST 1
+LOAD_FAST cond
+BINARY_ADD
+POP_TOP
+DELETE_FAST cond
+JUMP_ABSOLUTE 0
+LOAD_CONST None
+RETURN_VALUE
+""",
+        )
+        with self.assertRaisesRegex(
+            UnboundLocalError, "local variable 'cond' referenced before assignment"
+        ):
+            func(True)
+
+    def test_loop_variable_in_for_loop_is_unchecked(self):
+        source = """
+def foo(n):
+    result = []
+    for i in range(n):
+        result.append(i)
+    return result
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+BUILD_LIST 0
+STORE_FAST_REVERSE result
+LOAD_GLOBAL range
+LOAD_FAST_REVERSE_UNCHECKED n
+CALL_FUNCTION 1
+GET_ITER
+FOR_ITER 14
+STORE_FAST_REVERSE i
+LOAD_FAST_REVERSE_UNCHECKED result
+LOAD_METHOD append
+LOAD_FAST_REVERSE_UNCHECKED i
+CALL_METHOD 1
+POP_TOP
+JUMP_ABSOLUTE 12
+LOAD_FAST_REVERSE_UNCHECKED result
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(3), [0, 1, 2])
+
+    def test_loop_variable_after_for_loop_is_checked(self):
+        source = """
+def foo(n):
+    for i in range(n):
+        pass
+    return i
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+DELETE_FAST_REVERSE_UNCHECKED i
+LOAD_GLOBAL range
+LOAD_FAST_REVERSE_UNCHECKED n
+CALL_FUNCTION 1
+GET_ITER
+FOR_ITER 4
+STORE_FAST_REVERSE i
+JUMP_ABSOLUTE 10
+LOAD_FAST i
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(3), 2)
+
+    def test_loop_variable_in_async_for_loop_is_unchecked(self):
+        source = """
+async def foo(n):
+    result = []
+    async for i in range(n):
+        result.append(i)
+    return result
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+BUILD_LIST 0
+STORE_FAST_REVERSE result
+LOAD_GLOBAL range
+LOAD_FAST_REVERSE_UNCHECKED n
+CALL_FUNCTION 1
+GET_AITER
+SETUP_FINALLY 22
+GET_ANEXT
+LOAD_CONST None
+YIELD_FROM
+POP_BLOCK
+STORE_FAST_REVERSE i
+LOAD_FAST_REVERSE_UNCHECKED result
+LOAD_METHOD append
+LOAD_FAST_REVERSE_UNCHECKED i
+CALL_METHOD 1
+POP_TOP
+JUMP_ABSOLUTE 12
+END_ASYNC_FOR
+LOAD_FAST_REVERSE_UNCHECKED result
+RETURN_VALUE
+""",
+        )
+        # TODO(emacs): Figure out how to get the NameError for CM to go away.
+        return
+        self.assertEqual(asyncio.run(func(3)), [0, 1, 2])
+
+    def test_loop_variable_after_async_for_loop_is_checked(self):
+        source = """
+import asyncio
+
+async def arange(n):
+    for i in range(n):
+        yield i
+        asyncio.sleep(0)
+
+async def foo(n):
+    async for i in arange(n):
+        pass
+    return i
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+DELETE_FAST_REVERSE_UNCHECKED i
+LOAD_GLOBAL arange
+LOAD_FAST_REVERSE_UNCHECKED n
+CALL_FUNCTION 1
+GET_AITER
+SETUP_FINALLY 12
+GET_ANEXT
+LOAD_CONST None
+YIELD_FROM
+POP_BLOCK
+STORE_FAST_REVERSE i
+JUMP_ABSOLUTE 10
+END_ASYNC_FOR
+LOAD_FAST i
+RETURN_VALUE
+""",
+        )
+        # TODO(emacs): Figure out how to get the NameError for CM to go away.
+        return
+        self.assertEqual(asyncio.run(func(3)), 2)
+
+    def test_try_with_use_in_try_is_unchecked(self):
+        source = """
+def foo():
+    try:
+        x = 123
+        return x
+    except:
+        pass
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+SETUP_FINALLY 10
+LOAD_CONST 123
+STORE_FAST_REVERSE x
+LOAD_FAST_REVERSE_UNCHECKED x
+POP_BLOCK
+RETURN_VALUE
+POP_TOP
+POP_TOP
+POP_TOP
+POP_EXCEPT
+JUMP_FORWARD 2
+END_FINALLY
+LOAD_CONST None
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(), 123)
+
+    @unittest.skip(
+        "TODO(emacs): This should be unchecked but we need to tail-duplicate finally blocks"
+    )
+    def test_try_with_use_in_else_is_unchecked(self):
+        source = """
+def foo():
+    try:
+        x = 123
+    except:
+        pass
+    else:
+        return x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+SETUP_FINALLY 8
+LOAD_CONST 123
+STORE_FAST_REVERSE x
+POP_BLOCK
+JUMP_FORWARD 12
+POP_TOP
+POP_TOP
+POP_TOP
+POP_EXCEPT
+JUMP_FORWARD 6
+END_FINALLY
+LOAD_FAST_REVERSE_UNCHECKED x
+RETURN_VALUE
+LOAD_CONST None
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(), 123)
+
+    def test_try_with_use_after_except_is_checked(self):
+        source = """
+def foo():
+    try:
+        x = 123
+    except:
+        pass
+    return x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+DELETE_FAST_REVERSE_UNCHECKED x
+SETUP_FINALLY 8
+LOAD_CONST 123
+STORE_FAST_REVERSE x
+POP_BLOCK
+JUMP_FORWARD 12
+POP_TOP
+POP_TOP
+POP_TOP
+POP_EXCEPT
+JUMP_FORWARD 2
+END_FINALLY
+LOAD_FAST x
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(), 123)
+
+    def test_try_with_use_in_except_is_checked(self):
+        source = """
+def foo():
+    try:
+        x = 123
+    except:
+        return x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+DELETE_FAST_REVERSE_UNCHECKED x
+SETUP_FINALLY 8
+LOAD_CONST 123
+STORE_FAST_REVERSE x
+POP_BLOCK
+JUMP_FORWARD 16
+POP_TOP
+POP_TOP
+POP_TOP
+LOAD_FAST x
+ROT_FOUR
+POP_EXCEPT
+RETURN_VALUE
+END_FINALLY
+LOAD_CONST None
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(), None)
+
+    def test_try_with_use_in_finally_is_checked(self):
+        source = """
+def foo():
+    try:
+        x = 123
+    finally:
+        return x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+DELETE_FAST_REVERSE_UNCHECKED x
+LOAD_CONST None
+SETUP_FINALLY 8
+LOAD_CONST 123
+STORE_FAST_REVERSE x
+POP_BLOCK
+BEGIN_FINALLY
+LOAD_FAST x
+POP_FINALLY 1
+ROT_TWO
+POP_TOP
+RETURN_VALUE
+END_FINALLY
+POP_TOP
+""",
+        )
+        self.assertEqual(func(), 123)
+
+    def test_try_with_use_after_finally_is_unchecked(self):
+        source = """
+def foo():
+    try:
+        x = 123
+    finally:
+        x = 456
+    return x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+SETUP_FINALLY 8
+LOAD_CONST 123
+STORE_FAST_REVERSE x
+POP_BLOCK
+BEGIN_FINALLY
+LOAD_CONST 456
+STORE_FAST_REVERSE x
+END_FINALLY
+LOAD_FAST_REVERSE_UNCHECKED x
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(), 456)
+
+    def test_try_with_use_after_finally_is_unchecked_2(self):
+        source = """
+def foo():
+    try:
+        pass
+    finally:
+        x = 456
+    return x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+SETUP_FINALLY 4
+POP_BLOCK
+BEGIN_FINALLY
+LOAD_CONST 456
+STORE_FAST_REVERSE x
+END_FINALLY
+LOAD_FAST_REVERSE_UNCHECKED x
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(), 456)
+
+    def test_use_in_with_is_unchecked(self):
+        source = """
+class CM(object):
+    def __init__(self):
+        self.state = "init"
+    def __enter__(self):
+        self.state = "enter"
+    def __exit__(self, type, value, traceback):
+        self.state = "exit"
+
+def foo():
+    with CM() as cm:
+        return cm
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+LOAD_GLOBAL CM
+CALL_FUNCTION 0
+SETUP_WITH 18
+STORE_FAST_REVERSE cm
+LOAD_FAST_REVERSE_UNCHECKED cm
+POP_BLOCK
+ROT_TWO
+BEGIN_FINALLY
+WITH_CLEANUP_START
+WITH_CLEANUP_FINISH
+POP_FINALLY 0
+RETURN_VALUE
+WITH_CLEANUP_START
+WITH_CLEANUP_FINISH
+END_FINALLY
+LOAD_CONST None
+RETURN_VALUE
+""",
+        )
+        # TODO(emacs): Figure out how to get the NameError for CM to go away.
+        return
+        self.assertEqual(func(), 456)
+
+    def test_use_after_with_is_checked(self):
+        source = """
+class CM(object):
+    def __init__(self):
+        self.state = "init"
+    def __enter__(self):
+        self.state = "enter"
+    def __exit__(self, type, value, traceback):
+        self.state = "exit"
+
+def foo():
+    with CM() as cm:
+        pass
+    return cm
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+DELETE_FAST_REVERSE_UNCHECKED cm
+LOAD_GLOBAL CM
+CALL_FUNCTION 0
+SETUP_WITH 6
+STORE_FAST_REVERSE cm
+POP_BLOCK
+BEGIN_FINALLY
+WITH_CLEANUP_START
+WITH_CLEANUP_FINISH
+END_FINALLY
+LOAD_FAST cm
+RETURN_VALUE
+""",
+        )
+        # TODO(emacs): Figure out how to get the NameError for CM to go away.
+        return
+        self.assertEqual(func(), 456)
+
+    def test_use_in_async_with_is_unchecked(self):
+        source = """
+class CM(object):
+    def __init__(self):
+        self.state = "init"
+    def __aenter__(self):
+        self.state = "enter"
+    def __aexit__(self, type, value, traceback):
+        self.state = "exit"
+
+async def foo():
+    async with CM() as cm:
+        return cm
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+LOAD_GLOBAL CM
+CALL_FUNCTION 0
+BEFORE_ASYNC_WITH
+GET_AWAITABLE
+LOAD_CONST None
+YIELD_FROM
+SETUP_ASYNC_WITH 24
+STORE_FAST_REVERSE cm
+LOAD_FAST_REVERSE_UNCHECKED cm
+POP_BLOCK
+ROT_TWO
+BEGIN_FINALLY
+WITH_CLEANUP_START
+GET_AWAITABLE
+LOAD_CONST None
+YIELD_FROM
+WITH_CLEANUP_FINISH
+POP_FINALLY 0
+RETURN_VALUE
+WITH_CLEANUP_START
+GET_AWAITABLE
+LOAD_CONST None
+YIELD_FROM
+WITH_CLEANUP_FINISH
+END_FINALLY
+LOAD_CONST None
+RETURN_VALUE
+""",
+        )
+        # TODO(emacs): Figure out how to get the NameError for CM to go away.
+        return
+        self.assertEqual(func(), 456)
+
+    def test_use_after_async_with_is_checked(self):
+        source = """
+class CM(object):
+    def __init__(self):
+        self.state = "init"
+    def __aenter__(self):
+        self.state = "enter"
+    def __aexit__(self, type, value, traceback):
+        self.state = "exit"
+
+async def foo():
+    async with CM() as cm:
+        pass
+    return cm
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+DELETE_FAST_REVERSE_UNCHECKED cm
+LOAD_GLOBAL CM
+CALL_FUNCTION 0
+BEFORE_ASYNC_WITH
+GET_AWAITABLE
+LOAD_CONST None
+YIELD_FROM
+SETUP_ASYNC_WITH 6
+STORE_FAST_REVERSE cm
+POP_BLOCK
+BEGIN_FINALLY
+WITH_CLEANUP_START
+GET_AWAITABLE
+LOAD_CONST None
+YIELD_FROM
+WITH_CLEANUP_FINISH
+END_FINALLY
+LOAD_FAST cm
+RETURN_VALUE
+""",
+        )
+        # TODO(emacs): Figure out how to get the NameError for CM to go away.
+        return
+        self.assertEqual(func(), 456)
+
+    # TODO(emacs): Test with (multiple context managers)
 
 
 if __name__ == "__main__":

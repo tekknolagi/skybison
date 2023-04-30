@@ -9,7 +9,7 @@ from types import CodeType
 from typing import Generator, List, Optional
 
 from . import opcode36, opcode37, opcode38, opcode38cinder
-from .consts import CO_NEWLOCALS, CO_OPTIMIZED
+from .consts import CO_NEWLOCALS, CO_OPTIMIZED, CO_VARARGS, CO_VARKEYWORDS
 from .consts38 import CO_SUPPRESS_JIT
 from .peephole import Optimizer
 from .py38.peephole import Optimizer38
@@ -406,7 +406,6 @@ class IndexedSet:
 
 
 class PyFlowGraph(FlowGraph):
-
     super_init = FlowGraph.__init__
     opcode = opcode36.opcode
 
@@ -502,6 +501,7 @@ class PyFlowGraph(FlowGraph):
     def getCode(self):
         """Get a Python code object"""
         assert self.stage == ACTIVE, self.stage
+        self.optimizeLoadFast()
         self.stage = CLOSED
         self.computeStackDepth()
         self.flattenGraph()
@@ -584,6 +584,91 @@ class PyFlowGraph(FlowGraph):
             if block.getInstructions():
                 self.stacksize = self.stackdepth_walk(block)
                 break
+
+    def optimizeLoadFast(self):
+        blocks = self.getBlocksInOrder()
+        preds = tuple(set() for i in range(self.block_count))
+        for block in blocks:
+            for child in block.get_children():
+                if child is not None:
+                    # TODO(emacs): Tail-duplicate finally blocks or upgrade to
+                    # 3.10, which does this already. This avoids except blocks
+                    # falling through into else blocks and mucking up
+                    # performance.
+                    preds[child.bid].add(block.bid)
+
+        num_locals = len(self.varnames)
+        Top = 2**num_locals - 1
+        # map of block id -> assignment state in lattice
+        live_out = [Top] * self.block_count
+        conditionally_assigned = set()
+        argcount = (
+            len(self.args)
+            + len(self.kwonlyargs)
+            + bool(self.flags & CO_VARARGS)
+            + bool(self.flags & CO_VARKEYWORDS)
+        )
+        total_locals = num_locals + len(self.cellvars) + len(self.freevars)
+        ArgsAssigned = 2**argcount - 1
+
+        def reverse_local_idx(idx):
+            return total_locals - idx - 1
+
+        def meet(args):
+            result = Top
+            for arg in args:
+                result &= arg
+            return result
+
+        def process_one_block(block, modify=False):
+            bid = block.bid
+            if len(preds[bid]) == 0:
+                # No preds; all parameters are live-in
+                currently_alive = ArgsAssigned
+            else:
+                # Meet the live-out sets of all predecessors
+                currently_alive = meet(live_out[pred] for pred in preds[bid])
+            for instr in block.getInstructions():
+                if modify and instr.opname == "LOAD_FAST":
+                    if currently_alive & (1 << instr.ioparg):
+                        instr.opname = "LOAD_FAST_REVERSE_UNCHECKED"
+                        instr.ioparg = reverse_local_idx(instr.ioparg)
+                    elif instr.ioparg >= argcount:
+                        # Exclude arguments because they come into the function
+                        # body live. Anything that makes them no longer live
+                        # will have to be DELETE_FAST.
+                        conditionally_assigned.add(instr.oparg)
+                elif instr.opname == "STORE_FAST":
+                    currently_alive |= 1 << instr.ioparg
+                    if modify:
+                        instr.opname = "STORE_FAST_REVERSE"
+                        instr.ioparg = reverse_local_idx(instr.ioparg)
+                elif instr.opname == "DELETE_FAST":
+                    currently_alive &= ~(1 << instr.ioparg)
+            if currently_alive == live_out[block.bid]:
+                return False
+            live_out[block.bid] = currently_alive
+            return True
+
+        changed = True
+        while changed:
+            changed = False
+            for block in blocks:
+                changed |= process_one_block(block)
+
+        for block in blocks:
+            process_one_block(block, modify=True)
+
+        if conditionally_assigned:
+            deletes = [
+                Instruction(
+                    "DELETE_FAST_REVERSE_UNCHECKED",
+                    name,
+                    reverse_local_idx(self.varnames.index(name)),
+                )
+                for name in sorted(conditionally_assigned)
+            ]
+            self.entry.insts = deletes + self.entry.insts
 
     def flattenGraph(self):
         """Arrange the blocks in order and resolve jumps"""

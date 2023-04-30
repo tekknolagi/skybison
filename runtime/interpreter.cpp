@@ -4274,8 +4274,6 @@ HANDLER_INLINE Continue Interpreter::doSetupFinally(Thread* thread, word arg) {
 HANDLER_INLINE Continue Interpreter::doLoadFast(Thread* thread, word arg) {
   Frame* frame = thread->currentFrame();
   RawObject value = frame->local(arg);
-  // TODO(T66255738): Remove this once we can statically prove local variable
-  // are always bound.
   if (UNLIKELY(value.isErrorNotFound())) {
     HandleScope scope(thread);
     Str name(&scope, Tuple::cast(Code::cast(frame->code()).varnames()).at(arg));
@@ -4329,10 +4327,15 @@ HANDLER_INLINE Continue Interpreter::doStoreFastReverse(Thread* thread,
   return Continue::NEXT;
 }
 
+HANDLER_INLINE Continue
+Interpreter::doDeleteFastReverseUnchecked(Thread* thread, word arg) {
+  Frame* frame = thread->currentFrame();
+  frame->setLocalWithReverseIndex(arg, Error::notFound());
+  return Continue::NEXT;
+}
+
 HANDLER_INLINE Continue Interpreter::doDeleteFast(Thread* thread, word arg) {
   Frame* frame = thread->currentFrame();
-  // TODO(T66255738): Remove this once we can statically prove local variable
-  // are always bound.
   if (UNLIKELY(frame->local(arg).isErrorNotFound())) {
     HandleScope scope(thread);
     Object name(&scope,
