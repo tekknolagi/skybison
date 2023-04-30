@@ -66,3 +66,13 @@ To run tests with address sanitizer (ASAN), add
 Since you will likely have several `build-XYZ` folders hanging around, and it's
 useful for those not to show up in `git status`, they should be ignored by
 default in `.gitignore`.
+
+## Alternate linkers
+
+The [mold](https://github.com/rui314/mold) linker is very fast and is superb
+for use in development. To specify it as your linker,
+
+1. Install it
+1. Either
+   * Provide it as part of the CMake command with `-DSKYBISON_LINKER=mold`, or
+   * Have it preload into `ninja`/`make` with `mold -run ninja ...`
