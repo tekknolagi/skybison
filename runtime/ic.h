@@ -63,6 +63,11 @@ void icUpdateAttrModule(Thread* thread, const MutableTuple& caches, word cache,
                         const Object& receiver, const ValueCell& value_cell,
                         const Function& dependent);
 
+void icUpdateMethodModule(Thread* thread, const MutableTuple& caches,
+                          word cache, const Object& receiver,
+                          const ValueCell& value_cell,
+                          const Function& dependent);
+
 void icUpdateAttrType(Thread* thread, const MutableTuple& caches, word cache,
                       const Object& receiver, const Object& selector,
                       const Object& value, const Function& dependent);
@@ -361,7 +366,10 @@ class IcIterator {
     }
   }
 
-  bool isModuleAttrCache() const { return bytecode_op_.bc == LOAD_ATTR_MODULE; }
+  bool isModuleAttrCache() const {
+    return bytecode_op_.bc == LOAD_ATTR_MODULE ||
+           bytecode_op_.bc == LOAD_METHOD_MODULE;
+  }
 
   bool isBinaryOpCache() const {
     switch (bytecode_op_.bc) {
