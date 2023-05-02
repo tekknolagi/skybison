@@ -38,6 +38,7 @@ enum class LoadAttrKind {
   kInstanceTypeDescr,
   kModule,
   kType,
+  kDunderClass,
   kUnknown,
 };
 
@@ -463,6 +464,7 @@ class Interpreter {
   static Continue doLoadMethodInstanceFunction(Thread* thread, word arg);
   static Continue doLoadMethodPolymorphic(Thread* thread, word arg);
   static Continue doLoadName(Thread* thread, word arg);
+  static Continue doLoadType(Thread* thread, word arg);
   static Continue doPopExcept(Thread* thread, word arg);
   static Continue doPopFinally(Thread* thread, word arg);
   static Continue doRaiseVarargs(Thread* thread, word arg);

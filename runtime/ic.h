@@ -54,6 +54,9 @@ ICState icUpdateAttr(Thread* thread, const MutableTuple& caches, word cache,
                      LayoutId layout_id, const Object& value,
                      const Object& name, const Function& dependent);
 
+void icUpdateDunderClass(Thread* thread, LayoutId layout_id, const Object& name,
+                         const Object& dependent);
+
 bool icIsCacheEmpty(const MutableTuple& caches, word cache);
 
 void icUpdateAttrModule(Thread* thread, const MutableTuple& caches, word cache,
@@ -343,6 +346,7 @@ class IcIterator {
       case LOAD_METHOD_ANAMORPHIC:
       case LOAD_METHOD_INSTANCE_FUNCTION:
       case LOAD_METHOD_POLYMORPHIC:
+      case LOAD_TYPE:
       case STORE_ATTR_INSTANCE:
       case STORE_ATTR_INSTANCE_OVERFLOW:
       case STORE_ATTR_INSTANCE_OVERFLOW_UPDATE:

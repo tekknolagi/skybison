@@ -242,7 +242,12 @@ RawObject objectGetAttributeSetLocation(Thread* thread, const Object& object,
         // We cache only function objects as a getter to simplify its usage.
         if (location_out != nullptr) {
           *location_out = *getter;
-          *kind = LoadAttrKind::kInstanceProperty;
+          if (type.hasFlag(Type::Flag::kHasObjectDunderClass) &&
+              *name == runtime->symbols()->at(ID(__class__))) {
+            *kind = LoadAttrKind::kDunderClass;
+          } else {
+            *kind = LoadAttrKind::kInstanceProperty;
+          }
         }
         return Interpreter::call1(thread, getter, object);
       }
