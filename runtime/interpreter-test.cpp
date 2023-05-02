@@ -6664,6 +6664,95 @@ c = C()
   EXPECT_EQ(rewrittenBytecodeOpAt(bytecode, 1), LOAD_ATTR_INSTANCE_PROPERTY);
 }
 
+TEST_F(InterpreterTest, LoadAttrPolymorphicRewritesEntries) {
+  EXPECT_FALSE(runFromCStr(runtime_, R"(
+class A:
+  def __init__(self):
+    self.foo = 400
+
+class B(A):
+  pass
+
+class C(A):
+  pass
+
+class D(A):
+  pass
+
+class E(A):
+  pass
+
+def cache_attribute(c):
+  return c.foo
+
+a = A()
+b = B()
+c = C()
+d = D()
+e = E()
+)")
+                   .isError());
+  HandleScope scope(thread_);
+  Object a(&scope, mainModuleAt(runtime_, "a"));
+  Object b(&scope, mainModuleAt(runtime_, "b"));
+  Object c(&scope, mainModuleAt(runtime_, "c"));
+  Object d(&scope, mainModuleAt(runtime_, "d"));
+  Object e(&scope, mainModuleAt(runtime_, "e"));
+  Function cache_attribute(&scope, mainModuleAt(runtime_, "cache_attribute"));
+  MutableTuple caches(&scope, cache_attribute.caches());
+  ASSERT_EQ(caches.length(), 2 * kIcPointersPerEntry);
+
+  // Load the cache for `a'.
+  ASSERT_TRUE(icLookupAttr(*caches, 1, a.layoutId()).isErrorNotFound());
+  ASSERT_TRUE(icLookupAttr(*caches, 1, b.layoutId()).isErrorNotFound());
+  ASSERT_TRUE(icLookupAttr(*caches, 1, c.layoutId()).isErrorNotFound());
+  ASSERT_TRUE(icLookupAttr(*caches, 1, d.layoutId()).isErrorNotFound());
+  ASSERT_TRUE(icLookupAttr(*caches, 1, e.layoutId()).isErrorNotFound());
+  ASSERT_TRUE(
+      isIntEqualsWord(Interpreter::call1(thread_, cache_attribute, a), 400));
+  EXPECT_TRUE(icLookupAttr(*caches, 1, a.layoutId()).isSmallInt());
+  EXPECT_TRUE(icLookupAttr(*caches, 1, b.layoutId()).isErrorNotFound());
+  EXPECT_TRUE(icLookupAttr(*caches, 1, c.layoutId()).isErrorNotFound());
+  EXPECT_TRUE(icLookupAttr(*caches, 1, d.layoutId()).isErrorNotFound());
+  EXPECT_TRUE(icLookupAttr(*caches, 1, e.layoutId()).isErrorNotFound());
+
+  // Load the cache for `b'.
+  ASSERT_TRUE(
+      isIntEqualsWord(Interpreter::call1(thread_, cache_attribute, b), 400));
+  EXPECT_TRUE(icLookupAttr(*caches, 1, a.layoutId()).isSmallInt());
+  EXPECT_TRUE(icLookupAttr(*caches, 1, b.layoutId()).isSmallInt());
+  EXPECT_TRUE(icLookupAttr(*caches, 1, c.layoutId()).isErrorNotFound());
+  EXPECT_TRUE(icLookupAttr(*caches, 1, d.layoutId()).isErrorNotFound());
+  EXPECT_TRUE(icLookupAttr(*caches, 1, e.layoutId()).isErrorNotFound());
+
+  // Load the cache for `c'.
+  ASSERT_TRUE(
+      isIntEqualsWord(Interpreter::call1(thread_, cache_attribute, c), 400));
+  EXPECT_TRUE(icLookupAttr(*caches, 1, a.layoutId()).isSmallInt());
+  EXPECT_TRUE(icLookupAttr(*caches, 1, b.layoutId()).isSmallInt());
+  EXPECT_TRUE(icLookupAttr(*caches, 1, c.layoutId()).isSmallInt());
+  EXPECT_TRUE(icLookupAttr(*caches, 1, d.layoutId()).isErrorNotFound());
+  EXPECT_TRUE(icLookupAttr(*caches, 1, e.layoutId()).isErrorNotFound());
+
+  // Load the cache for `d'.
+  ASSERT_TRUE(
+      isIntEqualsWord(Interpreter::call1(thread_, cache_attribute, d), 400));
+  EXPECT_TRUE(icLookupAttr(*caches, 1, a.layoutId()).isSmallInt());
+  EXPECT_TRUE(icLookupAttr(*caches, 1, b.layoutId()).isSmallInt());
+  EXPECT_TRUE(icLookupAttr(*caches, 1, c.layoutId()).isSmallInt());
+  EXPECT_TRUE(icLookupAttr(*caches, 1, d.layoutId()).isSmallInt());
+  EXPECT_TRUE(icLookupAttr(*caches, 1, e.layoutId()).isErrorNotFound());
+
+  // Empty the cache and add `e'.
+  ASSERT_TRUE(
+      isIntEqualsWord(Interpreter::call1(thread_, cache_attribute, e), 400));
+  EXPECT_TRUE(icLookupAttr(*caches, 1, a.layoutId()).isErrorNotFound());
+  EXPECT_TRUE(icLookupAttr(*caches, 1, b.layoutId()).isErrorNotFound());
+  EXPECT_TRUE(icLookupAttr(*caches, 1, c.layoutId()).isErrorNotFound());
+  EXPECT_TRUE(icLookupAttr(*caches, 1, d.layoutId()).isErrorNotFound());
+  EXPECT_TRUE(icLookupAttr(*caches, 1, e.layoutId()).isSmallInt());
+}
+
 TEST_F(InterpreterTest, StoreAttrCachedInsertsExecutingFunctionAsDependent) {
   EXPECT_FALSE(runFromCStr(runtime_, R"(
 class C:

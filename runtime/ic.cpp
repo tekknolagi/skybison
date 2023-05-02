@@ -80,14 +80,23 @@ ICState icUpdateAttr(Thread* thread, const MutableTuple& caches, word cache,
   }
   RawMutableTuple polymorphic_cache =
       MutableTuple::cast(caches.at(index + kIcEntryValueOffset));
+  bool found = false;
   for (word j = 0; j < kIcPointersPerPolyCache; j += kIcPointersPerEntry) {
     entry_key = polymorphic_cache.at(j + kIcEntryKeyOffset);
     if (entry_key.isNoneType() || entry_key == key) {
       polymorphic_cache.atPut(j + kIcEntryKeyOffset, key);
       polymorphic_cache.atPut(j + kIcEntryValueOffset, *value);
       insertDependencyForTypeLookupInMro(thread, layout_id, name, dependent);
+      found = true;
       break;
     }
+  }
+  if (!found) {
+    // Start over. Empty the cache.
+    polymorphic_cache.fill(NoneType::object());
+    polymorphic_cache.atPut(kIcEntryKeyOffset, key);
+    polymorphic_cache.atPut(kIcEntryValueOffset, *value);
+    insertDependencyForTypeLookupInMro(thread, layout_id, name, dependent);
   }
   return ICState::kPolymorphic;
 }
