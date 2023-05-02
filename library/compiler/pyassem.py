@@ -600,7 +600,7 @@ class PyFlowGraph(FlowGraph):
         num_locals = len(self.varnames)
         Top = 2**num_locals - 1
         # map of block id -> assignment state in lattice
-        live_out = [Top] * self.block_count
+        assigned_out = [Top] * self.block_count
         conditionally_assigned = set()
         argcount = (
             len(self.args)
@@ -623,31 +623,31 @@ class PyFlowGraph(FlowGraph):
         def process_one_block(block, modify=False):
             bid = block.bid
             if len(preds[bid]) == 0:
-                # No preds; all parameters are live-in
-                currently_alive = ArgsAssigned
+                # No preds; all parameters are assigned
+                assigned = ArgsAssigned
             else:
-                # Meet the live-out sets of all predecessors
-                currently_alive = meet(live_out[pred] for pred in preds[bid])
+                # Meet the assigned sets of all predecessors
+                assigned = meet(assigned_out[pred] for pred in preds[bid])
             for instr in block.getInstructions():
                 if modify and instr.opname == "LOAD_FAST":
-                    if currently_alive & (1 << instr.ioparg):
+                    if assigned & (1 << instr.ioparg):
                         instr.opname = "LOAD_FAST_REVERSE_UNCHECKED"
                         instr.ioparg = reverse_local_idx(instr.ioparg)
                     elif instr.ioparg >= argcount:
                         # Exclude arguments because they come into the function
-                        # body live. Anything that makes them no longer live
-                        # will have to be DELETE_FAST.
+                        # body assigned. The only thing that can undefine them
+                        # is DELETE_FAST.
                         conditionally_assigned.add(instr.oparg)
                 elif instr.opname == "STORE_FAST":
-                    currently_alive |= 1 << instr.ioparg
+                    assigned |= 1 << instr.ioparg
                     if modify:
                         instr.opname = "STORE_FAST_REVERSE"
                         instr.ioparg = reverse_local_idx(instr.ioparg)
                 elif instr.opname == "DELETE_FAST":
-                    currently_alive &= ~(1 << instr.ioparg)
-            if currently_alive == live_out[block.bid]:
+                    assigned &= ~(1 << instr.ioparg)
+            if assigned == assigned_out[bid]:
                 return False
-            live_out[block.bid] = currently_alive
+            assigned_out[bid] = assigned
             return True
 
         changed = True
