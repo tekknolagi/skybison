@@ -618,10 +618,9 @@ void emitGetLayoutId(EmitEnv* env, Register r_dst, Register r_obj) {
   __ bind(&done);
 }
 
-void emitJumpIfNotHeapObjectWithLayoutId(EmitEnv* env, Register r_obj,
-                                         LayoutId layout_id, Label* target) {
-  emitJumpIfImmediate(env, r_obj, target, Assembler::kNearJump);
-
+// Assumes r_obj is a HeapObject.
+void emitJumpIfNotHasLayoutId(EmitEnv* env, Register r_obj, LayoutId layout_id,
+                              Label* target) {
   // It is a HeapObject.
   ScratchReg r_scratch(env);
   static_assert(RawHeader::kLayoutIdOffset + Header::kLayoutIdBits <= 32,
@@ -633,6 +632,14 @@ void emitJumpIfNotHeapObjectWithLayoutId(EmitEnv* env, Register r_obj,
   __ cmpl(r_scratch, Immediate(static_cast<word>(layout_id)
                                << RawHeader::kLayoutIdOffset));
   __ jcc(NOT_EQUAL, target, Assembler::kNearJump);
+}
+
+void emitJumpIfNotHeapObjectWithLayoutId(EmitEnv* env, Register r_obj,
+                                         LayoutId layout_id, Label* target) {
+  emitJumpIfImmediate(env, r_obj, target, Assembler::kNearJump);
+
+  // It is a HeapObject.
+  emitJumpIfNotHasLayoutId(env, r_obj, layout_id, target);
 }
 
 // Convert the given register from a SmallInt to an int.
@@ -1212,6 +1219,48 @@ void emitHandler<LOAD_ATTR_INSTANCE>(EmitEnv* env) {
 
   __ bind(&slow_path);
   __ pushq(r_base);
+  if (env->in_jit) {
+    emitJumpToDeopt(env);
+    return;
+  }
+  emitJumpToGenericHandler(env);
+}
+
+static void emitJumpIfNotTypeHasFlag(EmitEnv* env, Register r_type,
+                                     Type::Flag flag, Label* target) {
+  ScratchReg r_flags(env);
+  __ movq(r_flags, Address(r_type, heapObjectDisp(Type::kFlagsOffset)));
+  __ andq(r_flags, smallIntImmediate(flag));
+  __ jcc(ZERO, target, Assembler::kNearJump);
+}
+
+template <>
+void emitHandler<LOAD_TYPE>(EmitEnv* env) {
+  ScratchReg r_receiver(env);
+  ScratchReg r_layout_id(env);
+  ScratchReg r_result(env);
+  Label slow_path;
+  __ popq(r_receiver);
+  emitGetLayoutId(env, r_layout_id, r_receiver);
+  // Load thread->runtime()
+  __ movq(r_result, Address(env->thread, Thread::runtimeOffset()));
+  // Load runtime->layouts_
+  __ movq(r_result, Address(r_result, Runtime::layoutsOffset()));
+  // Load layouts_[r_layout_id]
+  __ movq(r_result, Address(r_result, r_layout_id, TIMES_4, heapObjectDisp(0)));
+  // Load layout.describedType()
+  __ movq(r_result,
+          Address(r_result, heapObjectDisp(Layout::kDescribedTypeOffset)));
+  // if (!r_result.isType()) { bail out }
+  emitJumpIfNotHasLayoutId(env, r_result, LayoutId::kType, &slow_path);
+  // if (!r_result.hasFlag(Type::Flag::kHasObjectDunderClass)) { bail out }
+  emitJumpIfNotTypeHasFlag(env, r_result, Type::Flag::kHasObjectDunderClass,
+                           &slow_path);
+  __ pushq(r_result);
+  emitNextOpcode(env);
+
+  __ bind(&slow_path);
+  __ pushq(r_receiver);
   if (env->in_jit) {
     emitJumpToDeopt(env);
     return;
