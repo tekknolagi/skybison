@@ -6737,6 +6737,238 @@ c = C()
   EXPECT_TRUE(isIntEqualsWord(Interpreter::call0(thread_, test_function), 70));
 }
 
+TEST_F(InterpreterTest, LoadMethodCachedModuleFunction) {
+  EXPECT_FALSE(runFromCStr(runtime_, R"(
+import sys
+
+class C:
+  def getdefaultencoding(self):
+    return "no-utf8"
+
+def test(obj):
+  return obj.getdefaultencoding()
+
+cached = sys.getdefaultencoding
+obj = C()
+)")
+                   .isError());
+  HandleScope scope(thread_);
+  Function test_function(&scope, mainModuleAt(runtime_, "test"));
+  Function expected_value(&scope, mainModuleAt(runtime_, "cached"));
+  MutableBytes bytecode(&scope, test_function.rewrittenBytecode());
+  ASSERT_EQ(rewrittenBytecodeOpAt(bytecode, 1), LOAD_METHOD_ANAMORPHIC);
+  ASSERT_EQ(rewrittenBytecodeOpAt(bytecode, 2), CALL_METHOD);
+
+  // Cache miss.
+  Module sys_module(&scope, runtime_->findModuleById(ID(sys)));
+  MutableTuple caches(&scope, test_function.caches());
+  word cache_index =
+      rewrittenBytecodeCacheAt(bytecode, 1) * kIcPointersPerEntry;
+  Object key(&scope, caches.at(cache_index + kIcEntryKeyOffset));
+  EXPECT_EQ(*key, NoneType::object());
+
+  // Call.
+  EXPECT_TRUE(isStrEqualsCStr(
+      Interpreter::call1(thread_, test_function, sys_module), "utf-8"));
+  EXPECT_EQ(rewrittenBytecodeOpAt(bytecode, 1), LOAD_METHOD_MODULE);
+
+  // Cache hit.
+  key = caches.at(cache_index + kIcEntryKeyOffset);
+  EXPECT_TRUE(isIntEqualsWord(*key, sys_module.id()));
+  Object value(&scope, caches.at(cache_index + kIcEntryValueOffset));
+  ASSERT_TRUE(value.isValueCell());
+  EXPECT_EQ(ValueCell::cast(*value).value(), *expected_value);
+
+  // Call.
+  EXPECT_TRUE(isStrEqualsCStr(
+      Interpreter::call1(thread_, test_function, sys_module), "utf-8"));
+
+  // Rewrite.
+  Object obj(&scope, mainModuleAt(runtime_, "obj"));
+  EXPECT_TRUE(isStrEqualsCStr(Interpreter::call1(thread_, test_function, obj),
+                              "no-utf8"));
+  EXPECT_EQ(rewrittenBytecodeOpAt(bytecode, 1), LOAD_METHOD_INSTANCE_FUNCTION);
+  key = caches.at(cache_index + kIcEntryKeyOffset);
+  EXPECT_FALSE(key.isValueCell());
+}
+
+TEST_F(InterpreterTest,
+       LoadMethodWithModuleAndNonFunctionRewritesToLoadMethodModule) {
+  EXPECT_FALSE(runFromCStr(runtime_, R"(
+import sys
+
+class C:
+  def __call__(self):
+    return 123
+
+mymodule = type(sys)("mymodule")
+mymodule.getdefaultencoding = C()
+
+def test(obj):
+  return obj.getdefaultencoding()
+)")
+                   .isError());
+  HandleScope scope(thread_);
+  Function test_function(&scope, mainModuleAt(runtime_, "test"));
+  MutableBytes bytecode(&scope, test_function.rewrittenBytecode());
+  Module mymodule(&scope, mainModuleAt(runtime_, "mymodule"));
+  ASSERT_EQ(rewrittenBytecodeOpAt(bytecode, 1), LOAD_METHOD_ANAMORPHIC);
+  ASSERT_EQ(rewrittenBytecodeOpAt(bytecode, 2), CALL_METHOD);
+
+  // Cache miss.
+  MutableTuple caches(&scope, test_function.caches());
+  word cache_index =
+      rewrittenBytecodeCacheAt(bytecode, 1) * kIcPointersPerEntry;
+  Object key(&scope, caches.at(cache_index + kIcEntryKeyOffset));
+  EXPECT_EQ(*key, NoneType::object());
+
+  // Call.
+  EXPECT_TRUE(isIntEqualsWord(
+      Interpreter::call1(thread_, test_function, mymodule), 123));
+  EXPECT_EQ(rewrittenBytecodeOpAt(bytecode, 1), LOAD_METHOD_MODULE);
+}
+
+TEST_F(InterpreterTest, LoadMethodModuleGetsEvicted) {
+  EXPECT_FALSE(runFromCStr(runtime_, R"(
+import sys
+
+def test(obj):
+  return obj.getdefaultencoding()
+)")
+                   .isError());
+  HandleScope scope(thread_);
+  Function test_function(&scope, mainModuleAt(runtime_, "test"));
+  MutableBytes bytecode(&scope, test_function.rewrittenBytecode());
+  ASSERT_EQ(rewrittenBytecodeOpAt(bytecode, 1), LOAD_METHOD_ANAMORPHIC);
+  ASSERT_EQ(rewrittenBytecodeOpAt(bytecode, 2), CALL_METHOD);
+
+  // Cache miss.
+  Module sys_module(&scope, runtime_->findModuleById(ID(sys)));
+  MutableTuple caches(&scope, test_function.caches());
+  word cache_index =
+      rewrittenBytecodeCacheAt(bytecode, 1) * kIcPointersPerEntry;
+  Object key(&scope, caches.at(cache_index + kIcEntryKeyOffset));
+  EXPECT_EQ(*key, NoneType::object());
+
+  // Call.
+  EXPECT_TRUE(isStrEqualsCStr(
+      Interpreter::call1(thread_, test_function, sys_module), "utf-8"));
+  EXPECT_EQ(rewrittenBytecodeOpAt(bytecode, 1), LOAD_METHOD_MODULE);
+
+  // Update module.
+  Str getdefaultencoding(
+      &scope, runtime_->internStrFromCStr(thread_, "getdefaultencoding"));
+  Object result(&scope,
+                moduleDeleteAttribute(thread_, sys_module, getdefaultencoding));
+  ASSERT_TRUE(result.isNoneType());
+
+  // Cache is empty.
+  key = caches.at(cache_index + kIcEntryKeyOffset);
+  EXPECT_TRUE(key.isNoneType());
+
+  // Cache miss.
+  EXPECT_TRUE(
+      raisedWithStr(Interpreter::call1(thread_, test_function, sys_module),
+                    LayoutId::kAttributeError,
+                    "module 'sys' has no attribute 'getdefaultencoding'"));
+
+  // Bytecode gets rewritten after next call.
+  EXPECT_EQ(rewrittenBytecodeOpAt(bytecode, 1), LOAD_METHOD_ANAMORPHIC);
+}
+
+TEST_F(InterpreterTest, LoadMethodModuleWithModuleMismatchUpdatesCache) {
+  EXPECT_FALSE(runFromCStr(runtime_, R"(
+import sys
+
+mymodule = type(sys)("mymodule")
+mymodule.getdefaultencoding = lambda: "hello"
+
+def test(obj):
+  return obj.getdefaultencoding()
+)")
+                   .isError());
+  HandleScope scope(thread_);
+  Function test_function(&scope, mainModuleAt(runtime_, "test"));
+  Module mymodule(&scope, mainModuleAt(runtime_, "mymodule"));
+  MutableBytes bytecode(&scope, test_function.rewrittenBytecode());
+  ASSERT_EQ(rewrittenBytecodeOpAt(bytecode, 1), LOAD_METHOD_ANAMORPHIC);
+  ASSERT_EQ(rewrittenBytecodeOpAt(bytecode, 2), CALL_METHOD);
+
+  // Cache miss.
+  Module sys_module(&scope, runtime_->findModuleById(ID(sys)));
+  MutableTuple caches(&scope, test_function.caches());
+  word cache_index =
+      rewrittenBytecodeCacheAt(bytecode, 1) * kIcPointersPerEntry;
+  Object key(&scope, caches.at(cache_index + kIcEntryKeyOffset));
+  EXPECT_EQ(*key, NoneType::object());
+
+  // Call.
+  EXPECT_TRUE(isStrEqualsCStr(
+      Interpreter::call1(thread_, test_function, sys_module), "utf-8"));
+  EXPECT_EQ(rewrittenBytecodeOpAt(bytecode, 1), LOAD_METHOD_MODULE);
+
+  // Cache contains sys.
+  key = caches.at(cache_index + kIcEntryKeyOffset);
+  EXPECT_TRUE(isIntEqualsWord(*key, sys_module.id()));
+
+  // Call.
+  EXPECT_TRUE(isStrEqualsCStr(
+      Interpreter::call1(thread_, test_function, mymodule), "hello"));
+  EXPECT_EQ(rewrittenBytecodeOpAt(bytecode, 1), LOAD_METHOD_MODULE);
+
+  // Cache contains mymodule.
+  key = caches.at(cache_index + kIcEntryKeyOffset);
+  EXPECT_TRUE(isIntEqualsWord(*key, mymodule.id()));
+}
+
+TEST_F(InterpreterTest, LoadMethodModuleGetsScannedInOtherEviction) {
+  EXPECT_FALSE(runFromCStr(runtime_, R"(
+import sys
+
+class C:
+  def __init__(self):
+    self.foo = 123
+
+c = C()
+
+def test(obj):
+  c.foo
+  return obj.getdefaultencoding()
+
+def invalidate():
+  C.foo = property(lambda self: 456)
+)")
+                   .isError());
+  HandleScope scope(thread_);
+  Function test_function(&scope, mainModuleAt(runtime_, "test"));
+  Function invalidate(&scope, mainModuleAt(runtime_, "invalidate"));
+  MutableBytes bytecode(&scope, test_function.rewrittenBytecode());
+  ASSERT_EQ(rewrittenBytecodeOpAt(bytecode, 4), LOAD_METHOD_ANAMORPHIC);
+  ASSERT_EQ(rewrittenBytecodeOpAt(bytecode, 5), CALL_METHOD);
+
+  // Cache miss.
+  Module sys_module(&scope, runtime_->findModuleById(ID(sys)));
+  MutableTuple caches(&scope, test_function.caches());
+  word cache_index =
+      rewrittenBytecodeCacheAt(bytecode, 4) * kIcPointersPerEntry;
+  Object key(&scope, caches.at(cache_index + kIcEntryKeyOffset));
+  EXPECT_EQ(*key, NoneType::object());
+
+  // Call.
+  EXPECT_TRUE(isStrEqualsCStr(
+      Interpreter::call1(thread_, test_function, sys_module), "utf-8"));
+  EXPECT_EQ(rewrittenBytecodeOpAt(bytecode, 4), LOAD_METHOD_MODULE);
+
+  // Evict the caches in the `test' function.
+  ASSERT_TRUE(Interpreter::call0(thread_, invalidate).isNoneType());
+
+  // The LOAD_METHOD_MODULE is not affected.
+  EXPECT_EQ(rewrittenBytecodeOpAt(bytecode, 4), LOAD_METHOD_MODULE);
+  EXPECT_TRUE(isStrEqualsCStr(
+      Interpreter::call1(thread_, test_function, sys_module), "utf-8"));
+  EXPECT_EQ(rewrittenBytecodeOpAt(bytecode, 4), LOAD_METHOD_MODULE);
+}
+
 TEST_F(InterpreterTest, LoadMethodCachedDoesNotCacheProperty) {
   HandleScope scope(thread_);
   EXPECT_FALSE(runFromCStr(runtime_, R"(

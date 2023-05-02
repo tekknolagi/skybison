@@ -120,6 +120,25 @@ void icUpdateAttrModule(Thread* thread, const MutableTuple& caches, word cache,
   icInsertDependentToValueCellDependencyLink(thread, dependent, value_cell);
 }
 
+void icUpdateMethodModule(Thread* thread, const MutableTuple& caches,
+                          word cache, const Object& receiver,
+                          const ValueCell& value_cell,
+                          const Function& dependent) {
+  DCHECK(icIsCacheEmpty(caches, cache), "cache must be empty\n");
+  HandleScope scope(thread);
+  word index = cache * kIcPointersPerEntry;
+  Module module(&scope, *receiver);
+  caches.atPut(index + kIcEntryKeyOffset, SmallInt::fromWord(module.id()));
+  caches.atPut(index + kIcEntryValueOffset, *value_cell);
+  RawMutableBytes bytecode =
+      RawMutableBytes::cast(dependent.rewrittenBytecode());
+  word pc = thread->currentFrame()->virtualPC() - kCodeUnitSize;
+  DCHECK(bytecode.byteAt(pc) == LOAD_METHOD_ANAMORPHIC,
+         "current opcode must be LOAD_METHOD_ANAMORPHIC");
+  bytecode.byteAtPut(pc, LOAD_METHOD_MODULE);
+  icInsertDependentToValueCellDependencyLink(thread, dependent, value_cell);
+}
+
 void icUpdateAttrType(Thread* thread, const MutableTuple& caches, word cache,
                       const Object& receiver, const Object& selector,
                       const Object& value, const Function& dependent) {
@@ -815,6 +834,15 @@ void icInvalidateGlobalVar(Thread* thread, const ValueCell& value_cell) {
       switch (op.bc) {
         case LOAD_ATTR_MODULE: {
           original_bc = LOAD_ATTR_ANAMORPHIC;
+          word index = op.cache * kIcPointersPerEntry;
+          if (caches.at(index + kIcEntryValueOffset) == *value_cell) {
+            caches.atPut(index + kIcEntryKeyOffset, NoneType::object());
+            caches.atPut(index + kIcEntryValueOffset, NoneType::object());
+          }
+          break;
+        }
+        case LOAD_METHOD_MODULE: {
+          original_bc = LOAD_METHOD_ANAMORPHIC;
           word index = op.cache * kIcPointersPerEntry;
           if (caches.at(index + kIcEntryValueOffset) == *value_cell) {
             caches.atPut(index + kIcEntryKeyOffset, NoneType::object());

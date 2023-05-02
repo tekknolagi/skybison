@@ -3971,6 +3971,8 @@ HANDLER_INLINE Continue Interpreter::doLoadAttrModule(Thread* thread,
       SmallInt::fromWord(receiver.rawCast<RawModule>().id()) == cache_key) {
     RawObject result = caches.at(index + kIcEntryValueOffset);
     DCHECK(result.isValueCell(), "cached value is not a value cell");
+    DCHECK(!ValueCell::cast(result).isPlaceholder(),
+           "attribute has been deleted");
     thread->stackSetTop(ValueCell::cast(result).value());
     return Continue::NEXT;
   }
@@ -5273,7 +5275,8 @@ Continue Interpreter::loadMethodUpdateCache(Thread* thread, word arg,
   Object result(&scope, thread->runtime()->attributeAtSetLocation(
                             thread, receiver, name, &kind, &location));
   if (result.isErrorException()) return Continue::UNWIND;
-  if (kind != LoadAttrKind::kInstanceFunction) {
+  if (kind != LoadAttrKind::kInstanceFunction &&
+      kind != LoadAttrKind::kModule) {
     thread->stackPush(*result);
     thread->stackSetAt(1, Unbound::object());
     return Continue::NEXT;
@@ -5281,21 +5284,44 @@ Continue Interpreter::loadMethodUpdateCache(Thread* thread, word arg,
 
   // Cache the attribute load.
   MutableTuple caches(&scope, frame->caches());
-  ICState next_ic_state = icUpdateAttr(
-      thread, caches, cache, receiver.layoutId(), location, name, dependent);
+  ICState ic_state = icCurrentState(*caches, cache);
 
-  switch (next_ic_state) {
-    case ICState::kMonomorphic:
-      rewriteCurrentBytecode(frame, LOAD_METHOD_INSTANCE_FUNCTION);
-      break;
-    case ICState::kPolymorphic:
-      rewriteCurrentBytecode(frame, LOAD_METHOD_POLYMORPHIC);
-      break;
-    case ICState::kAnamorphic:
-      UNREACHABLE("next_ic_state cannot be anamorphic");
-      break;
+  if (ic_state == ICState::kAnamorphic) {
+    switch (kind) {
+      case LoadAttrKind::kInstanceFunction:
+        rewriteCurrentBytecode(frame, LOAD_METHOD_INSTANCE_FUNCTION);
+        icUpdateAttr(thread, caches, cache, receiver.layoutId(), location, name,
+                     dependent);
+        break;
+      case LoadAttrKind::kModule: {
+        DCHECK(location.isValueCell(), "location must be ValueCell");
+        ValueCell value_cell(&scope, *location);
+        icUpdateMethodModule(thread, caches, cache, receiver, value_cell,
+                             dependent);
+        thread->stackPush(*result);
+        thread->stackSetAt(1, Unbound::object());
+        return Continue::NEXT;
+      }
+      default:
+        break;
+    }
+  } else {
+    DCHECK(currentBytecode(thread) == LOAD_METHOD_INSTANCE_FUNCTION ||
+               currentBytecode(thread) == LOAD_METHOD_MODULE ||
+               currentBytecode(thread) == LOAD_METHOD_POLYMORPHIC,
+           "unexpected opcode %s", kBytecodeNames[currentBytecode(thread)]);
+    switch (kind) {
+      case LoadAttrKind::kInstanceFunction:
+        rewriteCurrentBytecode(frame, LOAD_METHOD_POLYMORPHIC);
+        icUpdateAttr(thread, caches, cache, receiver.layoutId(), location, name,
+                     dependent);
+        break;
+      default:
+        break;
+    }
   }
-  thread->stackInsertAt(1, *location);
+  thread->stackPush(*result);
+  thread->stackSetAt(1, Unbound::object());
   return Continue::NEXT;
 }
 
@@ -5303,6 +5329,53 @@ HANDLER_INLINE Continue Interpreter::doLoadMethodAnamorphic(Thread* thread,
                                                             word arg) {
   word cache = currentCacheIndex(thread->currentFrame());
   return loadMethodUpdateCache(thread, arg, cache);
+}
+
+// This code cleans-up a monomorphic cache and prepares it for its potential
+// use as a polymorphic cache.  This code should be removed when we change the
+// structure of our caches directly accessible from a function to be monomophic
+// and to allocate the relatively uncommon polymorphic caches in a separate
+// object.
+NEVER_INLINE Continue Interpreter::retryLoadMethodCached(Thread* thread,
+                                                         word arg, word cache) {
+  // Revert the opcode, clear the cache, and retry the attribute lookup.
+  Frame* frame = thread->currentFrame();
+  if (frame->function().isCompiled()) {
+    return Continue::DEOPT;
+  }
+  rewriteCurrentBytecode(frame, LOAD_METHOD_ANAMORPHIC);
+  RawMutableTuple caches = MutableTuple::cast(frame->caches());
+  word index = cache * kIcPointersPerEntry;
+  caches.atPut(index + kIcEntryKeyOffset, NoneType::object());
+  caches.atPut(index + kIcEntryValueOffset, NoneType::object());
+  return Interpreter::loadMethodUpdateCache(thread, arg, cache);
+}
+
+HANDLER_INLINE Continue Interpreter::doLoadMethodModule(Thread* thread,
+                                                        word arg) {
+  Frame* frame = thread->currentFrame();
+  RawObject receiver = thread->stackTop();
+  RawMutableTuple caches = MutableTuple::cast(frame->caches());
+  word cache = currentCacheIndex(frame);
+  word index = cache * kIcPointersPerEntry;
+  RawObject cache_key = caches.at(index + kIcEntryKeyOffset);
+  // isInstanceOfModule() should be just as fast as isModule() in the common
+  // case. If code size or quality is an issue we can adjust this as needed
+  // based on the types that actually flow through here.
+  if (thread->runtime()->isInstanceOfModule(receiver) &&
+      // Use rawCast() to support subclasses without the overhead of a
+      // handle.
+      SmallInt::fromWord(receiver.rawCast<RawModule>().id()) == cache_key) {
+    RawObject result = caches.at(index + kIcEntryValueOffset);
+    DCHECK(result.isValueCell(), "cached value is not a value cell");
+    DCHECK(!ValueCell::cast(result).isPlaceholder(),
+           "attribute has been deleted");
+    thread->stackPush(ValueCell::cast(result).value());
+    thread->stackSetAt(1, Unbound::object());
+    return Continue::NEXT;
+  }
+  EVENT_CACHE(LOAD_METHOD_MODULE);
+  return retryLoadMethodCached(thread, arg, cache);
 }
 
 HANDLER_INLINE Continue
