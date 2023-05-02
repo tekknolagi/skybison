@@ -137,7 +137,7 @@ namespace py {
   V(UNUSED_BYTECODE_117, 117, doInvalidBytecode)                               \
   V(UNUSED_BYTECODE_118, 118, doInvalidBytecode)                               \
   V(UNUSED_BYTECODE_119, 119, doInvalidBytecode)                               \
-  V(UNUSED_BYTECODE_120, 120, doInvalidBytecode)                               \
+  V(LOAD_TYPE, 120, doLoadType)                                                \
   V(UNUSED_BYTECODE_121, 121, doInvalidBytecode)                               \
   V(SETUP_FINALLY, 122, doSetupFinally)                                        \
   V(UNUSED_BYTECODE_123, 123, doInvalidBytecode)                               \

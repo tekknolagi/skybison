@@ -6618,6 +6618,83 @@ c = C()
             *cache_attribute);
 }
 
+TEST_F(InterpreterTest, LoadAttrDunderClassRewritesToLoadType) {
+  EXPECT_FALSE(runFromCStr(runtime_, R"(
+class C:
+  pass
+
+class D:
+  @property
+  def __class__(self):
+    return 123
+
+def cache_attribute(c):
+  return c.__class__
+
+c = C()
+d = D()
+)")
+                   .isError());
+  HandleScope scope(thread_);
+  Type type_c(&scope, mainModuleAt(runtime_, "C"));
+  Object c(&scope, mainModuleAt(runtime_, "c"));
+  Function cache_attribute(&scope, mainModuleAt(runtime_, "cache_attribute"));
+  MutableBytes bytecode(&scope, cache_attribute.rewrittenBytecode());
+  ASSERT_EQ(rewrittenBytecodeOpAt(bytecode, 1), LOAD_ATTR_ANAMORPHIC);
+  MutableTuple caches(&scope, cache_attribute.caches());
+  ASSERT_EQ(caches.length(), 2 * kIcPointersPerEntry);
+
+  // Load the cache.
+  ASSERT_TRUE(icLookupAttr(*caches, 1, c.layoutId()).isErrorNotFound());
+  ASSERT_EQ(Interpreter::call1(thread_, cache_attribute, c), *type_c);
+  // It won't be in the cache.
+  EXPECT_TRUE(icLookupAttr(*caches, 1, c.layoutId()).isErrorNotFound());
+  ASSERT_EQ(rewrittenBytecodeOpAt(bytecode, 1), LOAD_TYPE);
+
+  // Verify that cache_attribute function is added as a dependent.
+  Object attr_name(&scope, Runtime::internStrFromCStr(thread_, "__class__"));
+  ValueCell value_cell(&scope, typeValueCellAt(*type_c, *attr_name));
+  ASSERT_TRUE(value_cell.dependencyLink().isWeakLink());
+  EXPECT_EQ(WeakLink::cast(value_cell.dependencyLink()).referent(),
+            *cache_attribute);
+
+  // Invalidate the cache with something that overrides __class__.
+  Object d(&scope, mainModuleAt(runtime_, "d"));
+  ASSERT_TRUE(
+      isIntEqualsWord(Interpreter::call1(thread_, cache_attribute, d), 123));
+  ASSERT_EQ(rewrittenBytecodeOpAt(bytecode, 1), LOAD_ATTR_INSTANCE_PROPERTY);
+}
+
+TEST_F(InterpreterTest, LoadAttrDunderClassWithPropertyDoesNotCache) {
+  EXPECT_FALSE(runFromCStr(runtime_, R"(
+class C:
+  @property
+  def __class__(self):
+    return 5
+
+def cache_attribute(c):
+  return c.__class__
+
+c = C()
+)")
+                   .isError());
+  HandleScope scope(thread_);
+  Object c(&scope, mainModuleAt(runtime_, "c"));
+  Function cache_attribute(&scope, mainModuleAt(runtime_, "cache_attribute"));
+  MutableBytes bytecode(&scope, cache_attribute.rewrittenBytecode());
+  ASSERT_EQ(rewrittenBytecodeOpAt(bytecode, 1), LOAD_ATTR_ANAMORPHIC);
+  MutableTuple caches(&scope, cache_attribute.caches());
+  ASSERT_EQ(caches.length(), 2 * kIcPointersPerEntry);
+
+  // Load the cache.
+  ASSERT_TRUE(icLookupAttr(*caches, 1, c.layoutId()).isErrorNotFound());
+  ASSERT_TRUE(
+      isIntEqualsWord(Interpreter::call1(thread_, cache_attribute, c), 5));
+  // It is a cached property getter, not LOAD_TYPE.
+  EXPECT_TRUE(icLookupAttr(*caches, 1, c.layoutId()).isFunction());
+  EXPECT_EQ(rewrittenBytecodeOpAt(bytecode, 1), LOAD_ATTR_INSTANCE_PROPERTY);
+}
+
 TEST_F(InterpreterTest,
        LoadAttrInstanceOnInvalidatedCacheUpdatesCacheCorrectly) {
   EXPECT_FALSE(runFromCStr(runtime_, R"(

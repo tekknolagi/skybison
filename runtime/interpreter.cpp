@@ -3546,6 +3546,19 @@ HANDLER_INLINE Continue Interpreter::doLoadName(Thread* thread, word arg) {
   return Continue::NEXT;
 }
 
+HANDLER_INLINE Continue Interpreter::doLoadType(Thread* thread, word arg) {
+  HandleScope scope(thread);
+  Object receiver(&scope, thread->stackTop());
+  Type type(&scope, thread->runtime()->typeOf(*receiver));
+  if (!type.isType() || !type.hasFlag(Type::Flag::kHasObjectDunderClass)) {
+    EVENT_CACHE(LOAD_TYPE);
+    word cache = currentCacheIndex(thread->currentFrame());
+    return retryLoadAttrCached(thread, arg, cache);
+  }
+  thread->stackSetTop(*type);
+  return Continue::NEXT;
+}
+
 HANDLER_INLINE Continue Interpreter::doBuildTuple(Thread* thread, word arg) {
   if (arg == 0) {
     thread->stackPush(thread->runtime()->emptyTuple());
@@ -3696,6 +3709,10 @@ Continue Interpreter::loadAttrUpdateCache(Thread* thread, word arg,
       case LoadAttrKind::kType:
         icUpdateAttrType(thread, caches, cache, receiver, name, location,
                          dependent);
+        break;
+      case LoadAttrKind::kDunderClass:
+        rewriteCurrentBytecode(frame, LOAD_TYPE);
+        icUpdateDunderClass(thread, receiver_layout_id, name, dependent);
         break;
       default:
         UNREACHABLE("kinds should have been handled before");

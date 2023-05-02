@@ -51,6 +51,11 @@ static void insertDependencyForTypeLookupInMro(Thread* thread,
   }
 }
 
+void icUpdateDunderClass(Thread* thread, LayoutId layout_id, const Object& name,
+                         const Object& dependent) {
+  insertDependencyForTypeLookupInMro(thread, layout_id, name, dependent);
+}
+
 ICState icUpdateAttr(Thread* thread, const MutableTuple& caches, word cache,
                      LayoutId layout_id, const Object& value,
                      const Object& name, const Function& dependent) {
