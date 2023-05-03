@@ -471,6 +471,7 @@ class Interpreter {
   static Continue doLoadMethodAnamorphic(Thread* thread, word arg);
   static Continue doLoadMethodInstanceFunction(Thread* thread, word arg);
   static Continue doLoadMethodModule(Thread* thread, word arg);
+  static Continue doLoadMethodType(Thread* thread, word arg);
   static Continue doLoadMethodPolymorphic(Thread* thread, word arg);
   static Continue doLoadName(Thread* thread, word arg);
   static Continue doLoadType(Thread* thread, word arg);

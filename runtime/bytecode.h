@@ -190,7 +190,7 @@ namespace py {
   V(UNUSED_BYTECODE_170, 170, doInvalidBytecode)                               \
   V(UNUSED_BYTECODE_171, 171, doInvalidBytecode)                               \
   V(UNUSED_BYTECODE_172, 172, doInvalidBytecode)                               \
-  V(UNUSED_BYTECODE_173, 173, doInvalidBytecode)                               \
+  V(LOAD_METHOD_TYPE, 173, doLoadMethodType)                                   \
   V(LOAD_METHOD_MODULE, 174, doLoadMethodModule)                               \
   V(CALL_FUNCTION_TYPE_INIT, 175, doCallFunctionTypeInit)                      \
   V(CALL_FUNCTION_TYPE_NEW, 176, doCallFunctionTypeNew)                        \
@@ -399,6 +399,7 @@ inline bool isByteCodeWithCache(const Bytecode bc) {
     case LOAD_METHOD_ANAMORPHIC:
     case LOAD_METHOD_INSTANCE_FUNCTION:
     case LOAD_METHOD_POLYMORPHIC:
+    case LOAD_METHOD_TYPE:
     case STORE_ATTR_INSTANCE:
     case STORE_ATTR_INSTANCE_OVERFLOW:
     case STORE_ATTR_INSTANCE_OVERFLOW_UPDATE:

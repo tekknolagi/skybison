@@ -68,6 +68,10 @@ void icUpdateMethodModule(Thread* thread, const MutableTuple& caches,
                           const ValueCell& value_cell,
                           const Function& dependent);
 
+void icUpdateMethodType(Thread* thread, const MutableTuple& caches, word cache,
+                        const Object& receiver, const ValueCell& value_cell,
+                        const Function& dependent);
+
 void icUpdateAttrType(Thread* thread, const MutableTuple& caches, word cache,
                       const Object& receiver, const Object& selector,
                       const Object& value, const Function& dependent);
@@ -351,6 +355,7 @@ class IcIterator {
       case LOAD_ATTR_ANAMORPHIC:
       case LOAD_METHOD_ANAMORPHIC:
       case LOAD_METHOD_INSTANCE_FUNCTION:
+      case LOAD_METHOD_TYPE:
       case LOAD_METHOD_POLYMORPHIC:
       case LOAD_TYPE:
       case STORE_ATTR_INSTANCE:
