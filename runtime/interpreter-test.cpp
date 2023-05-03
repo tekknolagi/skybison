@@ -6753,6 +6753,126 @@ e = E()
   EXPECT_TRUE(icLookupAttr(*caches, 1, e.layoutId()).isSmallInt());
 }
 
+TEST_F(InterpreterTest, BinOpPolymorphicRewritesEntries) {
+  EXPECT_FALSE(runFromCStr(runtime_, R"(
+class A:
+  def __add__(self, other):
+    return 123
+
+class B(A):
+  pass
+
+class C(A):
+  pass
+
+class D(A):
+  pass
+
+class E(A):
+  pass
+
+def cache_attribute(c):
+  return c + c
+
+a = A()
+b = B()
+c = C()
+d = D()
+e = E()
+)")
+                   .isError());
+  HandleScope scope(thread_);
+  Object a(&scope, mainModuleAt(runtime_, "a"));
+  Object b(&scope, mainModuleAt(runtime_, "b"));
+  Object c(&scope, mainModuleAt(runtime_, "c"));
+  Object d(&scope, mainModuleAt(runtime_, "d"));
+  Object e(&scope, mainModuleAt(runtime_, "e"));
+  Function cache_attribute(&scope, mainModuleAt(runtime_, "cache_attribute"));
+  MutableTuple caches(&scope, cache_attribute.caches());
+  ASSERT_EQ(caches.length(), kIcPointersPerEntry);
+  BinaryOpFlags flags;
+
+  // Load the cache for `a'.
+  ASSERT_TRUE(icLookupBinaryOp(*caches, 0, a.layoutId(), a.layoutId(), &flags)
+                  .isErrorNotFound());
+  ASSERT_TRUE(icLookupBinaryOp(*caches, 0, b.layoutId(), b.layoutId(), &flags)
+                  .isErrorNotFound());
+  ASSERT_TRUE(icLookupBinaryOp(*caches, 0, c.layoutId(), c.layoutId(), &flags)
+                  .isErrorNotFound());
+  ASSERT_TRUE(icLookupBinaryOp(*caches, 0, d.layoutId(), d.layoutId(), &flags)
+                  .isErrorNotFound());
+  ASSERT_TRUE(icLookupBinaryOp(*caches, 0, e.layoutId(), e.layoutId(), &flags)
+                  .isErrorNotFound());
+  ASSERT_TRUE(
+      isIntEqualsWord(Interpreter::call1(thread_, cache_attribute, a), 123));
+  EXPECT_TRUE(icLookupBinaryOp(*caches, 0, a.layoutId(), a.layoutId(), &flags)
+                  .isFunction());
+  EXPECT_TRUE(icLookupBinaryOp(*caches, 0, b.layoutId(), b.layoutId(), &flags)
+                  .isErrorNotFound());
+  EXPECT_TRUE(icLookupBinaryOp(*caches, 0, c.layoutId(), c.layoutId(), &flags)
+                  .isErrorNotFound());
+  EXPECT_TRUE(icLookupBinaryOp(*caches, 0, d.layoutId(), d.layoutId(), &flags)
+                  .isErrorNotFound());
+  EXPECT_TRUE(icLookupBinaryOp(*caches, 0, e.layoutId(), e.layoutId(), &flags)
+                  .isErrorNotFound());
+
+  // Load the cache for `b'.
+  ASSERT_TRUE(
+      isIntEqualsWord(Interpreter::call1(thread_, cache_attribute, b), 123));
+  EXPECT_TRUE(icLookupBinaryOp(*caches, 0, a.layoutId(), a.layoutId(), &flags)
+                  .isFunction());
+  EXPECT_TRUE(icLookupBinaryOp(*caches, 0, b.layoutId(), b.layoutId(), &flags)
+                  .isFunction());
+  EXPECT_TRUE(icLookupBinaryOp(*caches, 0, c.layoutId(), c.layoutId(), &flags)
+                  .isErrorNotFound());
+  EXPECT_TRUE(icLookupBinaryOp(*caches, 0, d.layoutId(), d.layoutId(), &flags)
+                  .isErrorNotFound());
+  EXPECT_TRUE(icLookupBinaryOp(*caches, 0, e.layoutId(), e.layoutId(), &flags)
+                  .isErrorNotFound());
+
+  // Load the cache for `c'.
+  ASSERT_TRUE(
+      isIntEqualsWord(Interpreter::call1(thread_, cache_attribute, c), 123));
+  EXPECT_TRUE(icLookupBinaryOp(*caches, 0, a.layoutId(), a.layoutId(), &flags)
+                  .isFunction());
+  EXPECT_TRUE(icLookupBinaryOp(*caches, 0, b.layoutId(), b.layoutId(), &flags)
+                  .isFunction());
+  EXPECT_TRUE(icLookupBinaryOp(*caches, 0, c.layoutId(), c.layoutId(), &flags)
+                  .isFunction());
+  EXPECT_TRUE(icLookupBinaryOp(*caches, 0, d.layoutId(), d.layoutId(), &flags)
+                  .isErrorNotFound());
+  EXPECT_TRUE(icLookupBinaryOp(*caches, 0, e.layoutId(), e.layoutId(), &flags)
+                  .isErrorNotFound());
+
+  // Load the cache for `d'.
+  ASSERT_TRUE(
+      isIntEqualsWord(Interpreter::call1(thread_, cache_attribute, d), 123));
+  EXPECT_TRUE(icLookupBinaryOp(*caches, 0, a.layoutId(), a.layoutId(), &flags)
+                  .isFunction());
+  EXPECT_TRUE(icLookupBinaryOp(*caches, 0, b.layoutId(), b.layoutId(), &flags)
+                  .isFunction());
+  EXPECT_TRUE(icLookupBinaryOp(*caches, 0, c.layoutId(), c.layoutId(), &flags)
+                  .isFunction());
+  EXPECT_TRUE(icLookupBinaryOp(*caches, 0, d.layoutId(), d.layoutId(), &flags)
+                  .isFunction());
+  EXPECT_TRUE(icLookupBinaryOp(*caches, 0, e.layoutId(), e.layoutId(), &flags)
+                  .isErrorNotFound());
+
+  // Empty the cache and add `e'.
+  ASSERT_TRUE(
+      isIntEqualsWord(Interpreter::call1(thread_, cache_attribute, e), 123));
+  EXPECT_TRUE(icLookupBinaryOp(*caches, 0, a.layoutId(), a.layoutId(), &flags)
+                  .isErrorNotFound());
+  EXPECT_TRUE(icLookupBinaryOp(*caches, 0, b.layoutId(), b.layoutId(), &flags)
+                  .isErrorNotFound());
+  EXPECT_TRUE(icLookupBinaryOp(*caches, 0, c.layoutId(), c.layoutId(), &flags)
+                  .isErrorNotFound());
+  EXPECT_TRUE(icLookupBinaryOp(*caches, 0, d.layoutId(), d.layoutId(), &flags)
+                  .isErrorNotFound());
+  EXPECT_TRUE(icLookupBinaryOp(*caches, 0, e.layoutId(), e.layoutId(), &flags)
+                  .isFunction());
+}
+
 TEST_F(InterpreterTest, StoreAttrCachedInsertsExecutingFunctionAsDependent) {
   EXPECT_FALSE(runFromCStr(runtime_, R"(
 class C:
