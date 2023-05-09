@@ -1034,9 +1034,12 @@ static RawObject strLowerASCII(Thread* thread, const Str& str, word length) {
   Runtime* runtime = thread->runtime();
   MutableBytes result(&scope, runtime->newMutableBytesUninitialized(length));
   result.replaceFromWithStr(0, *str, first_uppercase);
-  for (word i = first_uppercase; i < length; i++) {
-    byte lower = ASCII::toLower(str.byteAt(i));
-    result.byteAtPut(i, lower);
+  {
+    RawLargeStr str_raw = LargeStr::cast(*str);
+    for (word i = first_uppercase; i < length; i++) {
+      byte lower = ASCII::toLower(str_raw.byteAt(i));
+      result.byteAtPut(i, lower);
+    }
   }
   return result.becomeStr();
 }
