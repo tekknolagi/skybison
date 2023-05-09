@@ -1035,6 +1035,36 @@ RawObject METH(str, __len__)(Thread* thread, Arguments args) {
   return SmallInt::fromWord(self.codePointLength());
 }
 
+// From https://github.com/WojciechMula/toys/tree/master/changecase_swar, which
+// is BSD 2-clause.
+#define packed_byte(b) ((uint64_t(b) & 0xff) * 0x0101010101010101u)
+
+static inline bool is_ascii(uint64_t chars) {
+  return (chars & packed_byte(0x80)) == 0;
+}
+
+static inline uint64_t to_lower_ascii_mask(uint64_t chars) {
+  DCHECK(is_ascii(chars), "not given ascii");
+  // Note: MSBs are used here as boolean flags
+
+  // MSB[i] is set if chars[i] is greater or equal than 'A'
+  const uint64_t A = chars + packed_byte(128 - 'A');
+  // MSB[i] is set if chars[i] is greater than 'Z' - 1
+  const uint64_t Z = chars + packed_byte(128 - 'Z' - 1);
+
+  // Now relation 'A' <= chars[i] <= 'Z' is represented as A & ~Z.
+  // However, it's not possible that MSB_A[i] is false and MSB_B[i] is true.
+  // Thanks to that expression could be simplified to A ^ Z
+  return (A ^ Z) & packed_byte(0x80);
+}
+
+static inline uint64_t to_lower_ascii(uint64_t chars) {
+  const uint64_t mask =
+      to_lower_ascii_mask(chars) >> 2;  // change case (toggle 5th bit)
+  const uint64_t result = chars ^ mask;
+  return result;
+}
+
 static RawObject strLowerASCII(Thread* thread, const Str& str, word length) {
   if (str.isSmallStr()) {
     byte buf[SmallStr::kMaxLength];
@@ -1062,10 +1092,13 @@ static RawObject strLowerASCII(Thread* thread, const Str& str, word length) {
   MutableBytes result(&scope, runtime->newMutableBytesUninitialized(length));
   result.replaceFromWithStr(0, *str, first_uppercase);
   {
-    RawLargeStr str_raw = LargeStr::cast(*str);
-    for (word i = first_uppercase; i < length; i++) {
-      byte lower = ASCII::toLower(str_raw.byteAt(i));
-      result.byteAtPut(i, lower);
+    word size_in_words = (length + kWordSize - 1) >> kWordSizeLog2;
+    const uword* src_data =
+        reinterpret_cast<const uword*>(LargeStr::cast(*str).address());
+    uword* dst_data = reinterpret_cast<uword*>(result.address());
+    for (word i = 0; i < size_in_words; i++) {
+      uword block = src_data[i];
+      dst_data[i] = to_lower_ascii(block);
     }
   }
   return result.becomeStr();
