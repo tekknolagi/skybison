@@ -7,6 +7,7 @@
 
 #include "attributedict.h"
 #include "builtins-module.h"
+#include "builtins.h"
 #include "bytes-builtins.h"
 #include "complex-builtins.h"
 #include "dict-builtins.h"
@@ -1388,6 +1389,18 @@ static Bytecode currentBytecode(Thread* thread) {
   Frame* frame = thread->currentFrame();
   word pc = frame->virtualPC() - kCodeUnitSize;
   return static_cast<Bytecode>(frame->bytecode().byteAt(pc));
+}
+
+static Bytecode previousBytecode(Thread* thread) {
+  Frame* frame = thread->currentFrame();
+  word pc = frame->virtualPC() - kCodeUnitSize - kCodeUnitSize;
+  return static_cast<Bytecode>(frame->bytecode().byteAt(pc));
+}
+
+static byte previousBytecodeArg(Thread* thread) {
+  Frame* frame = thread->currentFrame();
+  word pc = frame->virtualPC() - kCodeUnitSize - kCodeUnitSize;
+  return frame->bytecode().byteAt(pc + 1);
 }
 
 static inline word currentCacheIndex(Frame* frame) {
@@ -4508,6 +4521,124 @@ HANDLER_INLINE Continue Interpreter::doCallFunction(Thread* thread, word arg) {
   return handleCall(thread, arg, arg, preparePositionalCall, &Function::entry);
 }
 
+static bool isHasattr(RawObject callable) {
+  if (!callable.isFunction()) {
+    return false;
+  }
+  if (Function::cast(callable).entry() != builtinTrampoline) {
+    return false;
+  }
+  BuiltinFunction c_function = bit_cast<BuiltinFunction>(
+      SmallInt::cast(Function::cast(callable).stacksizeOrBuiltin())
+          .asAlignedCPtr());
+  if (c_function != FUNC(builtins, hasattr)) {
+    return false;
+  }
+  return true;
+}
+
+static Continue retryCacheHasattr(Thread* thread, word arg) {
+  DCHECK(arg == 2, "unexpected oparg change");
+  HandleScope scope(thread);
+  Object receiver(&scope, thread->stackPeek(1));
+  Frame* frame = thread->currentFrame();
+  byte const_idx = previousBytecodeArg(thread);
+  Str name(&scope,
+           Tuple::cast(Code::cast(frame->code()).consts()).at(const_idx));
+  Object location(&scope, NoneType::object());
+  LoadAttrKind kind;
+  Object result(&scope, thread->runtime()->attributeAtSetLocation(
+                            thread, receiver, name, &kind, &location));
+  if (result.isErrorException()) {
+    if (!thread->pendingExceptionMatches(LayoutId::kAttributeError)) {
+      return Continue::UNWIND;
+    }
+    thread->clearPendingException();
+    thread->stackDrop(2);
+    thread->stackSetTop(Bool::falseObj());
+    return Continue::NEXT;
+  }
+  if (location.isNoneType()) {
+    thread->stackDrop(2);
+    thread->stackSetTop(Bool::trueObj());
+    return Continue::NEXT;
+  }
+  // Cache the attribute load
+  word cache = currentCacheIndex(frame);
+  MutableTuple caches(&scope, frame->caches());
+  ICState ic_state = icCurrentState(*caches, cache);
+  Function dependent(&scope, frame->function());
+  DCHECK(ic_state == ICState::kAnamorphic, "unexpected ic state");
+  LayoutId receiver_layout_id = receiver.layoutId();
+  switch (kind) {
+    case LoadAttrKind::kInstanceOffset:
+      rewriteCurrentBytecode(frame, CALL_FUNCTION_HASATTR_INSTANCE_OFFSET);
+      // TODO(emacs): Also cache negative results?
+      icUpdateAttr(thread, caches, cache, receiver_layout_id, location, name,
+                   dependent);
+      break;
+    default:
+      break;
+  }
+  thread->stackDrop(2);
+  thread->stackSetTop(Bool::trueObj());
+  return Continue::NEXT;
+}
+
+static bool canRewriteHasattr(Thread* thread, RawObject callable, word arg) {
+  if (arg != 2) {
+    // Number of args must be 2.
+    return false;
+  }
+  if (!isHasattr(callable)) {
+    return false;
+  }
+  Bytecode previous_op = previousBytecode(thread);
+  if (previous_op != LOAD_CONST) {
+    // We only want to rewrite hasattr(x, "some_const").
+    return false;
+  }
+  // TODO(emacs): Check for or take into account EXTENDED_ARG for const index.
+  byte const_idx = previousBytecodeArg(thread);
+  Frame* frame = thread->currentFrame();
+  if (!Tuple::cast(Code::cast(frame->code()).consts()).at(const_idx).isStr()) {
+    // We only want to rewrite hasattr(x, "some_const_str").
+    return false;
+  }
+  return true;
+}
+
+HANDLER_INLINE Continue
+Interpreter::doCallFunctionHasattrInstanceOffset(Thread* thread, word arg) {
+  DCHECK(arg == 2, "unexpected oparg change");
+  Frame* frame = thread->currentFrame();
+  RawObject callable = thread->stackPeek(2);
+  if (!isHasattr(callable)) {
+    // TODO(emacs): Restrict to LOAD_GLOBAL_CACHED targets and invalidate when
+    // global cache changes. Then avoid the check on each call.
+    EVENT_CACHE(CALL_FUNCTION_HASATTR_INSTANCE_OFFSET);
+    rewriteCurrentBytecode(frame, CALL_FUNCTION);
+    return doCallFunction(thread, arg);
+  }
+  word cache = currentCacheIndex(frame);
+  RawMutableTuple caches = MutableTuple::cast(frame->caches());
+  RawObject receiver = thread->stackPeek(1);
+  bool is_found;
+  icLookupMonomorphic(caches, cache, receiver.layoutId(), &is_found);
+  if (!is_found) {
+    EVENT_CACHE(CALL_FUNCTION_HASATTR_INSTANCE_OFFSET);
+    // Empty cache.
+    word index = cache * kIcPointersPerEntry;
+    caches.atPut(index + kIcEntryKeyOffset, NoneType::object());
+    caches.atPut(index + kIcEntryValueOffset, NoneType::object());
+    return retryCacheHasattr(thread, arg);
+  }
+  // Drop receiver and name and replace callable with attribute.
+  thread->stackDrop(2);
+  thread->stackSetTop(Bool::trueObj());
+  return Continue::NEXT;
+}
+
 HANDLER_INLINE Continue Interpreter::doCallFunctionAnamorphic(Thread* thread,
                                                               word arg) {
   Frame* frame = thread->currentFrame();
@@ -4517,6 +4648,9 @@ HANDLER_INLINE Continue Interpreter::doCallFunctionAnamorphic(Thread* thread,
   if (callable.isType()) {
     word cache = currentCacheIndex(frame);
     return callFunctionTypeNewUpdateCache(thread, arg, cache);
+  }
+  if (canRewriteHasattr(thread, callable, arg)) {
+    return retryCacheHasattr(thread, arg);
   }
   rewriteCurrentBytecode(frame, CALL_FUNCTION);
   return doCallFunction(thread, arg);
