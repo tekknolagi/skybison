@@ -1018,9 +1018,12 @@ static RawObject strLowerASCII(Thread* thread, const Str& str, word length) {
   }
   // Search for the first uppercase character.
   word first_uppercase = 0;
-  for (; first_uppercase < length; first_uppercase++) {
-    if (ASCII::isUpper(str.byteAt(first_uppercase))) {
-      break;
+  {
+    RawLargeStr str_raw = LargeStr::cast(*str);
+    for (; first_uppercase < length; first_uppercase++) {
+      if (ASCII::isUpper(str_raw.byteAt(first_uppercase))) {
+        break;
+      }
     }
   }
   if (first_uppercase >= length) {
