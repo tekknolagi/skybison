@@ -1008,8 +1008,8 @@ RawObject METH(str, __len__)(Thread* thread, Arguments args) {
   return SmallInt::fromWord(self.codePointLength());
 }
 
-static RawObject strLowerASCII(Thread* thread, Object& str_obj, Str& str,
-                               word length) {
+static RawObject strLowerASCII(Thread* thread, const Object& str_obj,
+                               const Str& str, word length) {
   if (str.isSmallStr()) {
     byte buf[SmallStr::kMaxLength];
     for (word i = 0; i < length; i++) {
