@@ -1008,8 +1008,7 @@ RawObject METH(str, __len__)(Thread* thread, Arguments args) {
   return SmallInt::fromWord(self.codePointLength());
 }
 
-static RawObject strLowerASCII(Thread* thread, const Object& str_obj,
-                               const Str& str, word length) {
+static RawObject strLowerASCII(Thread* thread, const Str& str, word length) {
   if (str.isSmallStr()) {
     byte buf[SmallStr::kMaxLength];
     for (word i = 0; i < length; i++) {
@@ -1024,8 +1023,8 @@ static RawObject strLowerASCII(Thread* thread, const Object& str_obj,
       break;
     }
   }
-  if (first_uppercase >= length && str_obj.isStr()) {
-    return *str_obj;
+  if (first_uppercase >= length) {
+    return *str;
   }
 
   HandleScope scope(thread);
@@ -1049,7 +1048,7 @@ RawObject METH(str, casefold)(Thread* thread, Arguments args) {
   Str self(&scope, strUnderlying(*self_obj));
   word length = self.length();
   if (self.isASCII()) {
-    return strLowerASCII(thread, self_obj, self, length);
+    return strLowerASCII(thread, self, length);
   }
 
   // Search for the first uppercase character.
@@ -1095,7 +1094,7 @@ RawObject METH(str, lower)(Thread* thread, Arguments args) {
   Str self(&scope, strUnderlying(*self_obj));
   word length = self.length();
   if (self.isASCII()) {
-    return strLowerASCII(thread, self_obj, self, length);
+    return strLowerASCII(thread, self, length);
   }
 
   // Search for the first uppercase character.
