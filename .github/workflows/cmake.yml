@@ -32,11 +32,13 @@ jobs:
         rm -rf bin/python-tests
         rm -rf third-party/cpython/cpython-tests
         strip bin/python
-    # TODO(max): tar it instead of manually changing permissions
+    - name: Tar it
+      working-directory: ${{github.workspace}}
+      run: tar -czf prev-build.tar.gz build
     - uses: actions/upload-artifact@v3
       with:
         name: prev-build
-        path: ${{github.workspace}}/build
+        path: ${{github.workspace}}/prev-build.tar.gz
 
   build:
     strategy:
@@ -102,13 +104,15 @@ jobs:
       working-directory: ${{github.workspace}}
       run: cp -r benchmarks build
 
-    # TODO(max): tar it instead of manually changing permissions
+    - name: Tar it
+      working-directory: ${{github.workspace}}
+      run: tar -czf curr-build.tar.gz build
 
     - uses: actions/upload-artifact@v3
       if: ${{ github.event_name == 'pull_request' && matrix.BUILD_TYPE == 'RelWithDebInfo' }}
       with:
         name: curr-build
-        path: ${{github.workspace}}/build
+        path: ${{github.workspace}}/curr-build.tar.gz
 
   benchmark:
     if: ${{ github.event_name == 'pull_request' }}
@@ -122,18 +126,18 @@ jobs:
     - uses: actions/download-artifact@v3
       with:
         name: prev-build
-        path: prev-build
+        path: ${{github.workspace}}
 
     - uses: actions/download-artifact@v3
       with:
         name: curr-build
-        path: curr-build
+        path: ${{github.workspace}}
 
-    - name: Mark binaries executable
+    - name: Unpack artifacts
       working-directory: ${{github.workspace}}
       run: |
-        chmod +x prev-build/bin/python
-        chmod +x curr-build/bin/python
+        tar -xzf curr-build.tar.gz
+        tar -xzf prev-build.tar.gz
 
     - name: Install valgrind
       run: sudo apt install -y valgrind
