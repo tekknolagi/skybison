@@ -141,7 +141,7 @@ jobs:
     - name: Run benchmarks
       working-directory: ${{github.workspace}}
       run: |
-        ./benchmarks/run.py --tool callgrind --json \
+        ./curr-build/benchmarks/run.py --tool callgrind --json \
           --interpreter prev-build/bin/python --interpreter-name python_base --path $(pwd)/curr-build/benchmarks/benchmarks \
           --interpreter curr-build/bin/python --interpreter-name python_new --path $(pwd)/curr-build/benchmarks/benchmarks \
           --interpreter $(which python3.8) --interpreter-name fbcode-cpython --path $(pwd)/curr-build/benchmarks/benchmarks \
@@ -150,7 +150,7 @@ jobs:
     - name: Format benchmark results
       working-directory: ${{github.workspace}}
       run: |
-        ./benchmarks/format_results.py benchmark-results.json > benchmark-results.md
+        ./curr-build/benchmarks/format_results.py benchmark-results.json > benchmark-results.md
 
     - name: Comment on Pull Request
       uses: actions/github-script@v5
