@@ -4638,6 +4638,17 @@ HANDLER_INLINE Continue Interpreter::doBuildSlice(Thread* thread, word arg) {
   return Continue::NEXT;
 }
 
+HANDLER_INLINE Continue Interpreter::doLoadSliceCached(Thread* thread, word) {
+  Frame* frame = thread->currentFrame();
+  RawMutableTuple caches = MutableTuple::cast(frame->caches());
+  word cache = currentCacheIndex(frame);
+  word index = cache * kIcPointersPerEntry;
+  RawObject slice = caches.at(index + kIcEntryValueOffset);
+  DCHECK(slice.isSlice(), "expected to have a slice in the cache");
+  thread->stackPush(slice);
+  return Continue::NEXT;
+}
+
 HANDLER_INLINE Continue Interpreter::doLoadClosure(Thread* thread, word arg) {
   Frame* frame = thread->currentFrame();
   RawCode code = Code::cast(frame->code());

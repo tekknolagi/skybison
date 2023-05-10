@@ -151,7 +151,7 @@ namespace py {
   V(CALL_FUNCTION, 131, doCallFunction)                                        \
   V(MAKE_FUNCTION, 132, doMakeFunction)                                        \
   V(BUILD_SLICE, 133, doBuildSlice)                                            \
-  V(UNUSED_BYTECODE_134, 134, doInvalidBytecode)                               \
+  V(LOAD_SLICE_CACHED, 134, doLoadSliceCached)                                 \
   V(LOAD_CLOSURE, 135, doLoadClosure)                                          \
   V(LOAD_DEREF, 136, doLoadDeref)                                              \
   V(STORE_DEREF, 137, doStoreDeref)                                            \
@@ -334,6 +334,7 @@ struct BytecodeOp {
   Bytecode bc;
   int32_t arg;
   uint16_t cache;
+  word index;
 };
 
 BytecodeOp nextBytecodeOp(const MutableBytes& bytecode, word* index);
