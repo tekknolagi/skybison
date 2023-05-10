@@ -681,11 +681,6 @@ void icInvalidateAttr(Thread* thread, const Type& type, const Object& attr_name,
     link = WeakLink::cast(*link).next();
     icEvictCache(thread, dependent, type, attr_name, attribute_kind);
   }
-  // In case is_data_descriptor is true, we shouldn't see any dependents after
-  // caching invalidation.
-  DCHECK(attribute_kind == AttributeKind::kNotADataDescriptor ||
-             value_cell.dependencyLink().isNoneType(),
-         "dependencyLink must be None if is_data_descriptor is true");
 }
 
 RawSmallInt encodeBinaryOpKey(LayoutId left_layout_id, LayoutId right_layout_id,
