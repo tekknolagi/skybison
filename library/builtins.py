@@ -5891,7 +5891,7 @@ class reversed(metaclass=_non_heaptype):
     def __iter__(self):
         return self
 
-    def __new__(cls, seq, **kwargs):
+    def __new__(cls, seq):
         dunder_reversed = _object_type_getattr(seq, "__reversed__")
         if dunder_reversed is None:
             raise TypeError(f"'{_type(seq).__name__}' object is not reversible")
