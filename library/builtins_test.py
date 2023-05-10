@@ -10216,6 +10216,16 @@ class ReversedTests(unittest.TestCase):
             reversed(C())
         self.assertEqual(str(context.exception), "'C' object is not reversible")
 
+    def test_dunder_new_with_kwargs_raises_type_error(self):
+        class C:
+            pass
+
+        with self.assertRaises(TypeError) as context:
+            reversed.__new__(reversed, [], foo=123)
+        # TODO(emacs): Make error message for unexpected keyword arguments more
+        # descriptive.
+        self.assertIn("arguments", str(context.exception))
+
     def test_reversed_iterates_backwards_over_iterable(self):
         it = reversed([1, 2, 3])
         self.assertEqual(it.__next__(), 3)
