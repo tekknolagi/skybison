@@ -300,6 +300,33 @@ static bool isLineBreak(int32_t c) {
   }
 }
 
+RawObject strSplitChar(Thread* thread, const Str& str, byte sep,
+                       word maxsplit) {
+  Runtime* runtime = thread->runtime();
+  HandleScope scope(thread);
+  word num_splits =
+      std::min(strCountCharFromTo(str, sep, 0, str.length()), maxsplit);
+  word result_len = num_splits + 1;
+  MutableTuple result_items(&scope, runtime->newMutableTuple(result_len));
+  word last_idx = 0;
+  for (word i = 0, result_idx = 0; result_idx < num_splits;) {
+    if (str.byteAt(i) == sep) {
+      result_items.atPut(result_idx++,
+                         strSubstr(thread, str, last_idx, i - last_idx));
+      i++;
+      last_idx = i;
+    } else {
+      i++;
+    }
+  }
+  result_items.atPut(num_splits,
+                     strSubstr(thread, str, last_idx, str.length() - last_idx));
+  List result(&scope, runtime->newList());
+  result.setItems(*result_items);
+  result.setNumItems(result_len);
+  return *result;
+}
+
 RawObject strSplit(Thread* thread, const Str& str, const Str& sep,
                    word maxsplit) {
   Runtime* runtime = thread->runtime();

@@ -5519,6 +5519,9 @@ RawObject FUNC(_builtins, _str_split)(Thread* thread, Arguments args) {
   if (maxsplit < 0) {
     maxsplit = kMaxWord;
   }
+  if (sep.length() == 1) {
+    return strSplitChar(thread, self, sep.byteAt(0), maxsplit);
+  }
   return strSplit(thread, self, sep, maxsplit);
 }
 

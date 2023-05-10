@@ -99,6 +99,12 @@ RawObject strStripSpaceRight(Thread* thread, const Str& src);
 RawObject strSplit(Thread* thread, const Str& str, const Str& sep,
                    word maxsplit);
 
+// Splits the string `str` into substrings delimited by the byte `sep`.
+// `maxsplit` limits the number of substrings that will be generated.
+//
+// Returns a list of strings
+RawObject strSplitChar(Thread* thread, const Str& str, byte sep, word maxsplit);
+
 // Split the string into logical lines using \r, \n, and other end-of-line
 // markers. keepends == true keeps the newline characters, keepends == false
 // does not.
