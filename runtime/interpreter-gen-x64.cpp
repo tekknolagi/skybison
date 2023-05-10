@@ -792,6 +792,11 @@ void emitAttrWithOffset(EmitEnv* env, void (Assembler::*asm_op)(Address),
 }
 
 template <>
+void emitHandler<NOP>(EmitEnv* env) {
+  emitNextOpcodeFallthrough(env);
+}
+
+template <>
 void emitHandler<BINARY_ADD_SMALLINT>(EmitEnv* env) {
   ScratchReg r_right(env);
   ScratchReg r_left(env);
