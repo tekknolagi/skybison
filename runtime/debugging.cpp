@@ -550,6 +550,15 @@ std::ostream& operator<<(std::ostream& os, RawValueCell value) {
   return os;
 }
 
+std::ostream& operator<<(std::ostream& os, RawWeakLink value) {
+  os << std::hex;
+  os << "<_weaklink 0x" << value.raw() << " referent=" << value.referent()
+     << ", next=0x" << value.next().raw() << ", prev=0x" << value.prev().raw()
+     << ">";
+  os << std::dec;
+  return os;
+}
+
 static void dumpSingleFrame(Thread* thread, std::ostream& os, Frame* frame,
                             RawObject* stack_pointer) {
   if (const char* invalid = frame->isInvalid()) {
@@ -730,6 +739,9 @@ static bool dumpSimple(std::ostream& os, RawObject value) {
       return true;
     case LayoutId::kValueCell:
       os << ValueCell::cast(value);
+      return true;
+    case LayoutId::kWeakLink:
+      os << WeakLink::cast(value);
       return true;
     default:
       return false;

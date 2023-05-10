@@ -856,6 +856,20 @@ TEST_F(DebuggingTests, FormatValueCellPlaceHolder) {
   EXPECT_EQ(ss.str(), "<value_cell placeholder>");
 }
 
+TEST_F(DebuggingTests, FormatWeakLink) {
+  HandleScope scope(thread_);
+  Object referent(&scope, NoneType::object());
+  Object prev(&scope, SmallInt::fromWord(1));
+  Object next(&scope, SmallInt::fromWord(2));
+  Object link(&scope, runtime_->newWeakLink(thread_, referent, prev, next));
+  std::stringstream ss;
+  ss << link;
+  std::stringstream expected;
+  expected << "<_weaklink 0x" << std::hex << link.raw() << std::dec
+           << " referent=None, next=0x4, prev=0x2>";
+  EXPECT_EQ(ss.str(), expected.str());
+}
+
 TEST_F(DebuggingTests, FormatThreadDumpsPendingException) {
   thread_->raiseWithFmt(LayoutId::kValueError, "foo");
   std::stringstream ss;
