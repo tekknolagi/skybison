@@ -2178,5 +2178,63 @@ object_getattribute = object.__getattribute__
   EXPECT_TRUE(x.hasFlag(Type::Flag::kHasObjectDunderGetattribute));
 }
 
+TEST_F(IcTest, IcInvalidateTypeHierarchy) {
+  ASSERT_FALSE(runFromCStr(runtime_, R"(
+class A:
+  def __init__(self):
+    self.foo = 400
+
+class B(A):
+  pass
+
+def cache_attribute(c):
+  return c.foo
+
+def invalidate():
+  A.foo = property(lambda self: 123)
+
+a = A()
+b = B()
+a_init = A.__init__
+)")
+                   .isError());
+  HandleScope scope(thread_);
+  Function a_init(&scope, mainModuleAt(runtime_, "a_init"));
+  Function cache_attribute(&scope, mainModuleAt(runtime_, "cache_attribute"));
+  Type type_a(&scope, mainModuleAt(runtime_, "A"));
+  Type type_b(&scope, mainModuleAt(runtime_, "B"));
+  Object obj_a(&scope, mainModuleAt(runtime_, "a"));
+  Object obj_b(&scope, mainModuleAt(runtime_, "b"));
+  Object foo_name(&scope, Runtime::internStrFromCStr(thread_, "foo"));
+  ValueCell foo_in_a(&scope, typeValueCellAt(*type_a, *foo_name));
+  ValueCell foo_in_b(&scope, typeValueCellAt(*type_b, *foo_name));
+
+  // We've called __init__ already so it should be a dependent.
+  EXPECT_TRUE(icDependentIncluded(*a_init, foo_in_a.dependencyLink()));
+  EXPECT_TRUE(icDependentIncluded(*a_init, foo_in_b.dependencyLink()));
+  EXPECT_FALSE(icDependentIncluded(*cache_attribute, foo_in_a.dependencyLink()));
+  EXPECT_FALSE(icDependentIncluded(*cache_attribute, foo_in_b.dependencyLink()));
+
+  // Cache an attribute elsewhere.
+  ASSERT_TRUE(isIntEqualsWord(Interpreter::call1(thread_, cache_attribute, obj_a), 400));
+  ASSERT_TRUE(isIntEqualsWord(Interpreter::call1(thread_, cache_attribute, obj_b), 400));
+
+  // That function should be a dependent too.
+  EXPECT_TRUE(icDependentIncluded(*a_init, foo_in_a.dependencyLink()));
+  EXPECT_TRUE(icDependentIncluded(*a_init, foo_in_b.dependencyLink()));
+  EXPECT_TRUE(icDependentIncluded(*cache_attribute, foo_in_a.dependencyLink()));
+  EXPECT_TRUE(icDependentIncluded(*cache_attribute, foo_in_b.dependencyLink()));
+
+  // Invalidate the attribute.
+  Function invalidate(&scope, mainModuleAt(runtime_, "invalidate"));
+  ASSERT_TRUE(Interpreter::call0(thread_, invalidate).isNoneType());
+
+  EXPECT_FALSE(icDependentIncluded(*a_init, foo_in_a.dependencyLink()));
+  EXPECT_FALSE(icDependentIncluded(*a_init, foo_in_b.dependencyLink()));
+  // TODO(#269): Change to EXPECT_FALSE.
+  EXPECT_TRUE(icDependentIncluded(*cache_attribute, foo_in_a.dependencyLink()));
+  EXPECT_TRUE(icDependentIncluded(*cache_attribute, foo_in_b.dependencyLink()));
+}
+
 }  // namespace testing
 }  // namespace py
