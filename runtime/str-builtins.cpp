@@ -1095,7 +1095,6 @@ static RawObject strLowerASCII(Thread* thread, const Str& str, word length) {
   HandleScope scope(thread);
   Runtime* runtime = thread->runtime();
   MutableBytes result(&scope, runtime->newMutableBytesUninitialized(length));
-  result.replaceFromWithStr(0, *str, first_uppercase);
   {
     word size_in_words = (length + kWordSize - 1) >> kWordSizeLog2;
     const uword* src_data =
