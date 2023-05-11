@@ -1078,20 +1078,6 @@ static RawObject strLowerASCII(Thread* thread, const Str& str, word length) {
   if (str.isSmallStr()) {
     return smallStrToLowerASCII(SmallStr::cast(*str));
   }
-  // Search for the first uppercase character.
-  word first_uppercase = 0;
-  {
-    RawLargeStr str_raw = LargeStr::cast(*str);
-    for (; first_uppercase < length; first_uppercase++) {
-      if (ASCII::isUpper(str_raw.byteAt(first_uppercase))) {
-        break;
-      }
-    }
-  }
-  if (first_uppercase >= length) {
-    return *str;
-  }
-
   HandleScope scope(thread);
   Runtime* runtime = thread->runtime();
   MutableBytes result(&scope, runtime->newMutableBytesUninitialized(length));
