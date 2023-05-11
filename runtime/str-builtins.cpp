@@ -1037,6 +1037,9 @@ RawObject METH(str, __len__)(Thread* thread, Arguments args) {
 
 // From https://github.com/WojciechMula/toys/tree/master/changecase_swar, which
 // is BSD 2-clause.
+// See also https://dotat.at/@/2022-06-27-tolower-swar.html
+// and https://github.com/intel/hyperscan/blob/master/src/util/compare.h ,
+// which references http://www.azillionmonkeys.com/qed/asmexample.html
 #define packed_byte(b) ((uint64_t(b) & 0xff) * 0x0101010101010101u)
 
 static inline bool is_ascii(uint64_t chars) {
