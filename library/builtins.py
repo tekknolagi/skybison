@@ -4528,11 +4528,11 @@ class int(bootstrap=True):
         if cls is bool:
             raise TypeError("int.__new__(bool) is not safe. Use bool.__new__()")
         _type_subclass_guard(cls, int)
-        if x is _Unbound:
-            if base is _Unbound:
-                return _int_new_from_int(cls, 0)
-            raise TypeError("int() missing string argument")
         if base is _Unbound:
+            if _str_check(x):
+                # TODO(emacs): Check if this should be _str_strip (or
+                # equivalent) and not call strip() on subclass
+                return _int_new_from_str(cls, x.strip(), 10)
             if _int_check_exact(x):
                 return _int_new_from_int(cls, x)
             if _object_type_hasattr(x, "__int__"):
@@ -4553,14 +4553,16 @@ class int(bootstrap=True):
                 raise TypeError(
                     f"__trunc__ returned non-Integral (type {_type(result).__name__})"
                 )
-            if _str_check(x):
-                return _int_new_from_str(cls, x.strip(), 10)
             if _byteslike_check(x):
                 return _int_new_from_byteslike(cls, x, 10)
+            if x is _Unbound:
+                return _int_new_from_int(cls, 0)
             raise TypeError(
                 f"int() argument must be a string, a bytes-like object "
                 f"or a number, not {_type(x).__name__}"
             )
+        if x is _Unbound:
+            raise TypeError("int() missing string argument")
         base = _index(base)
         if base > 36 or (base < 2 and base != 0):
             raise ValueError("int() base must be >= 2 and <= 36")
