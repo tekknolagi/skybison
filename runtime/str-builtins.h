@@ -33,6 +33,10 @@ word strCountSubStr(const Str& haystack, const Str& needle, word max_count);
 word strCountSubStrFromTo(const Str& haystack, const Str& needle, word start,
                           word end, word max_count);
 
+// Return the number of occurences of needle in haystack[start:end]. Note that
+// start and end are byte offsets, not code point offsets.
+word strCountCharFromTo(const Str& haystack, byte needle, word start, word end);
+
 RawObject strEncodeASCII(Thread* thread, const Str& str);
 
 RawObject strEscapeNonASCII(Thread* thread, const Str& str);

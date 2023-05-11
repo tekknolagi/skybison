@@ -5345,6 +5345,12 @@ RawObject FUNC(_builtins, _str_replace)(Thread* thread, Arguments args) {
   Str oldstr(&scope, strUnderlying(args.get(1)));
   Str newstr(&scope, strUnderlying(args.get(2)));
   word count = intUnderlying(args.get(3)).asWordSaturated();
+  if (oldstr.length() == 1) {
+    if (newstr.length() == 1) {
+      return runtime->strReplaceCharWithChar(thread, self, oldstr.byteAt(0),
+                                             newstr.byteAt(0), count);
+    }
+  }
   return runtime->strReplace(thread, self, oldstr, newstr, count);
 }
 

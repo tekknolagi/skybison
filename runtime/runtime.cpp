@@ -4654,6 +4654,47 @@ static RawObject strReplaceSmallStr(const Str& src, const Str& oldstr,
   return SmallStr::fromBytes(View<byte>(buffer, result_len));
 }
 
+RawObject Runtime::strReplaceCharWithChar(Thread* thread, const Str& src,
+                                          byte oldstr, byte newstr,
+                                          word count) {
+  word src_len = src.length();
+  if (count < 0) {
+    count = SmallInt::kMaxValue;  // PY_SSIZE_T_MAX.
+  } else if (count == 0 || src_len == 0) {
+    return *src;
+  }
+
+  if (oldstr == newstr) {
+    return *src;
+  }
+
+  if (src_len <= SmallStr::kMaxLength) {
+    byte buffer[SmallStr::kMaxLength];
+    src.copyTo(buffer, src_len);
+    for (word i = 0, match_count = 0; i < src_len; i++) {
+      if (buffer[i] == oldstr && match_count < count) {
+        buffer[i] = newstr;
+        match_count++;
+      }
+    }
+    return SmallStr::fromBytes(View<byte>(buffer, src_len));
+  }
+
+  HandleScope scope(thread);
+  LargeStr result(&scope, createLargeStr(src_len));
+  for (word i = 0, match_count = 0; i < src_len; i++) {
+    // TODO(T41400083): Use a different search algorithm
+    byte* dst = reinterpret_cast<byte*>(LargeStr::cast(*result).address());
+    if (src.byteAt(i) == oldstr && match_count < count) {
+      dst[i] = newstr;
+      match_count++;
+      continue;
+    }
+    dst[i] = src.byteAt(i);
+  }
+  return *result;
+}
+
 RawObject Runtime::strReplace(Thread* thread, const Str& src, const Str& oldstr,
                               const Str& newstr, word count) {
   word src_len = src.length();

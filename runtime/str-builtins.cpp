@@ -84,8 +84,8 @@ void strCopyToWCStr(wchar_t* buf, size_t buf_length, const Str& str) {
   buf[wchar_index] = '\0';
 }
 
-static word strCountCharFromTo(const Str& haystack, byte needle, word start,
-                               word end) {
+word strCountCharFromTo(const Str& haystack, byte needle, word start,
+                        word end) {
   word result = 0;
   if (haystack.isSmallStr()) {
     RawSmallStr small = SmallStr::cast(*haystack);

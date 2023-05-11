@@ -824,6 +824,11 @@ class Runtime {
   RawObject strReplace(Thread* thread, const Str& src, const Str& oldstr,
                        const Str& newstr, word count);
 
+  // Replace the occurences of oldstr get replaced for newstr in src up
+  // to maxcount. If no replacement happens, returns src itself, unmodified.
+  RawObject strReplaceCharWithChar(Thread* thread, const Str& src, byte oldstr,
+                                   byte newstr, word count);
+
   void strArrayAddASCII(Thread* thread, const StrArray& array, byte code_point);
   void strArrayAddCodePoint(Thread* thread, const StrArray& array,
                             int32_t code_point);
