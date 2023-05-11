@@ -1068,13 +1068,15 @@ static inline uint64_t to_lower_ascii(uint64_t chars) {
   return result;
 }
 
+static inline RawObject smallStrToLowerASCII(RawSmallStr str) {
+  uword chars = str.raw() & uword{0xffffffffffffff00};
+  uword tag = str.raw() & 0xff;
+  return RawObject{to_lower_ascii(chars) | tag};
+}
+
 static RawObject strLowerASCII(Thread* thread, const Str& str, word length) {
   if (str.isSmallStr()) {
-    byte buf[SmallStr::kMaxLength];
-    for (word i = 0; i < length; i++) {
-      buf[i] = ASCII::toLower(str.byteAt(i));
-    }
-    return SmallStr::fromBytes({buf, length});
+    return smallStrToLowerASCII(SmallStr::cast(*str));
   }
   // Search for the first uppercase character.
   word first_uppercase = 0;

@@ -1048,6 +1048,13 @@ class StrTests(unittest.TestCase):
         self.assertRaises(TypeError, str.ljust, "", 2, 3)
 
     def test_lower_returns_lowercased_string(self):
+        for c in range(0, 128):
+            if c in range(ord('A'), ord('Z')+1):
+                continue
+            for i in range(10):
+                # Try both small and large strs
+                s = chr(c) * i
+                self.assertEqual(s, s.lower())
         self.assertEqual(str.lower("HELLO"), "hello")
         self.assertEqual(str.lower("HeLLo_WoRlD"), "hello_world")
         self.assertEqual(str.lower("hellO World!"), "hello world!")
