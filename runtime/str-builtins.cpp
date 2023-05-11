@@ -247,9 +247,24 @@ RawObject strSubstr(Thread* thread, const Str& str, word start, word length) {
   }
   // SmallStr result
   if (length <= RawSmallStr::kMaxLength) {
-    byte buffer[RawSmallStr::kMaxLength];
-    str.copyToStartAt(buffer, length, start);
-    return SmallStr::fromBytes(View<byte>(buffer, length));
+    uword raw;
+    if (str.isSmallStr()) {
+      raw = str.raw();
+      raw >>= kBitsPerByte * (start + 1);
+      raw &= ~uword{0} >> (kBitsPerWord - length * kBitsPerByte);
+      raw <<= kBitsPerByte;
+    } else {
+      raw = 0;
+      std::memcpy(
+          &raw, reinterpret_cast<byte*>(LargeStr::cast(*str).address()) + start,
+          length);
+      raw <<= kBitsPerByte;
+    }
+    RawObject result = RawObject{raw | length << RawObject::kImmediateTagBits |
+                                 RawObject::kSmallStrTag};
+    DCHECK(result.isSmallStr(), "uh oh");
+    DCHECK(SmallStr::cast(result).length() == length, "uh oh");
+    return result;
   }
   // LargeStr result
   HandleScope scope(thread);
