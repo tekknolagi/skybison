@@ -28,10 +28,11 @@
 #include "frame.h"
 #include "thread.h"
 
+// clang-format off
+GDB_DECLARE_GPL_COMPATIBLE_READER
+// clang-format on
+
 extern "C" {
-
-int plugin_is_GPL_compatible(void) { return 0; }
-
 enum DwarfRegister {
   RAX,
   RDX,
