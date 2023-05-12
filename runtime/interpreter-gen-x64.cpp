@@ -1207,6 +1207,7 @@ void emitHandler<LOAD_ATTR_INSTANCE>(EmitEnv* env) {
   ScratchReg r_layout_id(env);
   ScratchReg r_scratch(env);
   ScratchReg r_caches(env);
+  __ breakpoint();
   Label slow_path;
   __ popq(r_base);
   emitGetLayoutId(env, r_layout_id, r_base);

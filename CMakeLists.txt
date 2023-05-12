@@ -465,6 +465,25 @@ else()
   message(FATAL_ERROR "Unsupported architecture ${CMAKE_SYSTEM_PROCESSOR}")
 endif()
 
+# TODO(emacs): Create install path so that we don't need to specify full path
+# in gdb
+add_library(
+  gdbsupport
+  SHARED
+  runtime/gdb-support.h
+  runtime/gdb-support.cpp
+)
+target_include_directories(
+  gdbsupport
+  PRIVATE
+  runtime
+)
+target_link_libraries(
+  gdbsupport
+  PUBLIC
+  pyruntime
+)
+
 add_library(
   libpython
   SHARED

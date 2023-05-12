@@ -391,6 +391,9 @@ class Thread {
 
   static int currentFrameOffset() { return offsetof(Thread, current_frame_); }
 
+  static int interpreterFuncOffset() {
+    return offsetof(Thread, interpreter_func_);
+  }
   static int interpreterDataOffset() {
     return offsetof(Thread, interpreter_data_);
   }
