@@ -110,6 +110,28 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
+# Debug build type: debug assertions/checks with -O0. Compiles very quickly and
+# runs very slowly.
+set(CMAKE_C_FLAGS_DEBUG "-O0 -ggdb" CACHE STRING
+    "Flags used by the C compiler during Debug builds."
+    FORCE)
+set(CMAKE_CXX_FLAGS_DEBUG "-O0 -ggdb" CACHE STRING
+    "Flags used by the C++ compiler during Debug builds."
+    FORCE)
+set(CMAKE_EXE_LINKER_FLAGS_DEBUG
+    "${CMAKE_EXE_LINKER_FLAGS_DEBUG}" CACHE STRING
+    "Flags used for linking binaries during Debug builds."
+    FORCE)
+set(CMAKE_SHARED_LINKER_FLAGS_DEBUG
+    "${CMAKE_SHARED_LINKER_FLAGS_DEBUG}" CACHE STRING
+    "Flags used by the shared libraries linker during Debug builds."
+    FORCE)
+mark_as_advanced(
+    CMAKE_CXX_FLAGS_DEBUG
+    CMAKE_C_FLAGS_DEBUG
+    CMAKE_EXE_LINKER_FLAGS_DEBUG
+    CMAKE_SHARED_LINKER_FLAGS_DEBUG)
+
 # DebugOpt build type: debug assertions/checks with -Os. Runs tests much more
 # quickly than Debug, but isn't as debuggable as a Debug build in gdb or lldb.
 set(CMAKE_C_FLAGS_DEBUGOPT "-Os -g3" CACHE STRING
