@@ -136,16 +136,17 @@ static struct gdb_frame_id pythonFrameId(struct gdb_reader_funcs*,
   return result;
 }
 
-static void destroyReader(struct gdb_reader_funcs* self) { delete self; }
+static void destroyReader(struct gdb_reader_funcs*) {}
 
 struct gdb_reader_funcs* gdb_init_reader(void) {
-  struct gdb_reader_funcs* result = new gdb_reader_funcs();
-  result->reader_version = GDB_READER_INTERFACE_VERSION;
-  result->priv_data = reinterpret_cast<void*>(0xdeadbeef);
-  result->read = readDebugInfo;
-  result->unwind = unwindPythonFrame;
-  result->get_frame_id = pythonFrameId;
-  result->destroy = destroyReader;
-  return result;
+  static struct gdb_reader_funcs result = {
+      GDB_READER_INTERFACE_VERSION,
+      nullptr,
+      readDebugInfo,
+      unwindPythonFrame,
+      pythonFrameId,
+      destroyReader,
+  };
+  return &result;
 }
 }
