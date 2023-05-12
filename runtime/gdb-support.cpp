@@ -49,6 +49,7 @@ enum DwarfRegister {
   R13,
   R14,
   R15,
+  RA,
 };
 
 static enum gdb_status readDebugInfo(struct gdb_reader_funcs*,
@@ -68,28 +69,54 @@ static uword readRegisterUWord(struct gdb_unwind_callbacks* cb,
   return result;
 }
 
+static void writeRegisterUWord(struct gdb_unwind_callbacks* cb,
+                               DwarfRegister reg, uword value) {
+  struct gdb_reg_value* reg_value =
+      static_cast<gdb_reg_value*>(std::malloc(sizeof *reg_value + kWordSize));
+  CHECK(reg_value != nullptr, "could not allocate gdb_reg_value");
+  reg_value->size = kWordSize;
+  reg_value->defined = 1;
+  reg_value->free = reinterpret_cast<gdb_reg_value_free*>(std::free);
+  std::memcpy(reg_value->value, &value, sizeof value);
+  cb->reg_set(cb, reg, reg_value);
+}
+
 const DwarfRegister kFrameReg = RBX;
 const DwarfRegister kThreadReg = R12;
+
+#define MEMORY_READ(cb, address, dst)                                          \
+  do {                                                                         \
+    enum gdb_status result = cb->target_read(address, &dst, sizeof dst);       \
+    if (result != GDB_SUCCESS) {                                               \
+      return result;                                                           \
+    }                                                                          \
+  } while (0)
 
 static enum gdb_status unwindPythonFrame(struct gdb_reader_funcs*,
                                          struct gdb_unwind_callbacks* cb) {
   uword frame = readRegisterUWord(cb, kFrameReg);
   uword previous_frame;
-  enum gdb_status result =
-      cb->target_read(frame + py::Frame::kPreviousFrameOffset, &previous_frame,
-                      sizeof previous_frame);
-  if (result != GDB_SUCCESS) {
-    return result;
-  }
-  struct gdb_reg_value* updated_frame = static_cast<gdb_reg_value*>(
-      std::malloc(sizeof *updated_frame + kWordSize));
-  CHECK(updated_frame != nullptr, "could not allocate gdb_reg_value");
-  updated_frame->size = kWordSize;
-  updated_frame->defined = 1;
-  updated_frame->free = reinterpret_cast<gdb_reg_value_free*>(std::free);
-  std::memcpy(updated_frame + offsetof(gdb_reg_value, value), &previous_frame,
-              sizeof previous_frame);
-  cb->reg_set(cb, kFrameReg, updated_frame);
+  MEMORY_READ(cb, frame + py::Frame::kPreviousFrameOffset, previous_frame);
+  writeRegisterUWord(cb, kFrameReg, previous_frame);
+  // This is kind of a lie, but I am not sure how to restore the actual return
+  // address inside the interpreter. Just restart at the beginning of the
+  // interpreter for now.
+  uword thread = readRegisterUWord(cb, kThreadReg);
+  uword asm_interpreter;
+  MEMORY_READ(cb, thread + py::Thread::interpreterFuncOffset(),
+              asm_interpreter);
+  writeRegisterUWord(cb, RA, asm_interpreter);
+  // RBP is unmodified
+  uword rbp = readRegisterUWord(cb, RBP);
+  writeRegisterUWord(cb, RBP, rbp);
+  uword locals_offset;
+  MEMORY_READ(cb, frame + py::Frame::kLocalsOffsetOffset, locals_offset);
+  writeRegisterUWord(
+      cb, RSP,
+      frame + locals_offset +
+          py::Frame::kImplicitGlobalsOffsetFromLocals * kPointerSize +
+          kPointerSize);
+  writeRegisterUWord(cb, kThreadReg, thread);
   return GDB_SUCCESS;
 }
 
