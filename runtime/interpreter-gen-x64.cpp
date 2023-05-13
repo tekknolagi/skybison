@@ -17,6 +17,7 @@
 #include "register-state.h"
 #include "runtime.h"
 #include "thread.h"
+#include "gdb-support.h"
 
 // This file generates an assembly version of our interpreter. The default
 // implementation for all opcodes calls back to the C++ version, with
@@ -3292,8 +3293,10 @@ X64Interpreter::~X64Interpreter() { OS::freeMemory(code_, size_); }
 
 void X64Interpreter::setupThread(Thread* thread) {
   thread->setInterpreterFunc(reinterpret_cast<Thread::InterpreterFunc>(code_));
+  thread->setInterpreterFuncSize(size_);
   thread->setInterpreterData(count_opcodes_ ? counting_handler_table_
                                             : default_handler_table_);
+  gdbSupportAddFunction("asm interpreter", reinterpret_cast<uword>(code_), size_);
 }
 
 void X64Interpreter::setOpcodeCounting(bool enabled) {

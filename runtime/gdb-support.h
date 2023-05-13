@@ -27,3 +27,7 @@
 PY_EXPORT struct gdb_reader_funcs* gdb_init_reader(void);
 
 PY_EXPORT int plugin_is_GPL_compatible(void);
+
+namespace py {
+void gdbSupportAddFunction(const char* name, uword code, uword size);
+}

@@ -472,6 +472,7 @@ add_library(
   SHARED
   runtime/gdb-support.h
   runtime/gdb-support.cpp
+  runtime/gdb-support-extra.cpp
 )
 target_include_directories(
   gdbsupport
@@ -564,6 +565,9 @@ add_library(
   runtime/frame.h
   runtime/function-builtins.cpp
   runtime/gc-module.cpp
+  runtime/gdb-support.cpp
+  runtime/gdb-support.h
+  runtime/gdb-support-extra.cpp
   runtime/generator-builtins.cpp
   runtime/globals.h
   runtime/handles.cpp

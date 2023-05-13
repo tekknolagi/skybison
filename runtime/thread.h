@@ -131,7 +131,9 @@ class Thread {
   using InterpreterFunc = RawObject (*)(Thread*);
 
   InterpreterFunc interpreterFunc() { return interpreter_func_; }
+  word interpreterFuncSize() { return interpreter_func_size_; }
   void setInterpreterFunc(InterpreterFunc func) { interpreter_func_ = func; }
+  void setInterpreterFuncSize(word size) { interpreter_func_size_ = size; }
 
   void* interpreterData() { return interpreter_data_; }
   void setInterpreterData(void* data) { interpreter_data_ = data; }
@@ -443,6 +445,7 @@ class Thread {
   Thread* prev_ = nullptr;
   Runtime* runtime_ = nullptr;
   InterpreterFunc interpreter_func_ = uninitializedInterpreterFunc;
+  word interpreter_func_size_ = 0;
   void* interpreter_data_ = nullptr;
 
   // State of the pending exception.
