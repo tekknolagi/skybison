@@ -251,7 +251,6 @@ static enum gdb_status unwindPythonFrame(struct gdb_reader_funcs* self,
   }
   uword frame = readRegisterUWord(cb, kFrameReg);
   if (frame == 0) {
-    fprintf(stderr, "we hit bottom, boys\n");
     // We hit the end of the interpreter frame chain; try to find the C frame.
     // This is like do_return in interpreter gen
     uword rbp = readRegisterUWord(cb, RBP);
@@ -267,7 +266,6 @@ static enum gdb_status unwindPythonFrame(struct gdb_reader_funcs* self,
     // writeRegisterUWord(cb, kFrameReg, frame);
     return GDB_SUCCESS;
   }
-  fprintf(stderr, "reading a python frame %p\n", (void*)frame);
   uword previous_frame;
   MEMORY_READ(cb, frame + py::Frame::kPreviousFrameOffset, previous_frame);
   writeRegisterUWord(cb, kFrameReg, previous_frame);
@@ -279,7 +277,6 @@ static enum gdb_status unwindPythonFrame(struct gdb_reader_funcs* self,
   uword asm_interpreter;
   MEMORY_READ(cb, thread + py::Thread::interpreterFuncOffset(),
               asm_interpreter);
-  fprintf(stderr, "asm interpreter in unwind: %p\n", (void*)asm_interpreter);
   writeRegisterUWord(cb, RA, asm_interpreter);
   // RBP is unmodified
   uword rbp = readRegisterUWord(cb, RBP);
