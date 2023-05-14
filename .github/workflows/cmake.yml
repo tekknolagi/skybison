@@ -75,7 +75,7 @@ jobs:
         popd
         ./benchmarks/quickbench/diffrevs.py --run-django HEAD^ HEAD | tee django-benchmark-results.json
     - name: Comment on Pull Request
-      uses: actions/github-script@v5
+      uses: actions/github-script@v6
       with:
         script: |
           const { promises: fs } = require('fs');
@@ -103,7 +103,7 @@ jobs:
       run: |
         ./benchmarks/format_results.py benchmark-results.json | tee benchmark-results.md
     - name: Comment on Pull Request
-      uses: actions/github-script@v5
+      uses: actions/github-script@v6
       with:
         script: |
           const { promises: fs } = require('fs');
