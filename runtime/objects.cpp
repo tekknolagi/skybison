@@ -882,23 +882,11 @@ void RawMutableTuple::replaceFromWith(word dst_start, RawTuple src,
 
 void RawMutableTuple::replaceFromWithStartAt(word dst_start, RawTuple src,
                                              word count, word src_start) const {
-  if (src != *this) {
-    // No overlap
-    for (word i = dst_start, j = src_start; count != 0; i++, j++, count--) {
-      atPut(i, src.at(j));
-    }
-  } else if (src_start < dst_start) {
-    // Overlap; copy backward
-    for (word i = dst_start + count - 1, j = src_start + count - 1; count != 0;
-         i--, j--, count--) {
-      atPut(i, src.at(j));
-    }
-  } else if (src_start > dst_start) {
-    // Overlap; copy forward
-    for (word i = dst_start, j = src_start; count != 0; i++, j++, count--) {
-      atPut(i, src.at(j));
-    }
-  }
+  // TODO(emacs): This may need to be reverted when we have read/write
+  // barriers.
+  std::memmove(reinterpret_cast<uword*>(address()) + dst_start,
+               reinterpret_cast<uword*>(src.address()) + src_start,
+               count * kPointerSize);
 }
 
 // RawTuple
