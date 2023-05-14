@@ -7,37 +7,6 @@ on:
     branches: [ trunk ]
 
 jobs:
-  build-prev:
-    if: ${{ github.event_name == 'pull_request' }}
-    runs-on: ubuntu-20.04
-    steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 2
-    - run: git checkout HEAD^
-    - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_TOOLCHAIN_FILE=util/linux.cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
-    - name: Build
-      working-directory: ${{github.workspace}}/build
-      run: make -j4
-    - name: Copy benchmarks into build dir
-      working-directory: ${{github.workspace}}
-      run: cp -r benchmarks build
-    - name: Remove big files
-      working-directory: ${{github.workspace}}/build
-      run: |
-        find . -name '*.o' -delete
-        find . -name '*.a' -delete
-        rm -rf CMakeFiles
-        rm -rf bin/python-tests
-        rm -rf third-party/cpython/cpython-tests
-        strip bin/python
-    # TODO(max): tar it instead of manually changing permissions
-    - uses: actions/upload-artifact@v3
-      with:
-        name: prev-build
-        path: ${{github.workspace}}/build
-
   build:
     strategy:
       matrix:
@@ -88,72 +57,53 @@ jobs:
       working-directory: ${{github.workspace}}
       run: PYRO_BUILD_DIR="build" ./util/python_tests_cpython.sh
 
-    - name: Remove big files
-      working-directory: ${{github.workspace}}/build
-      run: |
-        find . -name '*.o' -delete
-        find . -name '*.a' -delete
-        rm -rf CMakeFiles
-        rm -rf bin/python-tests
-        rm -rf third-party/cpython/cpython-tests
-        strip bin/python
-
-    - name: Copy benchmarks into build dir
-      working-directory: ${{github.workspace}}
-      run: cp -r benchmarks build
-
-    # TODO(max): tar it instead of manually changing permissions
-
-    - uses: actions/upload-artifact@v3
-      if: ${{ github.event_name == 'pull_request' && matrix.BUILD_TYPE == 'RelWithDebInfo' }}
-      with:
-        name: curr-build
-        path: ${{github.workspace}}/build
-
   benchmark:
     if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-20.04
-    needs: [build, build-prev]
     steps:
     - uses: actions/checkout@v3
       with:
-        fetch-depth: 1
-
-    - uses: actions/download-artifact@v3
-      with:
-        name: prev-build
-        path: prev-build
-
-    - uses: actions/download-artifact@v3
-      with:
-        name: curr-build
-        path: curr-build
-
-    - name: Mark binaries executable
+        fetch-depth: 2
+    - name: Install tools
+      run: sudo apt install -y ninja-build ccache valgrind
+    - name: Quickbench
       working-directory: ${{github.workspace}}
       run: |
-        chmod +x prev-build/bin/python
-        chmod +x curr-build/bin/python
-
-    - name: Install valgrind
-      run: sudo apt install -y valgrind
-
+        mkdir -p /var/tmp/django_minimal
+        pushd /var/tmp/django_minimal
+        ${{github.workspace}}/benchmarks/benchmarks/django/setup_django_minimal.sh
+        popd
+        ./benchmarks/quickbench/diffrevs.py --run-django HEAD^ HEAD | tee django-benchmark-results.json
+    - name: Comment on Pull Request
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const { promises: fs } = require('fs');
+          const benchmark_results = await fs.readFile('${{github.workspace}}/django-benchmark-results.json', 'utf8');
+          const formatted_body = "```json\n" + benchmark_results + "\n```";
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: formatted_body,
+          })
     - name: Run benchmarks
       working-directory: ${{github.workspace}}
       run: |
+        # Should be cached
+        PREV_BUILD="$(./benchmarks/quickbench/build_rev.py HEAD^)"
+        CURR_BUILD="$(./benchmarks/quickbench/build_rev.py HEAD)"
         ./benchmarks/run.py --tool callgrind --json \
-          --interpreter prev-build/bin/python --interpreter-name python_base --path $(pwd)/curr-build/benchmarks/benchmarks \
-          --interpreter curr-build/bin/python --interpreter-name python_new --path $(pwd)/curr-build/benchmarks/benchmarks \
-          --interpreter $(which python3.8) --interpreter-name fbcode-cpython --path $(pwd)/curr-build/benchmarks/benchmarks \
-          > benchmark-results.json
-
+          --interpreter "$PREV_BUILD" --interpreter-name python_base --path $(pwd)/benchmarks/benchmarks \
+          --interpreter "$CURR_BUILD" --interpreter-name python_new --path $(pwd)/benchmarks/benchmarks \
+          --interpreter $(which python3.8) --interpreter-name fbcode-cpython --path $(pwd)/benchmarks/benchmarks \
+          | tee benchmark-results.json
     - name: Format benchmark results
       working-directory: ${{github.workspace}}
       run: |
-        ./benchmarks/format_results.py benchmark-results.json > benchmark-results.md
-
+        ./benchmarks/format_results.py benchmark-results.json | tee benchmark-results.md
     - name: Comment on Pull Request
-      uses: actions/github-script@v5
+      uses: actions/github-script@v6
       with:
         script: |
           const { promises: fs } = require('fs');
