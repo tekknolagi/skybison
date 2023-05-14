@@ -165,6 +165,38 @@ jobs:
             body: benchmark_results,
           })
 
+  # TODO(emacs): Unify the two benchmark steps
+  benchmark-django:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 2
+    - name: Install tools
+      run: sudo apt install -y ninja-build ccache valgrind
+    - name: Quickbench
+      working-directory: ${{github.workspace}}
+      run: |
+        mkdir -p /var/tmp/django_minimal
+        pushd /var/tmp/django_minimal
+        ${{github.workspace}}/benchmarks/benchmarks/django/setup_django_minimal.sh
+        popd
+        ./benchmarks/quickbench/diffrevs.py --run-django HEAD^ HEAD | tee benchmark-results.json
+    - name: Comment on Pull Request
+      uses: actions/github-script@v5
+      with:
+        script: |
+          const { promises: fs } = require('fs');
+          const benchmark_results = await fs.readFile('${{github.workspace}}/benchmark-results.json', 'utf8');
+          const formatted_body = "```json\n" + benchmark_results + "\n```";
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: formatted_body,
+          })
+
   lint:
     runs-on: ubuntu-20.04
     # TODO(max): Install and run Black on Python code
