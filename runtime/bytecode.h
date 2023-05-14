@@ -59,8 +59,8 @@ namespace py {
   V(UNUSED_BYTECODE_39, 39, doInvalidBytecode)                                 \
   V(UNUSED_BYTECODE_40, 40, doInvalidBytecode)                                 \
   V(UNUSED_BYTECODE_41, 41, doInvalidBytecode)                                 \
-  V(UNUSED_BYTECODE_42, 42, doInvalidBytecode)                                 \
-  V(UNUSED_BYTECODE_43, 43, doInvalidBytecode)                                 \
+  V(INPLACE_ADD_FLOAT, 42, doInplaceAddFloat)                                  \
+  V(INPLACE_SUB_FLOAT, 43, doInplaceSubFloat)                                  \
   V(BINARY_ADD_FLOAT, 44, doBinaryAddFloat)                                    \
   V(BINARY_SUB_FLOAT, 45, doBinarySubFloat)                                    \
   V(BINARY_MUL_FLOAT, 46, doBinaryMulFloat)                                    \

@@ -5814,6 +5814,23 @@ Continue Interpreter::doInplaceAddSmallInt(Thread* thread, word arg) {
 }
 
 HANDLER_INLINE
+Continue Interpreter::doInplaceAddFloat(Thread* thread, word arg) {
+  RawObject left = thread->stackPeek(1);
+  RawObject right = thread->stackPeek(0);
+  if (left.isFloat() && right.isFloat()) {
+    double left_value = Float::cast(left).value();
+    double right_value = Float::cast(right).value();
+    double result_value = left_value + right_value;
+    thread->stackDrop(1);
+    thread->stackSetTop(thread->runtime()->newFloat(result_value));
+    return Continue::NEXT;
+  }
+  EVENT_CACHE(INPLACE_ADD_FLOAT);
+  word cache = currentCacheIndex(thread->currentFrame());
+  return inplaceOpUpdateCache(thread, arg, cache);
+}
+
+HANDLER_INLINE
 Continue Interpreter::doInplaceSubSmallInt(Thread* thread, word arg) {
   RawObject left = thread->stackPeek(1);
   RawObject right = thread->stackPeek(0);
@@ -5833,6 +5850,23 @@ Continue Interpreter::doInplaceSubSmallInt(Thread* thread, word arg) {
 }
 
 HANDLER_INLINE
+Continue Interpreter::doInplaceSubFloat(Thread* thread, word arg) {
+  RawObject left = thread->stackPeek(1);
+  RawObject right = thread->stackPeek(0);
+  if (left.isFloat() && right.isFloat()) {
+    double left_value = Float::cast(left).value();
+    double right_value = Float::cast(right).value();
+    double result_value = left_value - right_value;
+    thread->stackDrop(1);
+    thread->stackSetTop(thread->runtime()->newFloat(result_value));
+    return Continue::NEXT;
+  }
+  EVENT_CACHE(INPLACE_SUB_FLOAT);
+  word cache = currentCacheIndex(thread->currentFrame());
+  return inplaceOpUpdateCache(thread, arg, cache);
+}
+
+HANDLER_INLINE
 Continue Interpreter::doInplaceOpAnamorphic(Thread* thread, word arg) {
   Frame* frame = thread->currentFrame();
   if (thread->stackPeek(0).isSmallInt() && thread->stackPeek(1).isSmallInt()) {
@@ -5843,6 +5877,20 @@ Continue Interpreter::doInplaceOpAnamorphic(Thread* thread, word arg) {
       case BinaryOp::SUB:
         rewriteCurrentBytecode(frame, INPLACE_SUB_SMALLINT);
         return doInplaceSubSmallInt(thread, arg);
+      default: {
+        word cache = currentCacheIndex(frame);
+        return inplaceOpUpdateCache(thread, arg, cache);
+      }
+    }
+  }
+  if (thread->stackPeek(0).isFloat() && thread->stackPeek(1).isFloat()) {
+    switch (static_cast<BinaryOp>(arg)) {
+      case BinaryOp::ADD:
+        rewriteCurrentBytecode(frame, INPLACE_ADD_FLOAT);
+        return doInplaceAddFloat(thread, arg);
+      case BinaryOp::SUB:
+        rewriteCurrentBytecode(frame, INPLACE_SUB_FLOAT);
+        return doInplaceSubFloat(thread, arg);
       default: {
         word cache = currentCacheIndex(frame);
         return inplaceOpUpdateCache(thread, arg, cache);
