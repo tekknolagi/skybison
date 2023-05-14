@@ -3318,7 +3318,7 @@ class dict(bootstrap=True):
     __hash__ = None
 
     def __init__(self, other=_Unbound, /, **kwargs):
-        dict.update(self, other, **kwargs)
+        dict_update(self, other, **kwargs)
 
     def __iter__(self):
         _builtin()
@@ -3353,7 +3353,7 @@ class dict(bootstrap=True):
     def copy(self):
         _dict_guard(self)
         result = {}
-        result.update(self)
+        dict_update(result, self)
         return result
 
     @_classmethod
@@ -3412,7 +3412,11 @@ class dict(bootstrap=True):
         _dict_guard(self)
         # CPython's reversed() implementation for keys() ignores subclasses, so we explicitly
         # mimic that behavior.
-        return dict.keys(self).__reversed__()
+        return dict_keys_func(self).__reversed__()
+
+
+dict_keys_func = dict.keys
+dict_update = dict.update
 
 
 def _dictview_and(self, other):
@@ -3449,7 +3453,7 @@ def _dictview_sub(self, other):
 
 def _dictview_xor(self, other):
     result = set(self)
-    result.symmetric_difference_update(other)
+    set_symmetric_difference_update(result, other)
     return result
 
 
@@ -5034,7 +5038,7 @@ class list(bootstrap=True):
         _builtin()
 
     def __ne__(self, other):
-        eq_result = list.__eq__(self, other)
+        eq_result = list___eq__(self, other)
         if eq_result is NotImplemented:
             return NotImplemented
         return not eq_result
@@ -5156,7 +5160,7 @@ class list(bootstrap=True):
     def sort(self, key=None, reverse=False):
         _list_guard(self)
         if reverse:
-            list.reverse(self)
+            list_reverse(self)
         if key:
             i = 0
             length = _list_len(self)
@@ -5173,7 +5177,11 @@ class list(bootstrap=True):
         else:
             _list_sort(self)
         if reverse:
-            list.reverse(self)
+            list_reverse(self)
+
+
+list_reverse = list.reverse
+list___eq__ = list.__eq__
 
 
 class list_iterator(bootstrap=True):
@@ -5382,7 +5390,7 @@ class memoryview(bootstrap=True):
         if self is other:
             return True
         if _memoryview_check(other):
-            self_length = memoryview.__len__(self)
+            self_length = memoryview___len__(self)
             other_length = memoryview.__len__(other)
             if self_length == other_length:
                 for index in range(self_length):
@@ -5393,7 +5401,7 @@ class memoryview(bootstrap=True):
                 return True
             return False
         if _byteslike_check(other):
-            self_length = memoryview.__len__(self)
+            self_length = memoryview___len__(self)
             other_length = len(other)
             if self_length == other_length:
                 for index in range(self_length):
@@ -5404,7 +5412,7 @@ class memoryview(bootstrap=True):
         return NotImplemented
 
     def __exit__(self, exc_type, exc_value, exc_tb):
-        memoryview.release(self)
+        memoryview_release(self)
 
     def __getitem__(self, key):
         result = _memoryview_getitem(self, key)
@@ -5412,7 +5420,7 @@ class memoryview(bootstrap=True):
             return result
         if _slice_check(key):
             step = _slice_step(_slice_index(key.step))
-            length = memoryview.__len__(self)
+            length = memoryview___len__(self)
             start = _slice_start(_slice_index(key.start), step, length)
             stop = _slice_stop(_slice_index(key.stop), step, length)
             return _memoryview_getslice(self, start, stop, step)
@@ -5454,7 +5462,7 @@ class memoryview(bootstrap=True):
         if _slice_check(key):
             _byteslike_guard(value)
             step = _slice_step(_slice_index(key.step))
-            length = memoryview.__len__(self)
+            length = memoryview___len__(self)
             start = _slice_start(_slice_index(key.start), step, length)
             stop = _slice_stop(_slice_index(key.stop), step, length)
             return _memoryview_setslice(self, start, stop, step, value)
@@ -5477,6 +5485,10 @@ class memoryview(bootstrap=True):
     def tolist(self):
         _memoryview_guard(self)
         return [*self]
+
+
+memoryview___len__ = memoryview.__len__
+memoryview_release = memoryview.release
 
 
 def min(arg1, arg2=_Unbound, *args, key=_Unbound, default=_Unbound):  # noqa: C901
@@ -5680,7 +5692,7 @@ def ord(c):
 
 def pow(x, y, z=None):
     if z is None:
-        return x ** y
+        return x**y
     dunder_pow = _object_type_getattr(x, "__pow__")
     if dunder_pow is not _Unbound:
         result = dunder_pow(y, z)
@@ -5848,7 +5860,7 @@ class range(bootstrap=True):
     def count(self, value):
         _range_guard(self)
         if _int_check_exact(value) or _bool_check(value):
-            return 1 if range.__contains__(self, value) else 0
+            return 1 if range___contains__(self, value) else 0
         seen = 0
         for i in self:
             if i == value:
@@ -5858,7 +5870,7 @@ class range(bootstrap=True):
     def index(self, value):
         _range_guard(self)
         if _int_check_exact(value) or _bool_check(value):
-            if range.__contains__(self, value):
+            if range___contains__(self, value):
                 return int.__floordiv__(value - self.start, self.step)
         else:
             i = 0
@@ -5870,6 +5882,7 @@ class range(bootstrap=True):
 
 
 range___iter__ = range.__iter__
+range___contains__ = range.__contains__
 
 
 class range_iterator(bootstrap=True):
@@ -5975,14 +5988,14 @@ class set(bootstrap=True):
             return NotImplemented
         if self is other:
             return self
-        set.update(self, other)
+        set_update(self, other)
         return self
 
     def __isub__(self, other):
         _set_guard(self)
         if not _anyset_check(other):
             return NotImplemented
-        set.difference_update(self, other)
+        set_difference_update(self, other)
         return self
 
     def __iter__(self):
@@ -5992,7 +6005,7 @@ class set(bootstrap=True):
         _set_guard(self)
         if not _anyset_check(other):
             return NotImplemented
-        set.symmetric_difference_update(self, other)
+        set_symmetric_difference_update(self, other)
         return self
 
     def __le__(self, other):
@@ -6015,7 +6028,7 @@ class set(bootstrap=True):
         _set_guard(self)
         if not _anyset_check(other):
             return NotImplemented
-        result = set.copy(self)
+        result = set_copy(self)
         if self is other:
             return result
         set.update(result, other)
@@ -6049,19 +6062,19 @@ class set(bootstrap=True):
         _set_guard(self)
         if not _anyset_check(other):
             return NotImplemented
-        return set.symmetric_difference(self, other)
+        return set_symmetric_difference(self, other)
 
     def __sub__(self, other):
         _set_guard(self)
         if not _anyset_check(other):
             return NotImplemented
-        return set.difference(self, other)
+        return set_difference(self, other)
 
     def __xor__(self, other):
         _set_guard(self)
         if not _anyset_check(other):
             return NotImplemented
-        return set.symmetric_difference(self, other)
+        return set_symmetric_difference(self, other)
 
     def add(self, value):
         _builtin()
@@ -6087,7 +6100,7 @@ class set(bootstrap=True):
         _set_guard(self)
         for other in others:
             for item in other:
-                set.discard(self, item)
+                set_discard(self, item)
 
     def discard(self, elem):
         _builtin()
@@ -6099,7 +6112,7 @@ class set(bootstrap=True):
     def intersection_update(self, *others):
         _set_guard(self)
         for other in others:
-            set.__iand__(self, set(other))
+            set___iand__(self, set(other))
 
     def isdisjoint(self, other):
         _builtin()
@@ -6111,7 +6124,7 @@ class set(bootstrap=True):
         _set_guard(self)
         if not _anyset_check(other):
             other = set(other)
-        return set.__ge__(self, other)
+        return set___ge__(self, other)
 
     def pop(self):
         _builtin()
@@ -6132,14 +6145,14 @@ class set(bootstrap=True):
     def symmetric_difference_update(self, other):
         _set_guard(self)
         if self is other:
-            set.clear(self)
+            set_clear(self)
             return
         other = set(other)
         for item in other:
-            if set.__contains__(self, item):
-                set.remove(self, item)
+            if set___contains__(self, item):
+                set_remove(self, item)
             else:
-                set.add(self, item)
+                set_add(self, item)
 
     def union(self, *others):
         if not _set_check(self):
@@ -6147,7 +6160,7 @@ class set(bootstrap=True):
                 "'union' for 'set' objects doesn't apply to a "
                 f"'{_type(self).__name__}' object"
             )
-        result = set.copy(self)
+        result = set_copy(self)
         for item in others:
             if item is self:
                 continue
@@ -6156,6 +6169,21 @@ class set(bootstrap=True):
 
     def update(self, *args):
         _builtin()
+
+
+set_copy = set.copy
+set_add = set.add
+set_remove = set.remove
+set___contains__ = set.__contains__
+set_clear = set.clear
+set___ge__ = set.__ge__
+set___iand__ = set.__iand__
+set_discard = set.discard
+set_symmetric_difference = set.symmetric_difference
+set_symmetric_difference_update = set.symmetric_difference_update
+set_difference = set.difference
+set_difference_update = set.difference_update
+set_update = set.update
 
 
 class set_iterator(bootstrap=True):
@@ -6450,7 +6478,7 @@ class str(bootstrap=True):
         _str_guard(self)
         _int_guard(tabsize)
         if tabsize == 0:
-            return str.replace(self, "\t", "")
+            return str_replace(self, "\t", "")
         chars_seen = 0
         col_pos = 0
         substr_start = 0
@@ -6497,7 +6525,7 @@ class str(bootstrap=True):
         _unimplemented()
 
     def index(self, sub, start=None, end=None):
-        res = str.find(self, sub, start, end)
+        res = str_find(self, sub, start, end)
         if res < 0:
             raise ValueError("substring not found")
         return res
@@ -6631,7 +6659,7 @@ class str(bootstrap=True):
         return _str_rfind(self, sub, start, end)
 
     def rindex(self, sub, start=None, end=None):
-        res = str.rfind(self, sub, start, end)
+        res = str_rfind(self, sub, start, end)
         if res < 0:
             raise ValueError("substring not found")
         return res
@@ -6752,12 +6780,18 @@ class str(bootstrap=True):
             return self
 
         result = _str_array()
-        has_prefix = str.startswith(self, ("+", "-"))
+        has_prefix = str_startswith(self, ("+", "-"))
         if has_prefix:
             _str_array_iadd(result, _str_getitem(self, 0))
         _str_array_iadd(result, "0" * (width - str_len))
         _str_array_iadd(result, _str_getslice(self, int(has_prefix), str_len, 1))
         return str(result)
+
+
+str_find = str.find
+str_replace = str.replace
+str_rfind = str.rfind
+str_startswith = str.startswith
 
 
 class str_iterator(bootstrap=True):
