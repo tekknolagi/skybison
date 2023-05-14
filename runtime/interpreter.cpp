@@ -1,6 +1,7 @@
 // Copyright (c) Facebook, Inc. and its affiliates. (http://www.facebook.com)
 #include "interpreter.h"
 
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <sstream>
@@ -5975,6 +5976,23 @@ Continue Interpreter::doBinaryAddSmallInt(Thread* thread, word arg) {
 }
 
 HANDLER_INLINE
+Continue Interpreter::doBinaryAddFloat(Thread* thread, word arg) {
+  RawObject left = thread->stackPeek(1);
+  RawObject right = thread->stackPeek(0);
+  if (left.isFloat() && right.isFloat()) {
+    double left_value = Float::cast(left).value();
+    double right_value = Float::cast(right).value();
+    double result_value = left_value + right_value;
+    thread->stackDrop(1);
+    thread->stackSetTop(thread->runtime()->newFloat(result_value));
+    return Continue::NEXT;
+  }
+  EVENT_CACHE(BINARY_ADD_FLOAT);
+  word cache = currentCacheIndex(thread->currentFrame());
+  return binaryOpUpdateCache(thread, arg, cache);
+}
+
+HANDLER_INLINE
 Continue Interpreter::doBinaryAndSmallInt(Thread* thread, word arg) {
   RawObject left = thread->stackPeek(1);
   RawObject right = thread->stackPeek(0);
@@ -6007,6 +6025,23 @@ Continue Interpreter::doBinaryMulSmallInt(Thread* thread, word arg) {
     }
   }
   EVENT_CACHE(BINARY_MUL_SMALLINT);
+  word cache = currentCacheIndex(thread->currentFrame());
+  return binaryOpUpdateCache(thread, arg, cache);
+}
+
+HANDLER_INLINE
+Continue Interpreter::doBinaryMulFloat(Thread* thread, word arg) {
+  RawObject left = thread->stackPeek(1);
+  RawObject right = thread->stackPeek(0);
+  if (left.isFloat() && right.isFloat()) {
+    double left_value = Float::cast(left).value();
+    double right_value = Float::cast(right).value();
+    double result_value = left_value * right_value;
+    thread->stackDrop(1);
+    thread->stackSetTop(thread->runtime()->newFloat(result_value));
+    return Continue::NEXT;
+  }
+  EVENT_CACHE(BINARY_MUL_FLOAT);
   word cache = currentCacheIndex(thread->currentFrame());
   return binaryOpUpdateCache(thread, arg, cache);
 }
@@ -6054,6 +6089,23 @@ Continue Interpreter::doBinarySubSmallInt(Thread* thread, word arg) {
 }
 
 HANDLER_INLINE
+Continue Interpreter::doBinarySubFloat(Thread* thread, word arg) {
+  RawObject left = thread->stackPeek(1);
+  RawObject right = thread->stackPeek(0);
+  if (left.isFloat() && right.isFloat()) {
+    double left_value = Float::cast(left).value();
+    double right_value = Float::cast(right).value();
+    double result_value = left_value - right_value;
+    thread->stackDrop(1);
+    thread->stackSetTop(thread->runtime()->newFloat(result_value));
+    return Continue::NEXT;
+  }
+  EVENT_CACHE(BINARY_SUB_FLOAT);
+  word cache = currentCacheIndex(thread->currentFrame());
+  return binaryOpUpdateCache(thread, arg, cache);
+}
+
+HANDLER_INLINE
 Continue Interpreter::doBinaryOrSmallInt(Thread* thread, word arg) {
   RawObject left = thread->stackPeek(1);
   RawObject right = thread->stackPeek(0);
@@ -6067,6 +6119,23 @@ Continue Interpreter::doBinaryOrSmallInt(Thread* thread, word arg) {
     return Continue::NEXT;
   }
   EVENT_CACHE(BINARY_OR_SMALLINT);
+  word cache = currentCacheIndex(thread->currentFrame());
+  return binaryOpUpdateCache(thread, arg, cache);
+}
+
+HANDLER_INLINE
+Continue Interpreter::doBinaryPowerFloat(Thread* thread, word arg) {
+  RawObject left = thread->stackPeek(1);
+  RawObject right = thread->stackPeek(0);
+  if (left.isFloat() && right.isFloat()) {
+    double left_value = Float::cast(left).value();
+    double right_value = Float::cast(right).value();
+    double result_value = std::pow(left_value, right_value);
+    thread->stackDrop(1);
+    thread->stackSetTop(thread->runtime()->newFloat(result_value));
+    return Continue::NEXT;
+  }
+  EVENT_CACHE(BINARY_POWER_FLOAT);
   word cache = currentCacheIndex(thread->currentFrame());
   return binaryOpUpdateCache(thread, arg, cache);
 }
@@ -6094,6 +6163,30 @@ Continue Interpreter::doBinaryOpAnamorphic(Thread* thread, word arg) {
       case BinaryOp::OR:
         rewriteCurrentBytecode(frame, BINARY_OR_SMALLINT);
         return doBinaryOrSmallInt(thread, arg);
+      default: {
+        word cache = currentCacheIndex(frame);
+        return binaryOpUpdateCache(thread, arg, cache);
+      }
+    }
+  }
+  if (thread->stackPeek(0).isFloat() && thread->stackPeek(1).isFloat()) {
+    switch (static_cast<BinaryOp>(arg)) {
+      case BinaryOp::ADD:
+        rewriteCurrentBytecode(frame, BINARY_ADD_FLOAT);
+        return doBinaryAddFloat(thread, arg);
+        break;
+      case BinaryOp::SUB:
+        rewriteCurrentBytecode(frame, BINARY_SUB_FLOAT);
+        return doBinarySubFloat(thread, arg);
+        break;
+      case BinaryOp::MUL:
+        rewriteCurrentBytecode(frame, BINARY_MUL_FLOAT);
+        return doBinaryMulFloat(thread, arg);
+        break;
+      case BinaryOp::POW:
+        rewriteCurrentBytecode(frame, BINARY_POWER_FLOAT);
+        return doBinaryPowerFloat(thread, arg);
+        break;
       default: {
         word cache = currentCacheIndex(frame);
         return binaryOpUpdateCache(thread, arg, cache);

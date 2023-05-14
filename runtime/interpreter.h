@@ -360,6 +360,10 @@ class Interpreter {
   static Continue doBinarySubSmallInt(Thread* thread, word arg);
   static Continue doBinaryOrSmallInt(Thread* thread, word arg);
   static Continue doBinaryOpAnamorphic(Thread* thread, word arg);
+  static Continue doBinaryAddFloat(Thread* thread, word arg);
+  static Continue doBinarySubFloat(Thread* thread, word arg);
+  static Continue doBinaryMulFloat(Thread* thread, word arg);
+  static Continue doBinaryPowerFloat(Thread* thread, word arg);
   static Continue doBinaryOr(Thread* thread, word arg);
   static Continue doBinaryPower(Thread* thread, word arg);
   static Continue doBinaryRshift(Thread* thread, word arg);
