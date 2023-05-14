@@ -1002,6 +1002,7 @@ def _slice_start_long(start, step, length):
 
 
 def _slice_step(step):
+    "$intrinsic$"
     _builtin()
 
 
