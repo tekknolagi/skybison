@@ -108,6 +108,12 @@ Example:
         const="--run-benchmarks",
     )
     parser.add_argument(
+        "--run-benchmark",
+        dest="benchmark_rev_args",
+        action="append",
+        type=lambda arg: f"--run-benchmark={arg}",
+    )
+    parser.add_argument(
         "--ignore-cache",
         dest="benchmark_rev_args",
         action="append_const",
