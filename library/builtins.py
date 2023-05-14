@@ -5840,7 +5840,7 @@ class range(bootstrap=True):
         self_len = _range_len(self)
         new_stop = self.start - self.step
         new_start = new_stop + (self_len * self.step)
-        return range.__iter__(range(new_start, new_stop, -self.step))
+        return range___iter__(range(new_start, new_stop, -self.step))
 
     def __setstate__(self):
         _unimplemented()
@@ -5867,6 +5867,9 @@ class range(bootstrap=True):
                     return i
                 i += 1
         raise ValueError(f"{value} is not in range")
+
+
+range___iter__ = range.__iter__
 
 
 class range_iterator(bootstrap=True):
