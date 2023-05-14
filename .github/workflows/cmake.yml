@@ -7,37 +7,6 @@ on:
     branches: [ trunk ]
 
 jobs:
-  build-prev:
-    if: ${{ github.event_name == 'pull_request' }}
-    runs-on: ubuntu-20.04
-    steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 2
-    - run: git checkout HEAD^
-    - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_TOOLCHAIN_FILE=util/linux.cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
-    - name: Build
-      working-directory: ${{github.workspace}}/build
-      run: make -j4
-    - name: Copy benchmarks into build dir
-      working-directory: ${{github.workspace}}
-      run: cp -r benchmarks build
-    - name: Remove big files
-      working-directory: ${{github.workspace}}/build
-      run: |
-        find . -name '*.o' -delete
-        find . -name '*.a' -delete
-        rm -rf CMakeFiles
-        rm -rf bin/python-tests
-        rm -rf third-party/cpython/cpython-tests
-        strip bin/python
-    # TODO(max): tar it instead of manually changing permissions
-    - uses: actions/upload-artifact@v3
-      with:
-        name: prev-build
-        path: ${{github.workspace}}/build
-
   build:
     strategy:
       matrix:
@@ -88,85 +57,7 @@ jobs:
       working-directory: ${{github.workspace}}
       run: PYRO_BUILD_DIR="build" ./util/python_tests_cpython.sh
 
-    - name: Remove big files
-      working-directory: ${{github.workspace}}/build
-      run: |
-        find . -name '*.o' -delete
-        find . -name '*.a' -delete
-        rm -rf CMakeFiles
-        rm -rf bin/python-tests
-        rm -rf third-party/cpython/cpython-tests
-        strip bin/python
-
-    - name: Copy benchmarks into build dir
-      working-directory: ${{github.workspace}}
-      run: cp -r benchmarks build
-
-    # TODO(max): tar it instead of manually changing permissions
-
-    - uses: actions/upload-artifact@v3
-      if: ${{ github.event_name == 'pull_request' && matrix.BUILD_TYPE == 'RelWithDebInfo' }}
-      with:
-        name: curr-build
-        path: ${{github.workspace}}/build
-
   benchmark:
-    if: ${{ github.event_name == 'pull_request' }}
-    runs-on: ubuntu-20.04
-    needs: [build, build-prev]
-    steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 1
-
-    - uses: actions/download-artifact@v3
-      with:
-        name: prev-build
-        path: prev-build
-
-    - uses: actions/download-artifact@v3
-      with:
-        name: curr-build
-        path: curr-build
-
-    - name: Mark binaries executable
-      working-directory: ${{github.workspace}}
-      run: |
-        chmod +x prev-build/bin/python
-        chmod +x curr-build/bin/python
-
-    - name: Install valgrind
-      run: sudo apt install -y valgrind
-
-    - name: Run benchmarks
-      working-directory: ${{github.workspace}}
-      run: |
-        ./benchmarks/run.py --tool callgrind --json \
-          --interpreter prev-build/bin/python --interpreter-name python_base --path $(pwd)/curr-build/benchmarks/benchmarks \
-          --interpreter curr-build/bin/python --interpreter-name python_new --path $(pwd)/curr-build/benchmarks/benchmarks \
-          --interpreter $(which python3.8) --interpreter-name fbcode-cpython --path $(pwd)/curr-build/benchmarks/benchmarks \
-          > benchmark-results.json
-
-    - name: Format benchmark results
-      working-directory: ${{github.workspace}}
-      run: |
-        ./benchmarks/format_results.py benchmark-results.json > benchmark-results.md
-
-    - name: Comment on Pull Request
-      uses: actions/github-script@v5
-      with:
-        script: |
-          const { promises: fs } = require('fs');
-          const benchmark_results = await fs.readFile('${{github.workspace}}/benchmark-results.md', 'utf8');
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: benchmark_results,
-          })
-
-  # TODO(emacs): Unify the two benchmark steps
-  benchmark-django:
     if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-20.04
     steps:
