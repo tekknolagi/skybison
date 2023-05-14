@@ -851,8 +851,9 @@ void emitHandler<BINARY_ADD_SMALLINT>(EmitEnv* env) {
   emitHandleContinue(env, kGenericHandler);
 }
 
-template <>
-void emitHandler<BINARY_MUL_FLOAT>(EmitEnv* env) {
+static void emitBinaryOpFloat(EmitEnv* env,
+                              void (Assembler::*asm_op)(XmmRegister left,
+                                                        XmmRegister right)) {
   ScratchReg r_right(env);
   ScratchReg r_left(env);
   Label slow_path;
@@ -865,7 +866,7 @@ void emitHandler<BINARY_MUL_FLOAT>(EmitEnv* env) {
                                       &slow_path, Assembler::kNearJump);
   __ movsd(XMM0, Address(r_left, heapObjectDisp(Float::kValueOffset)));
   __ movsd(XMM1, Address(r_right, heapObjectDisp(Float::kValueOffset)));
-  __ mulsd(XMM0, XMM1);
+  (env->as.*asm_op)(XMM0, XMM1);
   emitPushFloat(env, &slow_path, XMM0);
   emitNextOpcode(env);
 
@@ -877,6 +878,31 @@ void emitHandler<BINARY_MUL_FLOAT>(EmitEnv* env) {
     return;
   }
   emitJumpToGenericHandler(env);
+}
+
+template <>
+void emitHandler<BINARY_MUL_FLOAT>(EmitEnv* env) {
+  emitBinaryOpFloat(env, &Assembler::mulsd);
+}
+
+template <>
+void emitHandler<BINARY_ADD_FLOAT>(EmitEnv* env) {
+  emitBinaryOpFloat(env, &Assembler::addsd);
+}
+
+template <>
+void emitHandler<INPLACE_ADD_FLOAT>(EmitEnv* env) {
+  emitBinaryOpFloat(env, &Assembler::addsd);
+}
+
+template <>
+void emitHandler<BINARY_SUB_FLOAT>(EmitEnv* env) {
+  emitBinaryOpFloat(env, &Assembler::subsd);
+}
+
+template <>
+void emitHandler<INPLACE_SUB_FLOAT>(EmitEnv* env) {
+  emitBinaryOpFloat(env, &Assembler::subsd);
 }
 
 template <>
