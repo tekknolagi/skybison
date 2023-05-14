@@ -26,6 +26,7 @@
 #include "mro.h"
 #include "object-builtins.h"
 #include "range-builtins.h"
+#include "set-builtins.h"
 #include "slice-builtins.h"
 #include "str-builtins.h"
 #include "strarray-builtins.h"
@@ -4425,6 +4426,19 @@ RawObject FUNC(_builtins,
   function.setCode(*new_code);
   function.setFlags(function.flags() | Function::Flags::kIterableCoroutine);
   return NoneType::object();
+}
+
+RawObject FUNC(_builtins, _set_ctor)(Thread* thread, Arguments args) {
+  Runtime* runtime = thread->runtime();
+  DCHECK(args.get(0) == runtime->typeAt(LayoutId::kSet), "unexpected cls");
+  RawObject iterable_raw = args.get(1);
+  if (iterable_raw == runtime->emptyTuple()) {
+    return runtime->newSet();
+  }
+  HandleScope scope(thread);
+  Object iterable(&scope, iterable_raw);
+  Set self(&scope, runtime->newSet());
+  return setUpdate(thread, self, iterable);
 }
 
 RawObject FUNC(_builtins, _set_guard)(Thread* thread, Arguments args) {

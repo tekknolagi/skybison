@@ -480,6 +480,7 @@ class Runtime;
   V(_set__data)                                                                \
   V(_set__num_items)                                                           \
   V(_set__num_filled)                                                          \
+  V(_set_ctor)                                                                 \
   V(_set_iterator__consumed_count)                                             \
   V(_set_iterator__index)                                                      \
   V(_set_iterator__iterable)                                                   \
