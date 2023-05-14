@@ -53,8 +53,13 @@ RawObject hasAttribute(Thread* thread, const Object& object,
   Object interned(&scope, attributeName(thread, name));
   if (interned.isErrorException()) return *interned;
 
-  Object result(&scope,
-                thread->runtime()->attributeAt(thread, object, interned));
+  LoadAttrKind kind;
+  Object location(&scope, Unbound::object());
+  Object result(&scope, thread->runtime()->attributeAtSetLocation(
+                            thread, object, interned, &kind, &location));
+  if (result.isErrorNotFound()) {
+    return Bool::falseObj();
+  }
   if (!result.isErrorException()) {
     return Bool::trueObj();
   }

@@ -2943,6 +2943,10 @@ RawObject Runtime::attributeAtSetLocation(Thread* thread,
     if (!result.isErrorNotFound()) {
       return *result;
     }
+    if (location_out != nullptr && location_out->isUnbound()) {
+      // hasattr doesn't need the full exception; don't format and raise.
+      return Error::notFound();
+    }
     return objectRaiseAttributeError(thread, receiver, name);
   }
   if (type.hasFlag(Type::Flag::kHasModuleDunderGetattribute) &&
@@ -2963,6 +2967,10 @@ RawObject Runtime::attributeAtSetLocation(Thread* thread,
     result = thread->invokeMethod2(receiver, ID(__getattr__), name);
     if (!result.isErrorNotFound()) {
       return *result;
+    }
+    if (location_out != nullptr && location_out->isUnbound()) {
+      // hasattr doesn't need the full exception; don't format and raise.
+      return Error::notFound();
     }
     return moduleRaiseAttributeError(thread, module, name);
   }
@@ -2987,6 +2995,10 @@ RawObject Runtime::attributeAtSetLocation(Thread* thread,
     if (!result.isErrorNotFound()) {
       return *result;
     }
+    if (location_out != nullptr && location_out->isUnbound()) {
+      // hasattr doesn't need the full exception; don't format and raise.
+      return Error::notFound();
+    }
     Object type_name(&scope, object_as_type.name());
     return thread->raiseWithFmt(LayoutId::kAttributeError,
                                 "type object '%S' has no attribute '%S'",
@@ -2997,6 +3009,10 @@ RawObject Runtime::attributeAtSetLocation(Thread* thread,
     Object result(&scope, superGetAttribute(thread, object_as_super, name));
     if (!result.isErrorNotFound()) {
       return *result;
+    }
+    if (location_out != nullptr && location_out->isUnbound()) {
+      // hasattr doesn't need the full exception; don't format and raise.
+      return Error::notFound();
     }
     return thread->raiseWithFmt(LayoutId::kAttributeError,
                                 "super object has no attribute '%S'", &name);
