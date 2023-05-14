@@ -182,19 +182,46 @@ jobs:
         pushd /var/tmp/django_minimal
         ${{github.workspace}}/benchmarks/benchmarks/django/setup_django_minimal.sh
         popd
-        ./benchmarks/quickbench/diffrevs.py --run-django HEAD^ HEAD | tee benchmark-results.json
+        ./benchmarks/quickbench/diffrevs.py --run-django HEAD^ HEAD | tee django-benchmark-results.json
     - name: Comment on Pull Request
       uses: actions/github-script@v5
       with:
         script: |
           const { promises: fs } = require('fs');
-          const benchmark_results = await fs.readFile('${{github.workspace}}/benchmark-results.json', 'utf8');
+          const benchmark_results = await fs.readFile('${{github.workspace}}/django-benchmark-results.json', 'utf8');
           const formatted_body = "```json\n" + benchmark_results + "\n```";
           github.rest.issues.createComment({
             issue_number: context.issue.number,
             owner: context.repo.owner,
             repo: context.repo.repo,
             body: formatted_body,
+          })
+    - name: Run benchmarks
+      working-directory: ${{github.workspace}}
+      run: |
+        # Should be cached
+        PREV_BUILD="$(./benchmarks/quickbench/build_rev.py HEAD^)"
+        CURR_BUILD="$(./benchmarks/quickbench/build_rev.py HEAD)"
+        ./benchmarks/run.py --tool callgrind --json \
+          --interpreter "$PREV_BUILD" --interpreter-name python_base --path $(pwd)/benchmarks/benchmarks \
+          --interpreter "$CURR_BUILD" --interpreter-name python_new --path $(pwd)/benchmarks/benchmarks \
+          --interpreter $(which python3.8) --interpreter-name fbcode-cpython --path $(pwd)/benchmarks/benchmarks \
+          | tee benchmark-results.json
+    - name: Format benchmark results
+      working-directory: ${{github.workspace}}
+      run: |
+        ./benchmarks/format_results.py benchmark-results.json | tee benchmark-results.md
+    - name: Comment on Pull Request
+      uses: actions/github-script@v5
+      with:
+        script: |
+          const { promises: fs } = require('fs');
+          const benchmark_results = await fs.readFile('${{github.workspace}}/benchmark-results.md', 'utf8');
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: benchmark_results,
           })
 
   lint:
