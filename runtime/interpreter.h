@@ -496,6 +496,7 @@ class Interpreter {
   static Continue doBuildConstKeyMap(Thread* thread, word arg);
   static Continue doBuildList(Thread* thread, word arg);
   static Continue doBuildSlice(Thread* thread, word arg);
+  static Continue doLoadSliceCached(Thread* thread, word arg);
   static Continue doBuildString(Thread* thread, word arg);
   static Continue doBuildTuple(Thread* thread, word arg);
   static Continue doDeleteDeref(Thread* thread, word arg);
