@@ -895,6 +895,18 @@ def _range_check(obj):
     _builtin()
 
 
+def _range_ctor_start_stop(cls, start, stop):
+    _builtin()
+
+
+def _range_ctor_start_stop_step(cls, start, stop, step):
+    _builtin()
+
+
+def _range_ctor_stop(cls, stop):
+    _builtin()
+
+
 def _range_guard(obj):
     "$intrinsic$"
     _builtin()

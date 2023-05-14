@@ -460,6 +460,9 @@ class Runtime;
   V(_pointer__cptr)                                                            \
   V(_pointer__length)                                                          \
   V(_pos)                                                                      \
+  V(_range_ctor_start_stop)                                                    \
+  V(_range_ctor_start_stop_step)                                               \
+  V(_range_ctor_stop)                                                          \
   V(_range_iterator__length)                                                   \
   V(_range_iterator__next)                                                     \
   V(_range_iterator__step)                                                     \

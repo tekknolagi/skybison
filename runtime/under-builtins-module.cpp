@@ -4315,6 +4315,79 @@ RawObject FUNC(_builtins, _range_check)(Thread*, Arguments args) {
   return Bool::fromBool(args.get(0).isRange());
 }
 
+RawObject FUNC(_builtins, _range_ctor_start_stop)(Thread* thread,
+                                                  Arguments args) {
+  Runtime* runtime = thread->runtime();
+  DCHECK(args.get(0) == runtime->typeAt(LayoutId::kRange), "unexpected cls");
+  HandleScope scope(thread);
+  Object start(&scope, args.get(1));
+  if (!start.isSmallInt()) {
+    start = intFromIndex(thread, start);
+    if (start.isError()) {
+      return *start;
+    }
+  }
+  Object stop(&scope, args.get(2));
+  if (!stop.isSmallInt()) {
+    stop = intFromIndex(thread, stop);
+    if (stop.isError()) {
+      return *stop;
+    }
+  }
+  Object step(&scope, SmallInt::fromWord(1));
+  return runtime->newRange(start, stop, step);
+}
+
+RawObject FUNC(_builtins, _range_ctor_start_stop_step)(Thread* thread,
+                                                       Arguments args) {
+  Runtime* runtime = thread->runtime();
+  DCHECK(args.get(0) == runtime->typeAt(LayoutId::kRange), "unexpected cls");
+  HandleScope scope(thread);
+  Object start(&scope, args.get(1));
+  if (!start.isSmallInt()) {
+    start = intFromIndex(thread, start);
+    if (start.isError()) {
+      return *start;
+    }
+  }
+  Object stop(&scope, args.get(2));
+  if (!stop.isSmallInt()) {
+    stop = intFromIndex(thread, stop);
+    if (stop.isError()) {
+      return *stop;
+    }
+  }
+  Object step(&scope, args.get(3));
+  if (!step.isSmallInt()) {
+    step = intFromIndex(thread, step);
+    if (step.isError()) {
+      return *step;
+    }
+  }
+  Int step_int(&scope, intUnderlying(*step));
+  if (step_int.isZero()) {
+    return thread->raiseWithFmt(LayoutId::kValueError,
+                                "range() arg 3 must not be zero");
+  }
+  return runtime->newRange(start, stop, step);
+}
+
+RawObject FUNC(_builtins, _range_ctor_stop)(Thread* thread, Arguments args) {
+  Runtime* runtime = thread->runtime();
+  DCHECK(args.get(0) == runtime->typeAt(LayoutId::kRange), "unexpected cls");
+  HandleScope scope(thread);
+  Object start(&scope, SmallInt::fromWord(0));
+  Object stop(&scope, args.get(1));
+  if (!stop.isSmallInt()) {
+    stop = intFromIndex(thread, stop);
+    if (stop.isError()) {
+      return *stop;
+    }
+  }
+  Object step(&scope, SmallInt::fromWord(1));
+  return runtime->newRange(start, stop, step);
+}
+
 RawObject FUNC(_builtins, _range_guard)(Thread* thread, Arguments args) {
   if (args.get(0).isRange()) {
     return NoneType::object();

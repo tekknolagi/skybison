@@ -52,10 +52,10 @@ positions: line
 events: Op
 
 fl=\\(0\\) <empty>
-fn=\\(0\\) builtins.range.__new__
+fn=\\(0\\) _builtins._profiler_exclude
 0 1
 
-fn=\\(1\\) _builtins._profiler_exclude
+fn=\\(1\\) _builtins._range_ctor_stop
 0 1
 
 fl=\\(1\\) {this_module.__file__}
@@ -66,14 +66,14 @@ fl=\\(2\\) {_profiler.__file__}
 fn=\\(3\\) _profiler.dump_callgrind
 [0-9]+ 0
 cfi=\\(0\\)
-cfn=\\(1\\)
+cfn=\\(0\\)
 calls=1 0
 [0-9]+ 1
 
 fl=\\(1\\)
 fn=\\(4\\) __main__.ProfilerTest.test_dump_callgrind_writes_file.<locals>.foo
 [0-9]+ [0-9]+
-cfn=\\(0\\)
+cfn=\\(1\\)
 calls=1 0
 [0-9]+ 1
 cfi=\\(1\\)
