@@ -2458,7 +2458,22 @@ void emitHandler<ROT_TWO>(EmitEnv* env) {
 
   __ popq(r_scratch);
   __ pushq(Address(RSP, 0));
-  __ movq(Address(RSP, 8), r_scratch);
+  __ movq(Address(RSP, kPointerSize), r_scratch);
+  emitNextOpcodeFallthrough(env);
+}
+
+template <>
+void emitHandler<ROT_THREE>(EmitEnv* env) {
+  ScratchReg r_top(env);
+  ScratchReg r_second(env);
+  ScratchReg r_third(env);
+
+  __ popq(r_top);
+  __ popq(r_second);
+  __ popq(r_third);
+  __ pushq(r_top);
+  __ pushq(r_third);
+  __ pushq(r_second);
   emitNextOpcodeFallthrough(env);
 }
 
