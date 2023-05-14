@@ -2683,12 +2683,19 @@ class RawModule : public RawAttributeDict {
   word id() const;
   void setId(word id) const;
 
+  // Return true if the module is built-in; if so, the high bit of id is
+  // tagged.
+  bool isBuiltin() const;
+
   // Layout.
   static const int kNameOffset = RawAttributeDict::kSize;
   static const int kDefOffset = kNameOffset + kPointerSize;
   static const int kStateOffset = kDefOffset + kPointerSize;
   static const int kModuleProxyOffset = kStateOffset + kPointerSize;
   static const int kSize = kModuleProxyOffset + kPointerSize;
+
+  static const uword kBuiltinTag = uword{1} << sizeof(uword);
+  static const uword kBuiltinTagMask = ~kBuiltinTag;
 
   // Constants.
   static const word kMaxModuleId = RawHeader::kHashCodeMask;
@@ -7058,6 +7065,10 @@ inline void RawModule::setId(word id) const {
   DCHECK(static_cast<word>(id & RawHeader::kHashCodeMask) == id,
          "Module ID %ld doesn't fit in hash code", id);
   setHeader(header().withHashCode(id));
+}
+
+inline bool RawModule::isBuiltin() const {
+  return id() & kBuiltinTagMask;
 }
 
 // RawModuleProxy

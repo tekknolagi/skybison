@@ -30,6 +30,7 @@ static RawObject createBuiltinModule(Thread* thread, const Str& name) {
   if (builtin_index >= 0) {
     const FrozenModule* frozen_module = &kFrozenModules[builtin_index];
     Module module(&scope, runtime->newModule(name));
+    module.setId(module.id() | RawModule::kBuiltinTag);
     Object modules(&scope, runtime->modules());
     Object result(&scope, objectSetItem(thread, modules, name, module));
     if (result.isErrorException()) return *result;
