@@ -21,15 +21,19 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    - name: Install ninja
+      run: sudo apt install -y ninja-build
+
     - name: Configure CMake
-      # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
-      # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{matrix.BUILD_TYPE}} -DCMAKE_TOOLCHAIN_FILE=util/linux.cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+      run: |
+        cmake -GNinja -B ${{github.workspace}}/build \
+        -DCMAKE_TOOLCHAIN_FILE=util/linux.cmake \
+        -DCMAKE_BUILD_TYPE=${{matrix.BUILD_TYPE}} \
+        -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
 
     - name: Build
       working-directory: ${{github.workspace}}/build
-      run: |
-        make -j4
+      run: ninja -j4
 
     - name: Run C++ tests with Skybison
       working-directory: ${{github.workspace}}/build
@@ -111,16 +115,19 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    - name: Install ninja
+      run: sudo apt install -y ninja-build
+
     - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build \
-        -DCMAKE_BUILD_TYPE=DebugOpt \
+      run: |
+        cmake -GNinja -B ${{github.workspace}}/build \
         -DCMAKE_TOOLCHAIN_FILE=util/linux.cmake \
+        -DCMAKE_BUILD_TYPE=DebugOpt \
         -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
 
     - name: Build
       working-directory: ${{github.workspace}}/build
-      run: |
-        make -j4 cpython cpython-tests
+      run: ninja -j4 cpython cpython-tests
 
     - name: Run C++ tests with CPython
       working-directory: ${{github.workspace}}
