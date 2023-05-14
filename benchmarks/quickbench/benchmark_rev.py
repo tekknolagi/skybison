@@ -46,6 +46,24 @@ def benchmark(repo_root, revision, binary, resultsdir, args):
         proc = run(cmd, cwd="/", log_level=logging.INFO)
         results += json.loads(proc.stdout)
 
+    if args.run_benchmark:
+        cgoutdir = f"{resultsdir}/cg"
+        cmd = [
+            f"{repo_root}/benchmarks/run.py",
+            "-i",
+            binary,
+            "-p",
+            f"{repo_root}/benchmarks/benchmarks",
+            "--benchmark",
+            args.run_benchmark,
+            "--json",
+            "--tool=callgrind",
+            "--callgrind-out-dir",
+            cgoutdir,
+        ]
+        proc = run(cmd, cwd="/", log_level=logging.INFO)
+        results += json.loads(proc.stdout)
+
     for result in results:
         # Remove interpreter path as it unnecessarily produces
         # differences because of changing temporary directories.
@@ -72,6 +90,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--run-django", default=None, action="store_true")
     parser.add_argument("--run-benchmarks", default=None, action="store_true")
+    parser.add_argument("--run-benchmark", default=None, action="store")
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
 
@@ -80,13 +99,18 @@ if __name__ == "__main__":
 
     repo_root = get_repo_root(SCRIPT_PATH)
 
-    if args.run_django is None and args.run_benchmarks is None:
+    if (
+        args.run_django is None
+        and args.run_benchmarks is None
+        and args.run_benchmark is None
+    ):
         args.run_django = True
 
     cache_env = (
         open(__file__, "r").read()
         + f"django: {args.run_django}"
         + f"benchmarks: {args.run_benchmarks}"
+        + f"benchmark: {args.run_benchmark}"
     )
     cache_env_hash = hashlib.sha256(cache_env.encode()).hexdigest()[:8]
 
