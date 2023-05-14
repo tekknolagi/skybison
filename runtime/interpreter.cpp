@@ -4581,8 +4581,8 @@ Continue Interpreter::callFunctionTypeNewUpdateCache(Thread* thread, word arg,
   MutableTuple caches(&scope, frame->caches());
   Object ctor(&scope, receiver.ctor());
   bool set_ctor = false;
+  Runtime* runtime = thread->runtime();
   if (arg == 1) {
-    Runtime* runtime = thread->runtime();
     switch (receiver.instanceLayoutId()) {
       case LayoutId::kStr:
         ctor = runtime->lookupNameInModule(thread, ID(_builtins),
@@ -4600,6 +4600,34 @@ Continue Interpreter::callFunctionTypeNewUpdateCache(Thread* thread, word arg,
         ctor = runtime->lookupNameInModule(thread, ID(_builtins),
                                            ID(_int_ctor_obj));
         DCHECK(!ctor.isError(), "cannot find _int_ctor_obj");
+        set_ctor = true;
+        break;
+      case LayoutId::kRange:
+        ctor = runtime->lookupNameInModule(thread, ID(_builtins),
+                                           ID(_range_ctor_stop));
+        DCHECK(!ctor.isError(), "cannot find _range_ctor_stop");
+        set_ctor = true;
+        break;
+      default:
+        break;
+    }
+  } else if (arg == 2) {
+    switch (receiver.instanceLayoutId()) {
+      case LayoutId::kRange:
+        ctor = runtime->lookupNameInModule(thread, ID(_builtins),
+                                           ID(_range_ctor_start_stop));
+        DCHECK(!ctor.isError(), "cannot find _range_ctor_start_stop");
+        set_ctor = true;
+        break;
+      default:
+        break;
+    }
+  } else if (arg == 3) {
+    switch (receiver.instanceLayoutId()) {
+      case LayoutId::kRange:
+        ctor = runtime->lookupNameInModule(thread, ID(_builtins),
+                                           ID(_range_ctor_start_stop_step));
+        DCHECK(!ctor.isError(), "cannot find _range_ctor_start_stop_step");
         set_ctor = true;
         break;
       default:
