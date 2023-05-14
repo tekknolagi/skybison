@@ -447,6 +447,11 @@ static void pickBuiltinTypeCtorFunction(Thread* thread, const Type& type) {
       ctor = moduleAtById(thread, under_builtins, ID(_list_ctor));
       break;
     }
+    case LayoutId::kSet: {
+      Module under_builtins(&scope, runtime->findModuleById(ID(_builtins)));
+      ctor = moduleAtById(thread, under_builtins, ID(_set_ctor));
+      break;
+    }
     case LayoutId::kStr: {
       Module under_builtins(&scope, runtime->findModuleById(ID(_builtins)));
       ctor = moduleAtById(thread, under_builtins, ID(_str_ctor));

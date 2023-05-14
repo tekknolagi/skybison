@@ -941,6 +941,10 @@ def _set_check(obj):
     _builtin()
 
 
+def _set_ctor(cls, iterable=()):
+    _builtin()
+
+
 def _set_function_flag_iterable_coroutine(code):
     _builtin()
 
