@@ -2446,6 +2446,13 @@ void emitHandler<DUP_TOP>(EmitEnv* env) {
 }
 
 template <>
+void emitHandler<DUP_TOP_TWO>(EmitEnv* env) {
+  __ pushq(Address(RSP, kPointerSize));
+  __ pushq(Address(RSP, kPointerSize));
+  emitNextOpcodeFallthrough(env);
+}
+
+template <>
 void emitHandler<ROT_TWO>(EmitEnv* env) {
   ScratchReg r_scratch(env);
 
