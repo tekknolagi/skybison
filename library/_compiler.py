@@ -2,9 +2,10 @@
 import ast
 from ast import AST
 from compiler import compile as compiler_compile
+from compiler.consts import CO_VARARGS, CO_VARKEYWORDS
 from compiler.optimizer import BIN_OPS, is_const, get_const_value
 from compiler.py38.optimizer import AstOptimizer38
-from compiler.pyassem import PyFlowGraph38
+from compiler.pyassem import PyFlowGraph38, Instruction
 from compiler.pycodegen import Python38CodeGenerator
 from compiler.symbols import SymbolVisitor
 from compiler.visitor import ASTVisitor, walk
@@ -209,6 +210,95 @@ class AstOptimizerPyro(AstOptimizer38):
 
 class PyroFlowGraph(PyFlowGraph38):
     opcode = opcodepyro.opcode
+
+    def optimizeLoadFast(self):
+        blocks = self.getBlocksInOrder()
+        preds = tuple(set() for i in range(self.block_count))
+        for block in blocks:
+            for child in block.get_children():
+                if child is not None:
+                    # TODO(emacs): Tail-duplicate finally blocks or upgrade to
+                    # 3.10, which does this already. This avoids except blocks
+                    # falling through into else blocks and mucking up
+                    # performance.
+                    preds[child.bid].add(block.bid)
+
+        num_locals = len(self.varnames)
+        Top = 2**num_locals - 1
+        # map of block id -> assignment state in lattice
+        assigned_out = [Top] * self.block_count
+        conditionally_assigned = set()
+        argcount = (
+            len(self.args)
+            + len(self.kwonlyargs)
+            + bool(self.flags & CO_VARARGS)
+            + bool(self.flags & CO_VARKEYWORDS)
+        )
+        total_locals = num_locals + len(self.cellvars) + len(self.freevars)
+        ArgsAssigned = 2**argcount - 1
+
+        def reverse_local_idx(idx):
+            return total_locals - idx - 1
+
+        def meet(args):
+            result = Top
+            for arg in args:
+                result &= arg
+            return result
+
+        def process_one_block(block, modify=False):
+            bid = block.bid
+            if len(preds[bid]) == 0:
+                # No preds; all parameters are assigned
+                assigned = ArgsAssigned
+            else:
+                # Meet the assigned sets of all predecessors
+                assigned = meet(assigned_out[pred] for pred in preds[bid])
+            for instr in block.getInstructions():
+                if modify and instr.opname == "LOAD_FAST":
+                    if assigned & (1 << instr.ioparg):
+                        instr.opname = "LOAD_FAST_REVERSE_UNCHECKED"
+                        instr.ioparg = reverse_local_idx(instr.ioparg)
+                    elif instr.ioparg >= argcount:
+                        # Exclude arguments because they come into the function
+                        # body assigned. The only thing that can undefine them
+                        # is DELETE_FAST.
+                        conditionally_assigned.add(instr.oparg)
+                elif instr.opname == "STORE_FAST":
+                    assigned |= 1 << instr.ioparg
+                    if modify:
+                        instr.opname = "STORE_FAST_REVERSE"
+                        instr.ioparg = reverse_local_idx(instr.ioparg)
+                elif instr.opname == "DELETE_FAST":
+                    assigned &= ~(1 << instr.ioparg)
+            if assigned == assigned_out[bid]:
+                return False
+            assigned_out[bid] = assigned
+            return True
+
+        changed = True
+        while changed:
+            changed = False
+            for block in blocks:
+                changed |= process_one_block(block)
+
+        for block in blocks:
+            process_one_block(block, modify=True)
+
+        if conditionally_assigned:
+            deletes = [
+                Instruction(
+                    "DELETE_FAST_REVERSE_UNCHECKED",
+                    name,
+                    reverse_local_idx(self.varnames.index(name)),
+                )
+                for name in sorted(conditionally_assigned)
+            ]
+            self.entry.insts = deletes + self.entry.insts
+
+    def getCode(self):
+        self.optimizeLoadFast()
+        return super().getCode()
 
 
 class ComprehensionRenamer(ASTVisitor):
