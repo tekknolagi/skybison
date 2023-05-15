@@ -3608,8 +3608,7 @@ void Runtime::freeApiHandles() {
   freeExtensionModules(thread);
 
   // Process any native instance that is only referenced through the NativeProxy
-  for (;;) {
-    word before = numExtensionObjects(this) + numApiHandles(this);
+  for (word before = numExtensionObjects(this) + numApiHandles(this);;) {
     collectGarbage();
     word after = numExtensionObjects(this) + numApiHandles(this);
     word num_handles_collected = before - after;
@@ -3617,6 +3616,7 @@ void Runtime::freeApiHandles() {
       // Fixpoint: no change in tracking
       break;
     }
+    before = after;
   }
   collectGarbage();
 
