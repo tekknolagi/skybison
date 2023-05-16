@@ -295,27 +295,6 @@ void rewriteBytecode(Thread* thread, const Function& function) {
   }
   MutableBytes bytecode(&scope, function.rewrittenBytecode());
   word num_opcodes = rewrittenBytecodeLength(bytecode);
-  // Scan bytecode to figure out how many caches we need and if we can use
-  // LOAD_FAST_REVERSE_UNCHECKED.
-  word num_caches = num_global_caches;
-  for (word i = 0; i < num_opcodes;) {
-    BytecodeOp op = nextBytecodeOp(bytecode, &i);
-    RewrittenOp rewritten = rewriteOperation(function, op);
-    if (rewritten.needs_inline_cache) {
-      num_caches++;
-    }
-  }
-  if (num_caches > kMaxCaches) {
-    // Populate global variable caches unconditionally since the interpreter
-    // assumes their existence.
-    if (num_global_caches > 0) {
-      MutableTuple caches(&scope, runtime->newMutableTuple(
-                                      num_global_caches * kIcPointersPerEntry));
-      caches.fill(NoneType::object());
-      function.setCaches(*caches);
-    }
-    return;
-  }
   word cache = num_global_caches;
   for (word i = 0; i < num_opcodes;) {
     BytecodeOp op = nextBytecodeOp(bytecode, &i);
@@ -323,19 +302,25 @@ void rewriteBytecode(Thread* thread, const Function& function) {
     RewrittenOp rewritten = rewriteOperation(function, op);
     if (rewritten.bc == UNUSED_BYTECODE_0) continue;
     if (rewritten.needs_inline_cache) {
-      rewrittenBytecodeOpAtPut(bytecode, previous_index, rewritten.bc);
-      rewrittenBytecodeArgAtPut(bytecode, previous_index,
-                                static_cast<byte>(rewritten.arg));
-      rewrittenBytecodeCacheAtPut(bytecode, previous_index, cache);
+      if (cache < kMaxCaches) {
+        rewrittenBytecodeOpAtPut(bytecode, previous_index, rewritten.bc);
+        rewrittenBytecodeArgAtPut(bytecode, previous_index,
+                                  static_cast<byte>(rewritten.arg));
+        rewrittenBytecodeCacheAtPut(bytecode, previous_index, cache);
 
-      cache++;
-    } else if (rewritten.arg != op.arg || rewritten.bc != op.bc) {
+        cache++;
+      }
+      continue;
+    }
+    if (rewritten.arg != op.arg || rewritten.bc != op.bc) {
       rewrittenBytecodeOpAtPut(bytecode, previous_index, rewritten.bc);
       rewrittenBytecodeArgAtPut(bytecode, previous_index,
                                 static_cast<byte>(rewritten.arg));
     }
   }
-  DCHECK(cache == num_caches, "cache size mismatch");
+  // It may end up exactly equal to kMaxCaches; that's fine because it's a post
+  // increment.
+  DCHECK(cache <= kMaxCaches, "Too many caches: %ld", cache);
   if (cache > 0) {
     MutableTuple caches(&scope,
                         runtime->newMutableTuple(cache * kIcPointersPerEntry));
