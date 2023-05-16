@@ -1512,24 +1512,33 @@ void emitHandler<STORE_ATTR_INSTANCE>(EmitEnv* env) {
 template <>
 void emitHandler<STORE_ATTR_INSTANCE_OVERFLOW>(EmitEnv* env) {
   ScratchReg r_base(env);
-  ScratchReg r_layout_id(env);
-  ScratchReg r_cache_value(env);
-  ScratchReg r_caches(env);
+  ScratchReg r_packed_location(env);
   Label slow_path;
 
-  __ popq(r_base);
-  emitGetLayoutId(env, r_layout_id, r_base);
-  __ movq(r_caches, Address(env->frame, Frame::kCachesOffset));
-  emitIcLookupMonomorphic(env, &slow_path, r_cache_value, r_layout_id,
-                          r_caches);
-  emitConvertFromSmallInt(env, r_cache_value);
-
   {
-    ScratchReg r_scratch(env);
-    emitLoadOverflowTuple(env, r_scratch, r_layout_id, r_base);
-    // The real tuple index is -offset - 1, which is the same as ~offset.
-    __ notq(r_cache_value);
-    __ popq(Address(r_scratch, r_cache_value, TIMES_8, heapObjectDisp(0)));
+    ScratchReg r_layout_id(env);
+    ScratchReg r_caches(env);
+    __ popq(r_base);
+    emitGetLayoutId(env, r_layout_id, r_base);
+    __ movq(r_caches, Address(env->frame, Frame::kCachesOffset));
+    emitIcLookupMonomorphic(env, &slow_path, r_packed_location, r_layout_id,
+                            r_caches);
+  }
+
+  ScratchReg r_overflow_offset(env);
+  // uword packed_location = SmallInt::cast(cached).value();
+  emitConvertFromSmallInt(env, r_packed_location);
+  __ movq(r_overflow_offset, r_packed_location);
+  // uword overflow_offset = packed_location & 0xffffffff;
+  __ andq(r_overflow_offset, Immediate(0xffffffff));
+  // uword offset = packed_location >> 32;
+  __ shrq(r_packed_location, Immediate(32));
+  {
+    ScratchReg r_overflow_tuple(env);
+    __ movq(r_overflow_tuple,
+            Address(r_base, r_overflow_offset, TIMES_1, heapObjectDisp(0)));
+    __ popq(Address(r_overflow_tuple, r_packed_location, TIMES_8,
+                    heapObjectDisp(0)));
     emitNextOpcode(env);
   }
 
