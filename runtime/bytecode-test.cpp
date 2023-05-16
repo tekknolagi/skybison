@@ -66,24 +66,11 @@ TEST_F(BytecodeTest, RewriteBytecodeWithMoreThanCacheLimitCapsRewriting) {
     bytecode[i * kCompilerCodeUnitSize] = LOAD_ATTR;
     bytecode[(i * kCompilerCodeUnitSize) + 1] = i * 3;
   }
-  // LOAD_GLOBAL 527 == 4 * 128 + 15.
+  // LOAD_GLOBAL 1039 == 4 * 256 + 15.
   bytecode[cache_limit * kCompilerCodeUnitSize] = EXTENDED_ARG;
   bytecode[cache_limit * kCompilerCodeUnitSize + 1] = 4;
   bytecode[(cache_limit + 1) * kCompilerCodeUnitSize] = LOAD_GLOBAL;
   bytecode[(cache_limit + 1) * kCompilerCodeUnitSize + 1] = 15;
-
-  // Expanded bytecode, as if by Runtime::expandBytecode
-  byte rewritten_bytecode[(cache_limit + 2) * kCodeUnitSize];
-  std::memset(rewritten_bytecode, 0, sizeof rewritten_bytecode);
-  for (word i = 0; i < cache_limit; i++) {
-    rewritten_bytecode[i * kCodeUnitSize] = LOAD_ATTR;
-    rewritten_bytecode[(i * kCodeUnitSize) + 1] = i * 3;
-  }
-  // LOAD_GLOBAL 527 == 4 * 128 + 15.
-  rewritten_bytecode[cache_limit * kCodeUnitSize] = EXTENDED_ARG;
-  rewritten_bytecode[cache_limit * kCodeUnitSize + 1] = 4;
-  rewritten_bytecode[(cache_limit + 1) * kCodeUnitSize] = LOAD_GLOBAL;
-  rewritten_bytecode[(cache_limit + 1) * kCodeUnitSize + 1] = 15;
 
   word global_names_length = 600;
   Tuple consts(&scope, runtime_->emptyTuple());
@@ -100,9 +87,29 @@ TEST_F(BytecodeTest, RewriteBytecodeWithMoreThanCacheLimitCapsRewriting) {
 
   // newFunctionWithCode() calls rewriteBytecode().
   Object rewritten_bytecode_obj(&scope, function.rewrittenBytecode());
-  // The bytecode hasn't changed.
-  EXPECT_TRUE(
-      isMutableBytesEqualsBytes(rewritten_bytecode_obj, rewritten_bytecode));
+  ASSERT_TRUE(rewritten_bytecode_obj.isMutableBytes());
+  MutableBytes rewritten_bytecode(&scope, *rewritten_bytecode_obj);
+  word expected_cache = global_names_length / kIcPointersPerEntry;
+  word i = 0;
+  for (; i < cache_limit - global_names_length / kIcPointersPerEntry;) {
+    BytecodeOp op = nextBytecodeOp(rewritten_bytecode, &i);
+    EXPECT_EQ(op.bc, LOAD_ATTR_ANAMORPHIC)
+        << "unexpected " << kBytecodeNames[op.bc] << " at idx " << i;
+    EXPECT_EQ(op.arg, ((i - 1) * 3) % 256);  // What fits in a byte
+    EXPECT_EQ(op.cache, expected_cache);
+    expected_cache++;
+  }
+  for (; i < cache_limit;) {
+    BytecodeOp op = nextBytecodeOp(rewritten_bytecode, &i);
+    EXPECT_EQ(op.bc, LOAD_ATTR)
+        << "unexpected " << kBytecodeNames[op.bc] << " at idx " << i;
+  }
+  BytecodeOp op = nextBytecodeOp(rewritten_bytecode, &i);
+  EXPECT_EQ(op.bc, LOAD_GLOBAL);
+  EXPECT_EQ(op.arg, 1039);
+  EXPECT_EQ(op.cache, 0);
+  EXPECT_EQ(Tuple::cast(function.caches()).length(),
+            cache_limit * kIcPointersPerEntry);
   // The cache for LOAD_GLOBAL was populated.
   EXPECT_GT(Tuple::cast(function.caches()).length(), 527);
 }
