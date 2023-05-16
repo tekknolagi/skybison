@@ -3317,8 +3317,10 @@ class dict(bootstrap=True):
 
     __hash__ = None
 
-    def __init__(self, other=_Unbound, /, **kwargs):
-        dict.update(self, other, **kwargs)
+    # def __init__(self, other=_Unbound, /, **kwargs):
+    #     if _dict_update(self, other, kwargs) is not _Unbound:
+    #         return
+    #     dict.update(self, other, **kwargs)
 
     def __iter__(self):
         _builtin()
@@ -3351,9 +3353,8 @@ class dict(bootstrap=True):
         _builtin()
 
     def copy(self):
-        _dict_guard(self)
         result = {}
-        result.update(self)
+        _dict_update(result, self, result)
         return result
 
     @_classmethod
@@ -3404,6 +3405,8 @@ class dict(bootstrap=True):
 
         for key, value in kwargs.items():
             _dict_setitem(self, key, value)
+
+    __init__ = update
 
     def values(self):
         _builtin()

@@ -325,13 +325,7 @@ static void dictInsertNoUpdate(const MutableTuple& data,
   }
 }
 
-static void dictEnsureCapacity(Thread* thread, const Dict& dict) {
-  DCHECK(dict.numIndices() && Utils::isPowerOfTwo(dict.numIndices()),
-         "dict capacity must be power of two, greater than zero");
-  if (dictHasUsableItem(dict)) {
-    return;
-  }
-
+static NEVER_INLINE void dictGrow(Thread* thread, const Dict& dict) {
   // TODO(T44247845): Handle overflow here.
   word new_num_indices = dict.numIndices() * kDictGrowthFactor;
   DCHECK(new_num_indices < kTombstoneValue,
@@ -359,6 +353,15 @@ static void dictEnsureCapacity(Thread* thread, const Dict& dict) {
   dict.setData(*new_data);
   dict.setIndices(*new_indices);
   dict.setFirstEmptyItemIndex(dict.numItems() * kItemNumPointers);
+}
+
+static void dictEnsureCapacity(Thread* thread, const Dict& dict) {
+  DCHECK(dict.numIndices() && Utils::isPowerOfTwo(dict.numIndices()),
+         "dict capacity must be power of two, greater than zero");
+  if (dictHasUsableItem(dict)) {
+    return;
+  }
+  dictGrow(thread, dict);
 }
 
 RawObject dictAtPut(Thread* thread, const Dict& dict, const Object& key,
