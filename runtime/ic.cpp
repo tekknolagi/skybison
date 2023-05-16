@@ -161,11 +161,6 @@ void icUpdateCallFunctionTypeNew(Thread* thread, const MutableTuple& caches,
   word id = static_cast<word>(type.instanceLayoutId());
   caches.atPut(index + kIcEntryKeyOffset, SmallInt::fromWord(id));
   caches.atPut(index + kIcEntryValueOffset, *constructor);
-  MutableBytes bytecode(&scope, dependent.rewrittenBytecode());
-  word pc = thread->currentFrame()->virtualPC() - kCodeUnitSize;
-  DCHECK(bytecode.byteAt(pc) == CALL_FUNCTION_ANAMORPHIC,
-         "current opcode must be CALL_FUNCTION_ANAMORPHIC");
-  bytecode.byteAtPut(pc, CALL_FUNCTION_TYPE_NEW);
   if (!type.isBuiltin()) {
     icInsertConstructorDependencies(thread, static_cast<LayoutId>(id),
                                     dependent);
@@ -859,6 +854,9 @@ bool IcIterator::isAttrNameEqualTo(const Object& attr_name) const {
     case BINARY_SUBSCR_MONOMORPHIC:
     case BINARY_SUBSCR_POLYMORPHIC:
       return attr_name == runtime_->symbols()->at(ID(__getitem__));
+    case CALL_FUNCTION_TYPE_INIT:
+      return attr_name == runtime_->symbols()->at(ID(__new__)) ||
+             attr_name == runtime_->symbols()->at(ID(__init__));
     case CALL_FUNCTION_TYPE_NEW:
       return attr_name == runtime_->symbols()->at(ID(__new__)) ||
              attr_name == runtime_->symbols()->at(ID(__init__));
