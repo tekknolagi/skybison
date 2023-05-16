@@ -4580,6 +4580,7 @@ Continue Interpreter::callFunctionTypeNewUpdateCache(Thread* thread, word arg,
   }
   MutableTuple caches(&scope, frame->caches());
   Object ctor(&scope, receiver.ctor());
+  bool set_ctor = false;
   if (arg == 1) {
     Runtime* runtime = thread->runtime();
     switch (receiver.instanceLayoutId()) {
@@ -4587,21 +4588,46 @@ Continue Interpreter::callFunctionTypeNewUpdateCache(Thread* thread, word arg,
         ctor = runtime->lookupNameInModule(thread, ID(_builtins),
                                            ID(_str_ctor_obj));
         DCHECK(!ctor.isError(), "cannot find _str_ctor_obj");
+        set_ctor = true;
         break;
       case LayoutId::kType:
         ctor =
             runtime->lookupNameInModule(thread, ID(_builtins), ID(_type_ctor));
         DCHECK(!ctor.isError(), "cannot find _type_ctor");
         break;
+        set_ctor = true;
       case LayoutId::kInt:
         ctor = runtime->lookupNameInModule(thread, ID(_builtins),
                                            ID(_int_ctor_obj));
         DCHECK(!ctor.isError(), "cannot find _int_ctor_obj");
+        set_ctor = true;
         break;
       default:
         break;
     }
   }
+  if (!set_ctor) {
+    // TODO(emacs): Split out objectInit from objectNew and split opcode into
+    // slots vs no slots
+    // TODO(emacs): Only cache if not abstract (and do not include that in
+    // objectInit)
+    // TODO(emacs): Also split by tuple overflow/no tuple overflow
+    // TODO(emacs): Also cache instanceSize so we can allocate without the
+    // layout object
+    bool use_object_dunder_new =
+        receiver.isType() && receiver.hasFlag(Type::Flag::kHasObjectDunderNew);
+    if (use_object_dunder_new) {
+      // Metaclass is "type" so we do not need to check for __init__ being a
+      // datadescriptor and we can look it up directly on the type.
+      ctor = typeLookupInMroById(thread, *receiver, ID(__init__));
+      DCHECK(!ctor.isError(), "self must have __init__");
+      rewriteCurrentBytecode(frame, CALL_FUNCTION_TYPE_INIT);
+      icUpdateCallFunctionTypeNew(thread, caches, cache, receiver, ctor,
+                                  dependent);
+      return doCallFunctionTypeInit(thread, arg);
+    }
+  }
+  rewriteCurrentBytecode(frame, CALL_FUNCTION_TYPE_NEW);
   icUpdateCallFunctionTypeNew(thread, caches, cache, receiver, ctor, dependent);
   return doCallFunctionTypeNew(thread, arg);
 }
@@ -4636,6 +4662,50 @@ HANDLER_INLINE Continue Interpreter::doCallFunctionTypeNew(Thread* thread,
   thread->stackSetAt(callable_idx, *ctor);
   thread->stackInsertAt(callable_idx, *receiver);
   return tailcallFunction(thread, arg + 1, *ctor);
+}
+
+HANDLER_INLINE Continue Interpreter::doCallFunctionTypeInit(Thread* thread,
+                                                            word arg) {
+  HandleScope scope(thread);
+  Frame* frame = thread->currentFrame();
+  word callable_idx = arg;
+  Object receiver(&scope, thread->stackPeek(callable_idx));
+  if (!receiver.isType()) {
+    EVENT_CACHE(CALL_FUNCTION_TYPE_INIT);
+    rewriteCurrentBytecode(frame, CALL_FUNCTION);
+    return doCallFunction(thread, arg);
+  }
+  MutableTuple caches(&scope, frame->caches());
+  word cache = currentCacheIndex(frame);
+  bool is_found;
+  Object init(&scope, icLookupMonomorphic(
+                          *caches, cache,
+                          Type::cast(*receiver).instanceLayoutId(), &is_found));
+  if (!is_found) {
+    EVENT_CACHE(CALL_FUNCTION_TYPE_INIT);
+    rewriteCurrentBytecode(frame, CALL_FUNCTION);
+    return doCallFunction(thread, arg);
+  }
+  Type type(&scope, *receiver);
+  Object instance(&scope, objectNew(thread, type));
+  DCHECK(init.isFunction(), "cached is expected to be a function");
+  thread->stackSetAt(callable_idx, *init);
+  thread->stackInsertAt(callable_idx, *instance);
+  Object result(&scope, callFunction(thread, arg + 1, *init));
+  // TODO(emacs): When we have real call/ret working in the assembly
+  // interpreter, add an asm implementation of this. Right now it does not make
+  // much sense to do that because the only way to call an entryAsm is to
+  // tailcall it... but we need to do the None check and return the instance.
+  if (!result.isNoneType()) {
+    if (!result.isErrorException()) {
+      Object type_name(&scope, type.name());
+      thread->raiseWithFmt(LayoutId::kTypeError,
+                           "%S.__init__ returned non None", &type_name);
+    }
+    return Continue::UNWIND;
+  }
+  thread->stackPush(*instance);
+  return Continue::NEXT;
 }
 
 HANDLER_INLINE Continue Interpreter::doMakeFunction(Thread* thread, word arg) {
