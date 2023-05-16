@@ -3353,9 +3353,8 @@ class dict(bootstrap=True):
         _builtin()
 
     def copy(self):
-        _dict_guard(self)
         result = {}
-        result.update(self)
+        _dict_update(result, self, result)
         return result
 
     @_classmethod
