@@ -759,11 +759,33 @@ std::ostream& operator<<(std::ostream& os, Thread* thread) {
   return os;
 }
 
+std::ostream& operator<<(std::ostream& os, LayoutId layout_id) {
+  os << "layout " << static_cast<word>(layout_id);
+  Thread* thread = Thread::current();
+  HandleScope scope(thread);
+  Runtime* runtime = thread->runtime();
+  Object layout_obj(&scope, runtime->layoutAtSafe(layout_id));
+  if (!layout_obj.isLayout()) {
+    os << '\n';
+    return os;
+  }
+  Layout layout(&scope, *layout_obj);
+  if (!runtime->isInstanceOfType(layout.describedType())) {
+    os << '\n';
+    return os;
+  }
+  Type type(&scope, layout.describedType());
+  os << " (" << type << "):\n";
+  return os;
+}
+
 USED void dump(RawObject object) { dumpExtended(std::cerr, object); }
 
 USED void dump(const Object& object) { dumpExtended(std::cerr, *object); }
 
 USED void dump(Frame* frame) { std::cerr << frame; }
+
+USED void dump(LayoutId id) { std::cerr << id; }
 
 USED void dumpPendingException(Thread* thread) { std::cerr << thread; }
 

@@ -53,10 +53,12 @@ std::ostream& operator<<(std::ostream& os, const Handle<T>& value) {
 
 std::ostream& operator<<(std::ostream& os, Frame* frame);
 std::ostream& operator<<(std::ostream& os, Thread* thread);
+std::ostream& operator<<(std::ostream& os, LayoutId layout_id);
 
 void dump(RawObject object);
 void dump(const Object& object);
 void dump(Frame* frame);
+void dump(LayoutId layout_id);
 void dumpPendingException(Thread* thread);
 void dumpSingleFrame(Frame* frame);
 void dumpTraceback();
