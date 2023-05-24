@@ -77,7 +77,7 @@ PY_EXPORT PyTypeObject* PyStructSequence_NewType(PyStructSequence_Desc* desc) {
   }
   Tuple field_names_tuple(&scope, field_names.becomeImmutable());
   Str name(&scope, runtime->newStrFromCStr(desc->name));
-  word flags = Type::Flag::kIsCPythonHeaptype;
+  word flags = Type::Flag::kIsCPythonHeaptype | Type::Flag::kIsStructseq;
   Object result(&scope, structseqNewType(thread, name, field_names_tuple,
                                          desc->n_in_sequence, flags));
   if (result.isErrorException()) return nullptr;
