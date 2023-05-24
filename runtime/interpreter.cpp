@@ -4594,8 +4594,8 @@ Continue Interpreter::callFunctionTypeNewUpdateCache(Thread* thread, word arg,
         ctor =
             runtime->lookupNameInModule(thread, ID(_builtins), ID(_type_ctor));
         DCHECK(!ctor.isError(), "cannot find _type_ctor");
-        break;
         set_ctor = true;
+        break;
       case LayoutId::kInt:
         ctor = runtime->lookupNameInModule(thread, ID(_builtins),
                                            ID(_int_ctor_obj));
