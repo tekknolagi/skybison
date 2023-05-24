@@ -139,10 +139,9 @@ jobs:
 
   lint:
     runs-on: ubuntu-20.04
-    # TODO(max): Install and run Black on Python code
     steps:
-    - name: Install clang-format
-      run: sudo apt install -y clang-format
+    - name: Install tools
+      run: sudo apt install -y clang-format black flake8
     - uses: actions/checkout@v3
     - name: Run clang-format
       working-directory: ${{github.workspace}}
@@ -150,3 +149,13 @@ jobs:
         find capi ext runtime -type f \( -name '*.c' -o -name '*.h' -o -name '*.cpp' \) \
           ! -wholename 'runtime/unicode-db.cpp' \
           -exec clang-format --dry-run --Werror '{}' ';'
+    - name: Run black
+      working-directory: ${{github.workspace}}
+      run: black --check --target-version=py310 library
+    - name: Run flake8
+      working-directory: ${{github.workspace}}
+      run: |
+        # Black allows 88 chars per line by default
+        flake8 --max-line-length=88 \
+        --extend-exclude=library/test/test_compiler/sbs_code_tests,library/test/test_compiler/testcorpus \
+        library
