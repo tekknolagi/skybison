@@ -4758,6 +4758,7 @@ RawObject FUNC(_builtins, _structseq_new_type)(Thread* thread, Arguments args) {
                              : SmallInt::cast(args.get(3)).value();
   word flags =
       is_heaptype.value() ? Type::Flag::kIsCPythonHeaptype : Type::Flag::kNone;
+  flags |= Type::Flag::kIsStructseq;
   return structseqNewType(thread, name, field_names, num_in_sequence, flags);
 }
 

@@ -3427,6 +3427,82 @@ a, b, c = l
                             "too many values to unpack"));
 }
 
+TEST_F(InterpreterTest, UnpackSequenceWithStructseq) {
+  ASSERT_FALSE(runFromCStr(runtime_, R"(
+from _builtins import _structseq_new_type
+C = _structseq_new_type("C", ("a", "b", "c"))
+obj = C((1,2,3))
+a, b, c = obj
+)")
+                   .isError());
+  HandleScope scope(thread_);
+  Object a(&scope, mainModuleAt(runtime_, "a"));
+  Object b(&scope, mainModuleAt(runtime_, "b"));
+  Object c(&scope, mainModuleAt(runtime_, "c"));
+  EXPECT_TRUE(isIntEqualsWord(*a, 1));
+  EXPECT_TRUE(isIntEqualsWord(*b, 2));
+  EXPECT_TRUE(isIntEqualsWord(*c, 3));
+}
+
+TEST_F(InterpreterTest, UnpackSequenceWithStructseqTooFewObjects) {
+  EXPECT_TRUE(raisedWithStr(runFromCStr(runtime_, R"(
+from _builtins import _structseq_new_type
+C = _structseq_new_type("C", ("a", "b"))
+obj = C((1,2))
+a, b, c = obj
+)"),
+                            LayoutId::kValueError,
+                            "not enough values to unpack"));
+}
+
+TEST_F(InterpreterTest, UnpackSequenceWithStructseqTooManyObjects) {
+  EXPECT_TRUE(raisedWithStr(runFromCStr(runtime_, R"(
+from _builtins import _structseq_new_type
+C = _structseq_new_type("C", ("a", "b", "c"))
+obj = C((1,2,3))
+a, b = obj
+)"),
+                            LayoutId::kValueError,
+                            "too many values to unpack"));
+}
+
+TEST_F(InterpreterTest, UnpackSequenceWithStructseqInObj) {
+  ASSERT_FALSE(runFromCStr(runtime_, R"(
+from _builtins import _structseq_new_type
+C = _structseq_new_type("C", ("a", "b", "c"), num_in_sequence=2)
+obj = C((1,2,3))
+a, b = obj
+)")
+                   .isError());
+  HandleScope scope(thread_);
+  Object a(&scope, mainModuleAt(runtime_, "a"));
+  Object b(&scope, mainModuleAt(runtime_, "b"));
+  EXPECT_TRUE(isIntEqualsWord(*a, 1));
+  EXPECT_TRUE(isIntEqualsWord(*b, 2));
+}
+
+TEST_F(InterpreterTest, UnpackSequenceWithStructseqTooFewObjectsInSeq) {
+  EXPECT_TRUE(raisedWithStr(runFromCStr(runtime_, R"(
+from _builtins import _structseq_new_type
+C = _structseq_new_type("C", ("a", "b", "c"), num_in_sequence=2)
+obj = C((1,2,3))
+a, b, c = obj
+)"),
+                            LayoutId::kValueError,
+                            "not enough values to unpack"));
+}
+
+TEST_F(InterpreterTest, UnpackSequenceWithStructseqTooManyObjectsInSeq) {
+  EXPECT_TRUE(raisedWithStr(runFromCStr(runtime_, R"(
+from _builtins import _structseq_new_type
+C = _structseq_new_type("C", ("a", "b", "c", "d"), num_in_sequence=3)
+obj = C((1,2,3,4))
+a, b = obj
+)"),
+                            LayoutId::kValueError,
+                            "too many values to unpack"));
+}
+
 TEST_F(InterpreterTest, PrintExprInvokesDisplayhook) {
   HandleScope scope(thread_);
   ASSERT_FALSE(runFromCStr(runtime_, R"(

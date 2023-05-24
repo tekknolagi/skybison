@@ -1286,6 +1286,9 @@ class RawType : public RawAttributeDict {
 
     // this_type.__eq__ is object.__eq__.
     kHasObjectDunderEq = 1 << 30,
+
+    // this_type is a structseq (and not a subclass thereof)
+    kIsStructseq = 1 << 31,
   };
 
   static const word kAttributeFlags =
@@ -1296,9 +1299,9 @@ class RawType : public RawAttributeDict {
       Flag::kHasDunderGet | Flag::kHasDunderSet | Flag::kHasDunderDelete |
       Flag::kHasObjectDunderEq;
 
-  static const word kUninheritableFlags = Flag::kIsAbstract |
-                                          Flag::kIsFixedAttributeBase |
-                                          Flag::kIsBasetype | kAttributeFlags;
+  static const word kUninheritableFlags =
+      Flag::kIsAbstract | Flag::kIsFixedAttributeBase | Flag::kIsBasetype |
+      kAttributeFlags | kIsStructseq;
 
   static const word kInheritableFlags = ~kUninheritableFlags;
 

@@ -2810,6 +2810,10 @@ HANDLER_INLINE USED RawObject Interpreter::unpackSequence(Thread* thread,
   } else if (iterable.isList()) {
     count = List::cast(iterable).numItems();
     iterable = List::cast(iterable).items();
+  } else if (thread->runtime()->typeOf(iterable).hasFlag(
+                 Type::Flag::kIsStructseq)) {
+    iterable = Tuple::cast(iterable.rawCast<RawUserTupleBase>().value());
+    count = Tuple::cast(iterable).length();
   } else {
     return unpackSequenceIterable(thread, length, iterable);
   }
