@@ -944,3 +944,18 @@ def getincrementalencoder(encoding):
     if encoder is None:
         raise LookupError(encoding)
     return encoder
+
+
+class EncodingMap:
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def size(self):
+        _unimplemented()
+
+
+def charmap_build(string):
+    _str_guard(string)
+    if _str_len(string) == "":
+        raise TypeError("bad argument type for built-in operation")
+    return EncodingMap()
