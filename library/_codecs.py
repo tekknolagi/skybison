@@ -208,8 +208,6 @@ def ascii_encode(data: str, errors: str = "strict"):
 def charmap_decode(data, errors="strict", mapping=None):
     _byteslike_guard(data)
     _str_guard(errors)
-    if errors != "strict":
-        _unimplemented()
 
     result = _str_array()
     data_len = _bytes_len(data)
@@ -218,19 +216,27 @@ def charmap_decode(data, errors="strict", mapping=None):
         try:
             mapped = mapping[data[i]]
             if mapped is None or mapped == "\ufffe":
+                if errors != "strict":
+                    _unimplemented()
                 raise UnicodeDecodeError(
                     "charmap", data, data[i], i, "character maps to <undefined>"
                 )
             if _int_check(mapped):
                 if mapped < 0 or mapped > _maxunicode:
+                    if errors != "strict":
+                        _unimplemented()
                     raise TypeError(
                         f"character mapping must be in range ({_maxunicode + 1:#x})"
                     )
                 mapped = chr(mapped)
             elif not _str_check(mapped):
+                if errors != "strict":
+                    _unimplemented()
                 raise TypeError("character mapping must return integer, None or str")
             _str_array_iadd(result, mapped)
         except (IndexError, KeyError):
+            if errors != "strict":
+                _unimplemented()
             raise UnicodeDecodeError(
                 "charmap", data, data[i], i, "character maps to <undefined>"
             )
