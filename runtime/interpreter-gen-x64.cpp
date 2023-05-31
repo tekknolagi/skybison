@@ -1459,6 +1459,62 @@ void emitHandler<LOAD_METHOD_INSTANCE_FUNCTION>(EmitEnv* env) {
   emitJumpToGenericHandler(env);
 }
 
+static void emitHeaderHashcode(EmitEnv* env, Register r_dst,
+                               Register r_container) {
+  // Load header().hashCode() as a SmallInt
+  // r_dst = header().hashCode()
+  __ movq(r_dst,
+          Address(r_container, heapObjectDisp(RawHeapObject::kHeaderOffset)));
+  __ shrq(r_dst, Immediate(RawHeader::kHashCodeOffset));
+  static_assert(RawHeader::kHashCodeOffset == 32,
+                "expected hash code to occupy top half of qword");
+  static_assert(RawHeader::kHashCodeBits == 32,
+                "expected hash code to occupy top half of qword");
+  __ shlq(r_dst, Immediate(Object::kSmallIntTagBits));
+}
+
+void emitPushImmediate(EmitEnv* env, word value) {
+  if (Utils::fits<int32_t>(value)) {
+    __ pushq(Immediate(value));
+  } else {
+    ScratchReg r_scratch(env);
+
+    __ movq(r_scratch, Immediate(value));
+    __ pushq(r_scratch);
+  }
+}
+
+template <>
+void emitHandler<LOAD_METHOD_MODULE>(EmitEnv* env) {
+  ScratchReg r_base(env);
+  ScratchReg r_module_id(env);
+  ScratchReg r_function(env);
+  ScratchReg r_caches(env);
+  Label slow_path;
+
+  __ popq(r_base);
+  emitJumpIfImmediate(env, r_base, &slow_path, Assembler::kNearJump);
+  emitJumpIfNotHasLayoutId(env, r_base, LayoutId::kModule, &slow_path);
+  __ movq(r_caches, Address(env->frame, Frame::kCachesOffset));
+  // TODO(emacs): Avoid a second header lookup here. I am not sure what a
+  // reasonable API for that would look like.
+  emitHeaderHashcode(env, r_module_id, r_base);
+  emitIcLookupMonomorphic(env, &slow_path, r_function, r_module_id, r_caches);
+  __ movq(r_function,
+          Address(r_function, heapObjectDisp(ValueCell::kValueOffset)));
+  emitPushImmediate(env, Unbound::object().raw());
+  __ pushq(r_function);
+  emitNextOpcode(env);
+
+  __ bind(&slow_path);
+  __ pushq(r_base);
+  if (env->in_jit) {
+    emitJumpToDeopt(env);
+    return;
+  }
+  emitJumpToGenericHandler(env);
+}
+
 template <>
 void emitHandler<LOAD_METHOD_POLYMORPHIC>(EmitEnv* env) {
   ScratchReg r_base(env);
@@ -2858,17 +2914,6 @@ void jitEmitHandler<CALL_FUNCTION>(JitEnv* env) {
 
   env->register_state.check(env->call_trampoline_assignment);
   emitCallTrampoline(env);
-}
-
-void emitPushImmediate(EmitEnv* env, word value) {
-  if (Utils::fits<int32_t>(value)) {
-    __ pushq(Immediate(value));
-  } else {
-    ScratchReg r_scratch(env);
-
-    __ movq(r_scratch, Immediate(value));
-    __ pushq(r_scratch);
-  }
 }
 
 template <>
