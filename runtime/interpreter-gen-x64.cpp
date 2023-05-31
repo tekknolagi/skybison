@@ -1516,6 +1516,35 @@ void emitHandler<LOAD_METHOD_MODULE>(EmitEnv* env) {
 }
 
 template <>
+void emitHandler<LOAD_METHOD_TYPE>(EmitEnv* env) {
+  ScratchReg r_base(env);
+  ScratchReg r_layout_id(env);
+  ScratchReg r_function(env);
+  ScratchReg r_caches(env);
+  Label slow_path;
+
+  __ popq(r_base);
+  emitJumpIfNotHeapObjectWithLayoutId(env, r_base, LayoutId::kType, &slow_path);
+  __ movq(r_layout_id,
+          Address(r_base, heapObjectDisp(Type::kInstanceLayoutIdOffset)));
+  __ movq(r_caches, Address(env->frame, Frame::kCachesOffset));
+  emitIcLookupMonomorphic(env, &slow_path, r_function, r_layout_id, r_caches);
+  __ movq(r_function,
+          Address(r_function, heapObjectDisp(ValueCell::kValueOffset)));
+  emitPushImmediate(env, Unbound::object().raw());
+  __ pushq(r_function);
+  emitNextOpcode(env);
+
+  __ bind(&slow_path);
+  __ pushq(r_base);
+  if (env->in_jit) {
+    emitJumpToDeopt(env);
+    return;
+  }
+  emitJumpToGenericHandler(env);
+}
+
+template <>
 void emitHandler<LOAD_METHOD_POLYMORPHIC>(EmitEnv* env) {
   ScratchReg r_base(env);
   ScratchReg r_layout_id(env);
