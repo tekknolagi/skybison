@@ -118,9 +118,11 @@ class UserVisibleFrameVisitor : public FrameVisitor {
     // this because uninitialized variables are not cleared and will read
     // arbitrary values.
     if (function.hasOptimizedOrNewlocals()) {
-      FrameProxy::cast(*heap_frame_).setLocals(thread_->runtime()->newDict());
+      RawObject locals = thread_->runtime()->newDict();
+      FrameProxy::cast(*heap_frame_).setLocals(locals);
     } else {
-      FrameProxy::cast(*heap_frame_).setLocals(frameLocals(thread_, frame));
+      RawObject locals = frameLocals(thread_, frame);
+      FrameProxy::cast(*heap_frame_).setLocals(locals);
     }
     if (result_.isNoneType()) {
       // The head of the linked list is returned as the result.

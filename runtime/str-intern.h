@@ -42,9 +42,13 @@ inline bool internSetAddFromAll(Thread* thread, RawMutableTuple data,
   for (;;) {
     RawObject slot = data.at(index);
     if (slot == SmallInt::fromWord(0)) {
+      // We need to create a handle in this case because we might trigger a GC
+      // and invalidate the pointer.
+      HandleScope scope(thread);
+      MutableTuple data_obj(&scope, data);
       RawLargeStr new_str = LargeStr::cast(runtime->newStrWithAll(bytes));
       new_str.setHeader(new_str.header().withHashCode(hash));
-      data.atPut(index, new_str);
+      data_obj.atPut(index, new_str);
       *result = new_str;
       return true;
     }

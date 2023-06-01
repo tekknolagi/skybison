@@ -5886,8 +5886,8 @@ Continue Interpreter::inplaceOpUpdateCache(Thread* thread, word arg,
   BinaryOp op = static_cast<BinaryOp>(arg);
   Object method(&scope, NoneType::object());
   BinaryOpFlags flags;
-  RawObject result =
-      inplaceOperationSetMethod(thread, op, left, right, &method, &flags);
+  Object result(&scope,
+      inplaceOperationSetMethod(thread, op, left, right, &method, &flags));
   if (!method.isNoneType()) {
     MutableTuple caches(&scope, frame->caches());
     LayoutId left_layout_id = left.layoutId();
@@ -5901,7 +5901,7 @@ Continue Interpreter::inplaceOpUpdateCache(Thread* thread, word arg,
                                       : INPLACE_OP_POLYMORPHIC);
   }
   if (result.isErrorException()) return Continue::UNWIND;
-  thread->stackPush(result);
+  thread->stackPush(*result);
   return Continue::NEXT;
 }
 
