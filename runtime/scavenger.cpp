@@ -246,7 +246,9 @@ void Scavenger::processLayouts() {
 
   // TODO(T59281894): We can skip this step if the Layouts table doesn't live
   // in the managed heap.
-  runtime_->setLayouts(transport(layouts_));
+  scavengePointer(&layouts_);
+  DCHECK(to_->contains(layouts_.address()), "layouts should have been transported");
+  runtime_->setLayouts(layouts_);
 
   // Remove dead empty entries (triples (A, B, C) where either A or C is dead).
   // Post-condition: all entries in the tuple will either be references to
