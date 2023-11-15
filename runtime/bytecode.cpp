@@ -272,6 +272,135 @@ RawObject expandBytecode(Thread* thread, const Bytes& bytecode) {
   return *result;
 }
 
+static constexpr uword setBottomNBits(uword n) {
+  // Shifting by the word size is undefined behavior in C++.
+  return n == kBitsPerWord ? kMaxUword : (1 << n) - 1;
+}
+
+static_assert(setBottomNBits(0) == 0, "");
+static_assert(setBottomNBits(1) == 1, "");
+static_assert(setBottomNBits(2) == 3, "");
+static_assert(setBottomNBits(3) == 7, "");
+static_assert(setBottomNBits(kBitsPerWord) == kMaxUword, "");
+
+struct Edge {
+  word start_index;
+  word end_index;
+};
+
+#define FOREACH_UNSUPPORTED_CASE(V)                                            \
+  V(POP_BLOCK)                                                                 \
+  V(RAISE_VARARGS)                                                             \
+  V(SETUP_ASYNC_WITH)                                                          \
+  V(SETUP_FINALLY)                                                             \
+  V(SETUP_WITH)                                                                \
+  V(WITH_CLEANUP_START)                                                        \
+  V(YIELD_FROM)                                                                \
+  V(YIELD_VALUE)                                                               \
+  V(END_ASYNC_FOR)
+
+static Vector<Edge> findEdges(const MutableBytes& bytecode) {
+  Vector<Edge> edges;
+  word num_opcodes = rewrittenBytecodeLength(bytecode);
+  for (word i = 0; i < num_opcodes;) {
+    BytecodeOp op = nextBytecodeOp(bytecode, &i);
+    switch (op.bc) {
+      case JUMP_IF_FALSE_OR_POP:
+      case JUMP_IF_TRUE_OR_POP:
+      case POP_JUMP_IF_FALSE:
+      case POP_JUMP_IF_TRUE:
+        edges.push_back(Edge{i, i + 1});
+        edges.push_back(Edge{i, i + op.arg / kCompilerCodeUnitSize});
+        break;
+      case JUMP_FORWARD:
+        edges.push_back(Edge{i, i + op.arg / kCompilerCodeUnitSize});
+        break;
+      case JUMP_ABSOLUTE:
+        edges.push_back(Edge{i, op.arg / kCompilerCodeUnitSize});
+        break;
+#define CASE(op) case op:
+        FOREACH_UNSUPPORTED_CASE(CASE)
+#undef CASE
+        UNIMPLEMENTED("exceptions, generators, and context managers: opcode %s",
+                      kBytecodeNames[op.bc]);
+        break;
+      default:
+        // By default, each instruction "jumps" to the next.
+        edges.push_back(Edge{i, i + 1});
+        break;
+    }
+  }
+  return edges;
+}
+
+static bool isHardToAnalyze(Thread* thread, const Function& function) {
+  uword flags = function.flags();
+  if (flags &
+      (Function::Flags::kGenerator | Function::Flags::kAsyncGenerator |
+       Function::Flags::kCoroutine | Function::Flags::kIterableCoroutine)) {
+    return true;
+  }
+  HandleScope scope(thread);
+  MutableBytes bytecode(&scope, function.rewrittenBytecode());
+  word num_opcodes = rewrittenBytecodeLength(bytecode);
+  for (word i = 0; i < num_opcodes;) {
+    BytecodeOp op = nextBytecodeOp(bytecode, &i);
+    switch (op.bc) {
+#define CASE(op) case op:
+      FOREACH_UNSUPPORTED_CASE(CASE)
+#undef CASE
+      return true;
+      default:
+        break;
+    }
+  }
+  return false;
+}
+
+static void analyzeDefiniteAssignment(Thread* thread,
+                                      const Function& function) {
+  HandleScope scope(thread);
+  MutableBytes bytecode(&scope, function.rewrittenBytecode());
+  word num_opcodes = rewrittenBytecodeLength(bytecode);
+  word num_locals = Code::cast(function.code()).nlocals();
+  if (num_locals == 0) {
+    // Nothing to do.
+    return;
+  }
+  if (num_locals > 64) {
+    // We don't support more than 64 locals.
+    return;
+  }
+  if (isHardToAnalyze(thread, function)) {
+    // I don't want to deal with the block stack (yet?).
+    return;
+  }
+  // Lattice definition
+  // uword top = kMaxUword;
+  uword bot = 0;
+  // auto meet = [](uword left, uword right) { return left & right; };
+  // Map of bytecode index to the uword representing which locals are
+  // definitely assigned.
+  Vector<Edge> edges = findEdges(bytecode);
+  Vector<uword> defined_at;
+  defined_at.reserve(num_locals);
+  defined_at.initializeWith(bot);
+  // We enter the function with all parameters definitely assigned.
+  defined_at[0] = setBottomNBits(function.totalArgs());
+  for (word i = 0; i < num_opcodes;) {
+    BytecodeOp op = nextBytecodeOp(bytecode, &i);
+    switch (op.bc) {
+      default:
+        break;
+    }
+  }
+}
+
+NEVER_INLINE static void analyzeBytecode(Thread* thread,
+                                         const Function& function) {
+  analyzeDefiniteAssignment(thread, function);
+}
+
 static const word kMaxCaches = 65536;
 
 void rewriteBytecode(Thread* thread, const Function& function) {
@@ -293,6 +422,7 @@ void rewriteBytecode(Thread* thread, const Function& function) {
     }
     return;
   }
+  analyzeBytecode(thread, function);
   MutableBytes bytecode(&scope, function.rewrittenBytecode());
   word num_opcodes = rewrittenBytecodeLength(bytecode);
   word cache = num_global_caches;
