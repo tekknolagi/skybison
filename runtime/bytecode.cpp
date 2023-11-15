@@ -357,6 +357,26 @@ static bool isHardToAnalyze(Thread* thread, const Function& function) {
   return false;
 }
 
+static uword runDefiniteAssignmentOpcode(BytecodeOp op, uword defined) {
+  switch (op.bc) {
+    case STORE_FAST: {
+      DCHECK_INDEX(op.arg, kBitsPerWord);
+      uword bit = uword{1} << op.arg;
+      defined |= bit;
+      break;
+    }
+    case DELETE_FAST: {
+      DCHECK_INDEX(op.arg, kBitsPerWord);
+      uword bit = uword{1} << op.arg;
+      defined &= ~bit;
+      break;
+    }
+    default:
+      break;
+  }
+  return defined;
+}
+
 static void analyzeDefiniteAssignment(Thread* thread,
                                       const Function& function) {
   HandleScope scope(thread);
@@ -379,21 +399,33 @@ static void analyzeDefiniteAssignment(Thread* thread,
   // uword top = kMaxUword;
   uword bot = 0;
   // auto meet = [](uword left, uword right) { return left & right; };
+
   // Map of bytecode index to the uword representing which locals are
   // definitely assigned.
   Vector<Edge> edges = findEdges(bytecode);
   Vector<uword> defined_at;
-  defined_at.reserve(num_locals);
+  defined_at.reserve(num_opcodes);
   defined_at.initializeWith(bot);
   // We enter the function with all parameters definitely assigned.
   defined_at[0] = setBottomNBits(function.totalArgs());
-  for (word i = 0; i < num_opcodes;) {
-    BytecodeOp op = nextBytecodeOp(bytecode, &i);
-    switch (op.bc) {
-      default:
-        break;
+  // Run until fixpoint.
+  word num_iterations = 0;
+  for (bool changed = true; changed;) {
+    changed = false;
+    // TODO(max): Iterate over edges, not opcodes.
+    for (word i = 0; i < num_opcodes;) {
+      // i points to the current opcode and is adjusted by nextBytecodeOp. This
+      // needs to happen before we load the opcode.
+      uword defined_before = defined_at[i];
+      BytecodeOp op = nextBytecodeOp(bytecode, &i);
+      uword defined_after = runDefiniteAssignmentOpcode(op, defined_before);
+      if (defined_after != defined_before) {
+        changed = true;
+      }
     }
+    num_iterations++;
   }
+  fprintf(stderr, "finished fixpoint after %ld iterations\n", num_iterations);
 }
 
 NEVER_INLINE static void analyzeBytecode(Thread* thread,
