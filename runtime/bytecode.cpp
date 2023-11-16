@@ -358,6 +358,7 @@ static bool isHardToAnalyze(Thread* thread, const Function& function) {
 #define CASE(op) case op:
       FOREACH_UNSUPPORTED_CASE(CASE)
 #undef CASE
+      DTRACE_PROBE1(python, DefiniteAssignmentBailout, kBytecodeNames[op.bc]);
       return true;
       default:
         break;
@@ -395,10 +396,12 @@ static void analyzeDefiniteAssignment(Thread* thread,
   word num_locals = Code::cast(function.code()).nlocals();
   if (num_locals == 0) {
     // Nothing to do.
+    DTRACE_PROBE1(python, DefiniteAssignmentBailout, "no_locals");
     return;
   }
   if (num_locals > 64) {
     // We don't support more than 64 locals.
+    DTRACE_PROBE1(python, DefiniteAssignmentBailout, "too_many_locals");
     return;
   }
   if (isHardToAnalyze(thread, function)) {
