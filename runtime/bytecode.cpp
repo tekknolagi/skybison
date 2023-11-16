@@ -1,6 +1,8 @@
 // Copyright (c) Facebook, Inc. and its affiliates. (http://www.facebook.com)
 #include "bytecode.h"
 
+#include "debugging.h"
+#include "event.h"
 #include "ic.h"
 #include "runtime.h"
 
@@ -297,26 +299,30 @@ struct Edge {
   V(WITH_CLEANUP_START)                                                        \
   V(YIELD_FROM)                                                                \
   V(YIELD_VALUE)                                                               \
-  V(END_ASYNC_FOR)
+  V(END_ASYNC_FOR)                                                             \
+  V(FOR_ITER)
 
 static Vector<Edge> findEdges(const MutableBytes& bytecode) {
   Vector<Edge> edges;
   word num_opcodes = rewrittenBytecodeLength(bytecode);
   for (word i = 0; i < num_opcodes;) {
+    // Make a copy because nextBytecodeOp modifies the index in-place.
+    word cur = i;
     BytecodeOp op = nextBytecodeOp(bytecode, &i);
+    word next = i;
     switch (op.bc) {
       case JUMP_IF_FALSE_OR_POP:
       case JUMP_IF_TRUE_OR_POP:
       case POP_JUMP_IF_FALSE:
       case POP_JUMP_IF_TRUE:
-        edges.push_back(Edge{i, i + 1});
-        edges.push_back(Edge{i, i + op.arg / kCompilerCodeUnitSize});
+        edges.push_back(Edge{cur, next});
+        edges.push_back(Edge{cur, op.arg / kCompilerCodeUnitSize});
         break;
       case JUMP_FORWARD:
-        edges.push_back(Edge{i, i + op.arg / kCompilerCodeUnitSize});
+        edges.push_back(Edge{cur, next + op.arg / kCompilerCodeUnitSize});
         break;
       case JUMP_ABSOLUTE:
-        edges.push_back(Edge{i, op.arg / kCompilerCodeUnitSize});
+        edges.push_back(Edge{cur, op.arg / kCompilerCodeUnitSize});
         break;
 #define CASE(op) case op:
         FOREACH_UNSUPPORTED_CASE(CASE)
@@ -324,9 +330,12 @@ static Vector<Edge> findEdges(const MutableBytes& bytecode) {
         UNIMPLEMENTED("exceptions, generators, and context managers: opcode %s",
                       kBytecodeNames[op.bc]);
         break;
+      case RETURN_VALUE:
+        // Return exits the function so there is no edge to the next opcode.
+        break;
       default:
         // By default, each instruction "jumps" to the next.
-        edges.push_back(Edge{i, i + 1});
+        edges.push_back(Edge{cur, next});
         break;
     }
   }
@@ -357,17 +366,18 @@ static bool isHardToAnalyze(Thread* thread, const Function& function) {
   return false;
 }
 
-static uword runDefiniteAssignmentOpcode(BytecodeOp op, uword defined) {
-  switch (op.bc) {
+static uword runDefiniteAssignmentOpcode(Bytecode op, uword arg,
+                                         uword defined) {
+  switch (op) {
     case STORE_FAST: {
-      DCHECK_INDEX(op.arg, kBitsPerWord);
-      uword bit = uword{1} << op.arg;
+      DCHECK_INDEX(arg, kBitsPerWord);
+      uword bit = uword{1} << arg;
       defined |= bit;
       break;
     }
     case DELETE_FAST: {
-      DCHECK_INDEX(op.arg, kBitsPerWord);
-      uword bit = uword{1} << op.arg;
+      DCHECK_INDEX(arg, kBitsPerWord);
+      uword bit = uword{1} << arg;
       defined &= ~bit;
       break;
     }
@@ -412,20 +422,37 @@ static void analyzeDefiniteAssignment(Thread* thread,
   word num_iterations = 0;
   for (bool changed = true; changed;) {
     changed = false;
-    // TODO(max): Iterate over edges, not opcodes.
-    for (word i = 0; i < num_opcodes;) {
-      // i points to the current opcode and is adjusted by nextBytecodeOp. This
-      // needs to happen before we load the opcode.
-      uword defined_before = defined_at[i];
-      BytecodeOp op = nextBytecodeOp(bytecode, &i);
-      uword defined_after = runDefiniteAssignmentOpcode(op, defined_before);
+    for (const Edge& edge : edges) {
+      Bytecode op = rewrittenBytecodeOpAt(bytecode, edge.start_index);
+      DCHECK(op != RETURN_VALUE, "RETURN_VALUE should not have any edges");
+      uword arg = rewrittenBytecodeArgAt(bytecode, edge.start_index);
+      uword defined_before = defined_at[edge.start_index];
+      uword defined_after =
+          runDefiniteAssignmentOpcode(op, arg, defined_before);
       if (defined_after != defined_before) {
         changed = true;
       }
+      defined_at[edge.end_index] = defined_after;
     }
+
+    // // TODO(max): Iterate over edges, not opcodes.
+    // for (word i = 0; i < num_opcodes;) {
+    //   // i points to the current opcode and is adjusted by nextBytecodeOp.
+    //   This
+    //   // needs to happen before we load the opcode.
+    //   uword defined_before = defined_at[i];
+    //   BytecodeOp op = nextBytecodeOp(bytecode, &i);
+    //   uword defined_after = runDefiniteAssignmentOpcode(op, defined_before);
+    //   if (defined_after != defined_before) {
+    //     changed = true;
+    //   }
+    // }
+
     num_iterations++;
   }
-  fprintf(stderr, "finished fixpoint after %ld iterations\n", num_iterations);
+  // DTRACE_PROBE1(python, DefiniteAssignment,
+  // Str::cast(function.qualname()).toCStr());
+  DTRACE_PROBE1(python, DefiniteAssignmentIterations, num_iterations);
 }
 
 NEVER_INLINE static void analyzeBytecode(Thread* thread,
