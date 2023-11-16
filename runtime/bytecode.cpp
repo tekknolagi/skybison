@@ -372,14 +372,12 @@ static uword runDefiniteAssignmentOpcode(Bytecode op, uword arg,
   switch (op) {
     case STORE_FAST: {
       DCHECK_INDEX(arg, kBitsPerWord);
-      uword bit = uword{1} << arg;
-      defined |= bit;
+      defined |= uword{1} << arg;
       break;
     }
     case DELETE_FAST: {
       DCHECK_INDEX(arg, kBitsPerWord);
-      uword bit = uword{1} << arg;
-      defined &= ~bit;
+      defined &= ~(uword{1} << arg);
       break;
     }
     default:
