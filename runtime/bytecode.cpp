@@ -414,18 +414,21 @@ static void analyzeDefiniteAssignment(Thread* thread,
     return;
   }
   // Lattice definition
-  // uword top = kMaxUword;
-  uword bot = 0;
+  uword top = kMaxUword;
   auto meet = [](uword left, uword right) { return left & right; };
+  (void)meet;
 
   // Map of bytecode index to the uword representing which locals are
   // definitely assigned.
   Vector<Edge> edges = findEdges(bytecode);
-  Vector<uword> defined_at;
-  defined_at.reserve(num_opcodes);
-  defined_at.initializeWith(bot);
+  Vector<uword> defined_in;
+  Vector<uword> defined_out;
+  defined_in.reserve(num_opcodes);
+  defined_out.reserve(num_opcodes);
+  defined_in.initializeWith(top);
+  defined_out.initializeWith(top);
   // We enter the function with all parameters definitely assigned.
-  defined_at[0] = setBottomNBits(function.totalArgs());
+  defined_in[0] = setBottomNBits(function.totalArgs());
   // Run until fixpoint.
   word num_iterations = 0;
   for (bool changed = true; changed;) {
@@ -434,14 +437,14 @@ static void analyzeDefiniteAssignment(Thread* thread,
       Bytecode op = rewrittenBytecodeOpAt(bytecode, edge.start_index);
       DCHECK(op != RETURN_VALUE, "RETURN_VALUE should not have any edges");
       uword arg = rewrittenBytecodeArgAt(bytecode, edge.start_index);
-      uword defined_before = defined_at[edge.start_index];
+      // TODO(max): Compute meet of previous edges here
+      uword defined_before = defined_in[edge.start_index];
       uword defined_after =
           runDefiniteAssignmentOpcode(op, arg, defined_before);
       if (defined_after != defined_before) {
         changed = true;
       }
-      defined_at[edge.end_index] =
-          meet(defined_at[edge.end_index], defined_after);
+      defined_out[edge.end_index] = defined_after;
     }
     num_iterations++;
   }
@@ -450,8 +453,8 @@ static void analyzeDefiniteAssignment(Thread* thread,
   for (word i = 0; i < num_opcodes;) {
     word idx = i;
     BytecodeOp op = nextBytecodeOp(bytecode, &i);
-    fprintf(stderr, "%04lx %s %d (", idx, kBytecodeNames[op.bc], op.arg);
-    printBits(stderr, defined_at[idx]);
+    fprintf(stderr, "%04lx %24s %4d (", idx, kBytecodeNames[op.bc], op.arg);
+    printBits(stderr, defined_in[idx]);
     fprintf(stderr, ")\n");
   }
   DTRACE_PROBE1(python, DefiniteAssignmentIterations, num_iterations);
@@ -482,7 +485,7 @@ void rewriteBytecode(Thread* thread, const Function& function) {
     }
     return;
   }
-  analyzeBytecode(thread, function);
+  // analyzeBytecode(thread, function);
   MutableBytes bytecode(&scope, function.rewrittenBytecode());
   word num_opcodes = rewrittenBytecodeLength(bytecode);
   word cache = num_global_caches;
