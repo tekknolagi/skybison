@@ -437,24 +437,8 @@ static void analyzeDefiniteAssignment(Thread* thread,
       }
       defined_at[edge.end_index] = defined_after;
     }
-
-    // // TODO(max): Iterate over edges, not opcodes.
-    // for (word i = 0; i < num_opcodes;) {
-    //   // i points to the current opcode and is adjusted by nextBytecodeOp.
-    //   This
-    //   // needs to happen before we load the opcode.
-    //   uword defined_before = defined_at[i];
-    //   BytecodeOp op = nextBytecodeOp(bytecode, &i);
-    //   uword defined_after = runDefiniteAssignmentOpcode(op, defined_before);
-    //   if (defined_after != defined_before) {
-    //     changed = true;
-    //   }
-    // }
-
     num_iterations++;
   }
-  // DTRACE_PROBE1(python, DefiniteAssignment,
-  // Str::cast(function.qualname()).toCStr());
   DTRACE_PROBE1(python, DefiniteAssignmentIterations, num_iterations);
 }
 
