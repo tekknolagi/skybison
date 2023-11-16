@@ -459,8 +459,7 @@ static void analyzeDefiniteAssignment(Thread* thread,
   DTRACE_PROBE1(python, DefiniteAssignmentIterations, num_iterations);
 }
 
-NEVER_INLINE static void analyzeBytecode(Thread* thread,
-                                         const Function& function) {
+void analyzeBytecode(Thread* thread, const Function& function) {
   analyzeDefiniteAssignment(thread, function);
 }
 

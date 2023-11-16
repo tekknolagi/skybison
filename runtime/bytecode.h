@@ -365,6 +365,8 @@ uint16_t rewrittenBytecodeCacheAt(const MutableBytes& bytecode, word index);
 void rewrittenBytecodeCacheAtPut(const MutableBytes& bytecode, word index,
                                  uint16_t cache);
 
+void analyzeBytecode(Thread* thread, const Function& function);
+
 inline bool isByteCodeWithCache(const Bytecode bc) {
   // TODO(T45720638): Add all caching opcodes here once they are supported for
   // cache invalidation.
