@@ -388,6 +388,13 @@ static uword runDefiniteAssignmentOpcode(Bytecode op, uword arg,
   return defined;
 }
 
+static void printBits(FILE* file, uword bits) {
+  fprintf(file, "0b");
+  for (word i = kBitsPerWord - 1; i >= 0; i--) {
+    fprintf(file, "%lu", (bits >> i) & 1);
+  }
+}
+
 static void analyzeDefiniteAssignment(Thread* thread,
                                       const Function& function) {
   HandleScope scope(thread);
@@ -411,7 +418,7 @@ static void analyzeDefiniteAssignment(Thread* thread,
   // Lattice definition
   // uword top = kMaxUword;
   uword bot = 0;
-  // auto meet = [](uword left, uword right) { return left & right; };
+  auto meet = [](uword left, uword right) { return left & right; };
 
   // Map of bytecode index to the uword representing which locals are
   // definitely assigned.
@@ -435,9 +442,19 @@ static void analyzeDefiniteAssignment(Thread* thread,
       if (defined_after != defined_before) {
         changed = true;
       }
-      defined_at[edge.end_index] = defined_after;
+      defined_at[edge.end_index] =
+          meet(defined_at[edge.end_index], defined_after);
     }
     num_iterations++;
+  }
+  fprintf(stderr, "===== Func %s (%ld iterations) =====\n",
+          Str::cast(function.qualname()).toCStr(), num_iterations);
+  for (word i = 0; i < num_opcodes;) {
+    word idx = i;
+    BytecodeOp op = nextBytecodeOp(bytecode, &i);
+    fprintf(stderr, "%04lx %s %d (", idx, kBytecodeNames[op.bc], op.arg);
+    printBits(stderr, defined_at[idx]);
+    fprintf(stderr, ")\n");
   }
   DTRACE_PROBE1(python, DefiniteAssignmentIterations, num_iterations);
 }
