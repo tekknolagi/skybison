@@ -470,7 +470,7 @@ static void analyzeDefiniteAssignment(Thread* thread,
   }
   (void)printBits;
   (void)runDefiniteAssignmentOpcode;
-  // DTRACE_PROBE1(python, DefiniteAssignmentIterations, num_iterations);
+  DTRACE_PROBE1(python, DefiniteAssignmentIterations, num_iterations);
 }
 
 void analyzeBytecode(Thread* thread, const Function& function) {
@@ -498,7 +498,7 @@ void rewriteBytecode(Thread* thread, const Function& function) {
     }
     return;
   }
-  // analyzeBytecode(thread, function);
+  analyzeBytecode(thread, function);
   MutableBytes bytecode(&scope, function.rewrittenBytecode());
   word num_opcodes = rewrittenBytecodeLength(bytecode);
   word cache = num_global_caches;
