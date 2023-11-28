@@ -421,10 +421,10 @@ static void analyzeDefiniteAssignment(Thread* thread,
   // Map of bytecode index to the uword representing which locals are
   // definitely assigned.
   Vector<Edge> edges = findEdges(bytecode);
-  dump(*function);
-  for (const Edge& edge : edges) {
-    fprintf(stderr, "%lx -> %lx\n", edge.cur_idx*kCodeUnitSize, edge.next_idx*kCodeUnitSize);
-  }
+  // dump(*function);
+  // for (const Edge& edge : edges) {
+  //   fprintf(stderr, "%lx -> %lx\n", edge.cur_idx*kCodeUnitSize, edge.next_idx*kCodeUnitSize);
+  // }
   Vector<uword> defined_in;
   Vector<uword> defined_out;
   defined_in.reserve(num_opcodes);
@@ -435,7 +435,8 @@ static void analyzeDefiniteAssignment(Thread* thread,
   defined_in[0] = setBottomNBits(function.totalArgs());
   // Run until fixpoint.
   word num_iterations = 0;
-  for (bool changed = true; changed && num_iterations < 100;) {
+  for (bool changed = true; changed;) {
+    DCHECK(num_iterations < 100, "Too many iterations... something went wrong");
     changed = false;
     num_iterations++;
     for (const Edge& edge : edges) {
@@ -455,21 +456,20 @@ static void analyzeDefiniteAssignment(Thread* thread,
       }
     }
   }
-   fprintf(stderr, "===== Func %s (%ld iterations) =====\n",
-           Str::cast(function.qualname()).toCStr(), num_iterations);
-  for (word i = 0; i < num_opcodes;) {
-    word idx = i;
-    BytecodeOp op = nextBytecodeOp(bytecode, &i);
-    fprintf(stderr, "  IN : ");
-    printBits(stderr, defined_in[idx]);
-    fprintf(stderr, "\n");
-    fprintf(stderr, "%04lx %24s %4d\n", idx, kBytecodeNames[op.bc], op.arg);
-    fprintf(stderr, "  OUT: ");
-    printBits(stderr, defined_out[idx]);
-    fprintf(stderr, "\n");
-  }
-  (void)printBits;
-  (void)runDefiniteAssignmentOpcode;
+  fprintf(stderr, "%s %ld\n",
+      Str::cast(function.qualname()).toCStr(), num_iterations);
+   (void)printBits;
+  // for (word i = 0; i < num_opcodes;) {
+  //   word idx = i;
+  //   BytecodeOp op = nextBytecodeOp(bytecode, &i);
+  //   fprintf(stderr, "  IN : ");
+  //   printBits(stderr, defined_in[idx]);
+  //   fprintf(stderr, "\n");
+  //   fprintf(stderr, "%04lx %24s %4d\n", idx, kBytecodeNames[op.bc], op.arg);
+  //   fprintf(stderr, "  OUT: ");
+  //   printBits(stderr, defined_out[idx]);
+  //   fprintf(stderr, "\n");
+  // }
   DTRACE_PROBE1(python, DefiniteAssignmentIterations, num_iterations);
 }
 
