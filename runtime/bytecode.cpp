@@ -303,6 +303,11 @@ struct Edge {
   V(END_ASYNC_FOR)
 
 static Vector<Edge> findEdges(const MutableBytes& bytecode) {
+  // TODO(max): Collapse edges for uninteresting opcodes. There shouldn't be
+  // edges for POP_TOP, etc; just control flow and anything that touches
+  // locals. But maybe this is analysis specific (definite assignment only
+  // cares about STORE_FAST and DELETE_FAST whereas constant propagation cares
+  // about LOAD_CONST and BINARY_ADD and stuff.)
   Vector<Edge> edges;
   word num_opcodes = rewrittenBytecodeLength(bytecode);
   for (word i = 0; i < num_opcodes;) {
