@@ -442,8 +442,6 @@ static void analyzeDefiniteAssignment(Thread* thread,
       }
     }
   }
-  fprintf(stderr, "%s %ld\n", Str::cast(function.qualname()).toCStr(),
-          num_iterations);
   DTRACE_PROBE1(python, DefiniteAssignmentIterations, num_iterations);
 }
 
