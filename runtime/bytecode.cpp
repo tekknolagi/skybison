@@ -391,25 +391,6 @@ static void analyzeDefiniteAssignment(Thread* thread,
   HandleScope scope(thread);
   MutableBytes bytecode(&scope, function.rewrittenBytecode());
   word num_opcodes = rewrittenBytecodeLength(bytecode);
-  word num_locals = Code::cast(function.code()).nlocals();
-  if (num_locals == 0) {
-    // Nothing to do.
-    DTRACE_PROBE1(python, DefiniteAssignmentBailout, "no_locals");
-    return;
-  }
-  if (num_locals > 64) {
-    // We don't support more than 64 locals.
-    DTRACE_PROBE1(python, DefiniteAssignmentBailout, "too_many_locals");
-    return;
-  }
-  if (isHardToAnalyze(thread, function)) {
-    // I don't want to deal with the block stack (yet?).
-    return;
-  }
-  if (num_opcodes == 0) {
-    // Some tests generate empty code objects. Bail out.
-    return;
-  }
   // Lattice definition
   uword top = kMaxUword;
   auto meet = [](uword left, uword right) { return left & right; };
@@ -479,6 +460,28 @@ static void analyzeDefiniteAssignment(Thread* thread,
 }
 
 void analyzeBytecode(Thread* thread, const Function& function) {
+  HandleScope scope(thread);
+  MutableBytes bytecode(&scope, function.rewrittenBytecode());
+  word num_opcodes = rewrittenBytecodeLength(bytecode);
+  word num_locals = Code::cast(function.code()).nlocals();
+  if (num_locals == 0) {
+    // Nothing to do.
+    DTRACE_PROBE1(python, DefiniteAssignmentBailout, "no_locals");
+    return;
+  }
+  if (num_locals > 64) {
+    // We don't support more than 64 locals.
+    DTRACE_PROBE1(python, DefiniteAssignmentBailout, "too_many_locals");
+    return;
+  }
+  if (isHardToAnalyze(thread, function)) {
+    // I don't want to deal with the block stack (yet?).
+    return;
+  }
+  if (num_opcodes == 0) {
+    // Some tests generate empty code objects. Bail out.
+    return;
+  }
   analyzeDefiniteAssignment(thread, function);
 }
 
