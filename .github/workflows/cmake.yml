@@ -96,6 +96,9 @@ jobs:
       working-directory: ${{github.workspace}}
       run: |
         ./benchmarks/format_results.py benchmark-results.json | tee benchmark-results.md
+    # Hide all previous benchmark comments from GitHub Actions; they are
+    # outdated.
+    - uses: int128/hide-comment-action@v1
     - name: Comment on Pull Request
       uses: actions/github-script@v6
       with:
