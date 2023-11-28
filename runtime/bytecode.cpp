@@ -406,6 +406,10 @@ static void analyzeDefiniteAssignment(Thread* thread,
     // I don't want to deal with the block stack (yet?).
     return;
   }
+  if (num_opcodes == 0) {
+    // Some tests generate empty code objects. Bail out.
+    return;
+  }
   // Lattice definition
   uword top = kMaxUword;
   auto meet = [](uword left, uword right) { return left & right; };
