@@ -1,6 +1,8 @@
 // Copyright (c) Facebook, Inc. and its affiliates. (http://www.facebook.com)
 #include "bytecode.h"
 
+#include <functional>
+
 #include "debugging.h"
 #include "event.h"
 #include "ic.h"
@@ -392,6 +394,16 @@ static uword runDefiniteAssignmentOpcode(Bytecode op, uword arg,
   return defined;
 }
 
+static void runUntilFixpoint(std::function<bool()> f) {
+  word num_iterations = 0;
+  for (bool changed = true; changed;) {
+    DCHECK(num_iterations < 100, "Too many iterations... something went wrong");
+    num_iterations++;
+    changed = f();
+  }
+  DTRACE_PROBE1(python, DefiniteAssignmentIterations, num_iterations);
+}
+
 static void analyzeDefiniteAssignment(Thread* thread, const Function& function,
                                       const Vector<Edge>& edges) {
   HandleScope scope(thread);
@@ -411,11 +423,8 @@ static void analyzeDefiniteAssignment(Thread* thread, const Function& function,
   // We enter the function with all parameters definitely assigned.
   defined_in[0] = setBottomNBits(function.totalArgs());
   // Run until fixpoint.
-  word num_iterations = 0;
-  for (bool changed = true; changed;) {
-    DCHECK(num_iterations < 100, "Too many iterations... something went wrong");
-    changed = false;
-    num_iterations++;
+  runUntilFixpoint([&edges, &defined_in, &bytecode, &defined_out, &meet] {
+    bool changed = false;
     for (const Edge& edge : edges) {
       uword defined_before = defined_in[edge.cur_idx];
       uword defined_after = runDefiniteAssignmentOpcode(
@@ -431,7 +440,8 @@ static void analyzeDefiniteAssignment(Thread* thread, const Function& function,
         defined_in[edge.next_idx] = next_met;
       }
     }
-  }
+    return changed;
+  });
   // Rewrite all LOAD_FAST opcodes with definitely-assigned locals to
   // LOAD_FAST_REVERSE_UNCHECKED (if the arg would fit in a byte).
   word total_locals = function.totalLocals();
@@ -461,7 +471,6 @@ static void analyzeDefiniteAssignment(Thread* thread, const Function& function,
     rewrittenBytecodeOpAtPut(bytecode, i, LOAD_FAST_REVERSE_UNCHECKED);
     rewrittenBytecodeArgAtPut(bytecode, i, reverse_arg);
   }
-  DTRACE_PROBE1(python, DefiniteAssignmentIterations, num_iterations);
 }
 
 void analyzeBytecode(Thread* thread, const Function& function) {
