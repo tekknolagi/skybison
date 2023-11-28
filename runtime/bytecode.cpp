@@ -459,6 +459,7 @@ static void analyzeDefiniteAssignment(Thread* thread, const Function& function,
 }
 
 void analyzeBytecode(Thread* thread, const Function& function) {
+  DTRACE_PROBE(python, AnalysisAttempt);
   HandleScope scope(thread);
   MutableBytes bytecode(&scope, function.rewrittenBytecode());
   word num_opcodes = rewrittenBytecodeLength(bytecode);
@@ -483,6 +484,7 @@ void analyzeBytecode(Thread* thread, const Function& function) {
   }
   Vector<Edge> edges = findEdges(bytecode);
   analyzeDefiniteAssignment(thread, function, edges);
+  DTRACE_PROBE(python, AnalysisSuccess);
 }
 
 static const word kMaxCaches = 65536;
