@@ -386,8 +386,8 @@ static uword runDefiniteAssignmentOpcode(Bytecode op, uword arg,
   return defined;
 }
 
-static void analyzeDefiniteAssignment(Thread* thread,
-                                      const Function& function) {
+static void analyzeDefiniteAssignment(Thread* thread, const Function& function,
+                                      const Vector<Edge>& edges) {
   HandleScope scope(thread);
   MutableBytes bytecode(&scope, function.rewrittenBytecode());
   word num_opcodes = rewrittenBytecodeLength(bytecode);
@@ -396,7 +396,6 @@ static void analyzeDefiniteAssignment(Thread* thread,
   auto meet = [](uword left, uword right) { return left & right; };
   // Map of bytecode index to the uword representing which locals are
   // definitely assigned.
-  Vector<Edge> edges = findEdges(bytecode);
   Vector<uword> defined_in;
   Vector<uword> defined_out;
   defined_in.reserve(num_opcodes);
@@ -482,7 +481,8 @@ void analyzeBytecode(Thread* thread, const Function& function) {
     // Some tests generate empty code objects. Bail out.
     return;
   }
-  analyzeDefiniteAssignment(thread, function);
+  Vector<Edge> edges = findEdges(bytecode);
+  analyzeDefiniteAssignment(thread, function, edges);
 }
 
 static const word kMaxCaches = 65536;
