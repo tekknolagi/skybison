@@ -299,8 +299,7 @@ struct Edge {
   V(WITH_CLEANUP_START)                                                        \
   V(YIELD_FROM)                                                                \
   V(YIELD_VALUE)                                                               \
-  V(END_ASYNC_FOR)                                                             \
-  V(FOR_ITER)
+  V(END_ASYNC_FOR)
 
 static Vector<Edge> findEdges(const MutableBytes& bytecode) {
   Vector<Edge> edges;
@@ -323,6 +322,10 @@ static Vector<Edge> findEdges(const MutableBytes& bytecode) {
         break;
       case JUMP_ABSOLUTE:
         edges.push_back(Edge{cur, op.arg / kCompilerCodeUnitSize});
+        break;
+      case FOR_ITER:
+        edges.push_back(Edge{cur, next});
+        edges.push_back(Edge{cur, next + op.arg / kCompilerCodeUnitSize});
         break;
 #define CASE(op) case op:
         FOREACH_UNSUPPORTED_CASE(CASE)
