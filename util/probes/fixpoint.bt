@@ -1,0 +1,19 @@
+usdt:./build/bin/python:python:DefiniteAssignmentIterations {
+  @definite[arg0]++;
+}
+
+usdt:./build/bin/python:python:DefiniteAssignmentBailout {
+  @bailout[str(arg0)]++;
+}
+
+usdt:./build/bin/python:python:AnalysisAttempt {
+  @analysis_attempt++;
+}
+
+usdt:./build/bin/python:python:AnalysisSuccess {
+  @analysis_success++;
+}
+
+// usdt:./build-debugopt/bin/python:python:DefiniteAssignment {
+//   @analyze[str(arg0)]++;
+// }
