@@ -292,7 +292,6 @@ struct Edge {
 
 #define FOREACH_UNSUPPORTED_CASE(V)                                            \
   V(POP_BLOCK)                                                                 \
-  V(RAISE_VARARGS)                                                             \
   V(SETUP_ASYNC_WITH)                                                          \
   V(SETUP_FINALLY)                                                             \
   V(SETUP_WITH)                                                                \
@@ -335,6 +334,10 @@ static Vector<Edge> findEdges(const MutableBytes& bytecode) {
         break;
       case RETURN_VALUE:
         // Return exits the function so there is no edge to the next opcode.
+        break;
+      case RAISE_VARARGS:
+        // In the absence of try/except, RAISE_VARARGS exits the function, so
+        // there is no edge to the next opcode.
         break;
       default:
         // By default, each instruction "jumps" to the next.
