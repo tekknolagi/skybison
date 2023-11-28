@@ -469,6 +469,9 @@ void analyzeBytecode(Thread* thread, const Function& function) {
   HandleScope scope(thread);
   MutableBytes bytecode(&scope, function.rewrittenBytecode());
   word num_opcodes = rewrittenBytecodeLength(bytecode);
+  Bytecode last_op = rewrittenBytecodeOpAt(bytecode, num_opcodes - 1);
+  DCHECK(last_op == RETURN_VALUE,
+         "Last opcode must be RETURN_VALUE (was %s)", kBytecodeNames[last_op]);
   word num_locals = Code::cast(function.code()).nlocals();
   if (num_locals == 0) {
     // Nothing to do.
