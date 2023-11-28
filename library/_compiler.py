@@ -297,7 +297,7 @@ class PyroFlowGraph(PyFlowGraph38):
             self.entry.insts = deletes + self.entry.insts
 
     def getCode(self):
-        self.optimizeLoadFast()
+        # self.optimizeLoadFast()
         return super().getCode()
 
 

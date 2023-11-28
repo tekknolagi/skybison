@@ -372,7 +372,7 @@ static uword runDefiniteAssignmentOpcode(Bytecode op, uword arg,
   switch (op) {
     case STORE_FAST: {
       DCHECK_INDEX(arg, kBitsPerWord);
-      defined |= uword{1} << arg;
+      defined |= (uword{1} << arg);
       break;
     }
     case DELETE_FAST: {
@@ -431,20 +431,29 @@ static void analyzeDefiniteAssignment(Thread* thread,
   defined_in[0] = setBottomNBits(function.totalArgs());
   // Run until fixpoint.
   word num_iterations = 0;
-  for (bool changed = true; changed;) {
+  for (bool changed = true; changed && num_iterations < 100;) {
     changed = false;
     for (const Edge& edge : edges) {
       Bytecode op = rewrittenBytecodeOpAt(bytecode, edge.start_index);
+      fprintf(stderr, "processing op %s\n", kBytecodeNames[op]);
       DCHECK(op != RETURN_VALUE, "RETURN_VALUE should not have any edges");
       uword arg = rewrittenBytecodeArgAt(bytecode, edge.start_index);
       // TODO(max): Compute meet of previous edges here
+      // uword defined_before = top;
+      // for (const Edge& edge2 : edges) {
+      //   if (edge2.end_index == edge.start_index) {
+      //     defined_before = meet(defined_before, defined_out[edge2.start_index]);
+      //   }
+      // }
       uword defined_before = defined_in[edge.start_index];
       uword defined_after =
           runDefiniteAssignmentOpcode(op, arg, defined_before);
       if (defined_after != defined_before) {
         changed = true;
       }
+      // TODO(max): Use meet
       defined_out[edge.end_index] = defined_after;
+      defined_in[edge.end_index] = defined_after;
     }
     num_iterations++;
   }
@@ -454,7 +463,7 @@ static void analyzeDefiniteAssignment(Thread* thread,
     word idx = i;
     BytecodeOp op = nextBytecodeOp(bytecode, &i);
     fprintf(stderr, "%04lx %24s %4d (", idx, kBytecodeNames[op.bc], op.arg);
-    printBits(stderr, defined_in[idx]);
+    printBits(stderr, defined_out[idx]);
     fprintf(stderr, ")\n");
   }
   DTRACE_PROBE1(python, DefiniteAssignmentIterations, num_iterations);
