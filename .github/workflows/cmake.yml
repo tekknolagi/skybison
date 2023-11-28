@@ -68,6 +68,9 @@ jobs:
         ${{github.workspace}}/benchmarks/benchmarks/django/setup_django_minimal.sh
         popd
         ./benchmarks/quickbench/diffrevs.py --run-django HEAD^ HEAD | tee django-benchmark-results.json
+    # Hide all previous benchmark comments from GitHub Actions; they are
+    # outdated.
+    - uses: int128/hide-comment-action@v1
     - name: Comment on Pull Request
       uses: actions/github-script@v6
       with:
