@@ -286,8 +286,8 @@ static_assert(setBottomNBits(3) == 7, "");
 static_assert(setBottomNBits(kBitsPerWord) == kMaxUword, "");
 
 struct Edge {
-  word start_index;
-  word end_index;
+  word cur_idx;
+  word next_idx;
 };
 
 #define FOREACH_UNSUPPORTED_CASE(V)                                            \
@@ -421,6 +421,10 @@ static void analyzeDefiniteAssignment(Thread* thread,
   // Map of bytecode index to the uword representing which locals are
   // definitely assigned.
   Vector<Edge> edges = findEdges(bytecode);
+  dump(*function);
+  for (const Edge& edge : edges) {
+    fprintf(stderr, "%lx -> %lx\n", edge.cur_idx*kCodeUnitSize, edge.next_idx*kCodeUnitSize);
+  }
   Vector<uword> defined_in;
   Vector<uword> defined_out;
   defined_in.reserve(num_opcodes);
@@ -433,40 +437,40 @@ static void analyzeDefiniteAssignment(Thread* thread,
   word num_iterations = 0;
   for (bool changed = true; changed && num_iterations < 100;) {
     changed = false;
-    for (const Edge& edge : edges) {
-      Bytecode op = rewrittenBytecodeOpAt(bytecode, edge.start_index);
-      fprintf(stderr, "processing op %s\n", kBytecodeNames[op]);
-      DCHECK(op != RETURN_VALUE, "RETURN_VALUE should not have any edges");
-      uword arg = rewrittenBytecodeArgAt(bytecode, edge.start_index);
-      // TODO(max): Compute meet of previous edges here
-      // uword defined_before = top;
-      // for (const Edge& edge2 : edges) {
-      //   if (edge2.end_index == edge.start_index) {
-      //     defined_before = meet(defined_before, defined_out[edge2.start_index]);
-      //   }
-      // }
-      uword defined_before = defined_in[edge.start_index];
-      uword defined_after =
-          runDefiniteAssignmentOpcode(op, arg, defined_before);
-      if (defined_after != defined_before) {
-        changed = true;
-      }
-      // TODO(max): Use meet
-      defined_out[edge.end_index] = defined_after;
-      defined_in[edge.end_index] = defined_after;
-    }
     num_iterations++;
+    for (const Edge& edge : edges) {
+      uword defined_before = defined_in[edge.cur_idx];
+      uword defined_after = runDefiniteAssignmentOpcode(
+          rewrittenBytecodeOpAt(bytecode, edge.cur_idx),
+          rewrittenBytecodeArgAt(bytecode, edge.cur_idx),
+          defined_before);
+      if (defined_out[edge.cur_idx] != defined_after) {
+        changed = true;
+        defined_out[edge.cur_idx] = defined_after;
+      }
+      uword next_met = meet(defined_in[edge.next_idx], defined_after);
+      if (defined_in[edge.next_idx] != next_met) {
+        changed = true;
+        defined_in[edge.next_idx] = next_met;
+      }
+    }
   }
-  fprintf(stderr, "===== Func %s (%ld iterations) =====\n",
-          Str::cast(function.qualname()).toCStr(), num_iterations);
+   fprintf(stderr, "===== Func %s (%ld iterations) =====\n",
+           Str::cast(function.qualname()).toCStr(), num_iterations);
   for (word i = 0; i < num_opcodes;) {
     word idx = i;
     BytecodeOp op = nextBytecodeOp(bytecode, &i);
-    fprintf(stderr, "%04lx %24s %4d (", idx, kBytecodeNames[op.bc], op.arg);
+    fprintf(stderr, "  IN : ");
+    printBits(stderr, defined_in[idx]);
+    fprintf(stderr, "\n");
+    fprintf(stderr, "%04lx %24s %4d\n", idx, kBytecodeNames[op.bc], op.arg);
+    fprintf(stderr, "  OUT: ");
     printBits(stderr, defined_out[idx]);
-    fprintf(stderr, ")\n");
+    fprintf(stderr, "\n");
   }
-  DTRACE_PROBE1(python, DefiniteAssignmentIterations, num_iterations);
+  (void)printBits;
+  (void)runDefiniteAssignmentOpcode;
+  // DTRACE_PROBE1(python, DefiniteAssignmentIterations, num_iterations);
 }
 
 void analyzeBytecode(Thread* thread, const Function& function) {
