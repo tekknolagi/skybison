@@ -442,6 +442,35 @@ static void analyzeDefiniteAssignment(Thread* thread,
       }
     }
   }
+  // Rewrite all LOAD_FAST opcodes with definitely-assigned locals to
+  // LOAD_FAST_REVERSE_UNCHECKED (if the arg would fit in a byte).
+  word total_locals = function.totalLocals();
+  for (word i = 0; i < num_opcodes; i++) {
+    Bytecode op = rewrittenBytecodeOpAt(bytecode, i);
+    if (op != LOAD_FAST) {
+      continue;
+    }
+    uword defined_before = defined_in[i];
+    uword arg = rewrittenBytecodeArgAt(bytecode, i);
+    bool definitely_assigned = defined_before & (uword{1} << arg);
+    if (!definitely_assigned) {
+      continue;
+    }
+    // Check if the original opcode uses an extended arg
+    if (arg > kMaxByte) {
+      DTRACE_PROBE1(python, DefiniteAssignmentBailout,
+                    "load_fast_extended_arg");
+      continue;
+    }
+    int32_t reverse_arg = total_locals - arg - 1;
+    // Check that the new value fits in a byte
+    if (reverse_arg > kMaxByte) {
+      DTRACE_PROBE1(python, DefiniteAssignmentBailout, "reverse_arg_too_large");
+      continue;
+    }
+    rewrittenBytecodeOpAtPut(bytecode, i, LOAD_FAST_REVERSE_UNCHECKED);
+    rewrittenBytecodeArgAtPut(bytecode, i, reverse_arg);
+  }
   DTRACE_PROBE1(python, DefiniteAssignmentIterations, num_iterations);
 }
 
