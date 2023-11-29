@@ -380,24 +380,6 @@ static bool isHardToAnalyze(Thread* thread, const Function& function) {
   return false;
 }
 
-static uword runDefiniteAssignmentOpcode(Bytecode op, uword arg,
-                                         uword defined) {
-  switch (op) {
-    case STORE_FAST: {
-      DCHECK_INDEX(arg, kBitsPerWord);
-      defined |= (uword{1} << arg);
-      break;
-    }
-    case DELETE_FAST: {
-      DCHECK_INDEX(arg, kBitsPerWord);
-      defined &= ~(uword{1} << arg);
-      break;
-    }
-    default:
-      break;
-  }
-  return defined;
-}
 
 static word runUntilFixpoint(std::function<bool()> f) {
   word num_iterations = 0;
@@ -428,25 +410,41 @@ static void analyzeDefiniteAssignment(Thread* thread, const Function& function,
   // We enter the function with all parameters definitely assigned.
   defined_in[0] = setBottomNBits(function.totalArgs());
   // Run until fixpoint.
-  word num_iterations = runUntilFixpoint([&edges, &defined_in, &bytecode, &defined_out, &meet] {
-    bool changed = false;
-    for (const Edge& edge : edges) {
-      uword defined_before = defined_in[edge.cur_idx];
-      uword defined_after = runDefiniteAssignmentOpcode(
-          rewrittenBytecodeOpAt(bytecode, edge.cur_idx),
-          rewrittenBytecodeArgAt(bytecode, edge.cur_idx), defined_before);
-      if (defined_out[edge.cur_idx] != defined_after) {
-        changed = true;
-        defined_out[edge.cur_idx] = defined_after;
-      }
-      uword next_met = meet(defined_in[edge.next_idx], defined_after);
-      if (defined_in[edge.next_idx] != next_met) {
-        changed = true;
-        defined_in[edge.next_idx] = next_met;
-      }
-    }
-    return changed;
-  });
+  word num_iterations =
+      runUntilFixpoint([&edges, &defined_in, &bytecode, &defined_out, &meet] {
+        bool changed = false;
+        for (const Edge& edge : edges) {
+          Bytecode op = rewrittenBytecodeOpAt(bytecode, edge.cur_idx);
+          uword arg = rewrittenBytecodeArgAt(bytecode, edge.cur_idx);
+          uword defined_before = defined_in[edge.cur_idx];
+          uword defined_after;
+          switch (op) {
+            case STORE_FAST: {
+              DCHECK_INDEX(arg, kBitsPerWord);
+              defined_after = defined_before | (uword{1} << arg);
+              break;
+            }
+            case DELETE_FAST: {
+              DCHECK_INDEX(arg, kBitsPerWord);
+              defined_after = defined_before & ~(uword{1} << arg);
+              break;
+            }
+            default:
+              defined_after = defined_before;
+              break;
+          }
+          if (defined_out[edge.cur_idx] != defined_after) {
+            changed = true;
+            defined_out[edge.cur_idx] = defined_after;
+          }
+          uword next_met = meet(defined_in[edge.next_idx], defined_after);
+          if (defined_in[edge.next_idx] != next_met) {
+            changed = true;
+            defined_in[edge.next_idx] = next_met;
+          }
+        }
+        return changed;
+      });
   DTRACE_PROBE1(python, DefiniteAssignmentIterations, num_iterations);
   // Rewrite all LOAD_FAST opcodes with definitely-assigned locals to
   // LOAD_FAST_REVERSE_UNCHECKED (if the arg would fit in a byte).
