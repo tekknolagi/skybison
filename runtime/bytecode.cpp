@@ -613,6 +613,22 @@ class LiveLattice : public Lattice<LiveLatticeValue> {
   LiveLatticeValue value_;
 };
 
+static uword bitSet(uword set, uword idx) {
+  DCHECK(idx < kBitsPerWord, "idx must be less than kBitsPerWord");
+  return set | (1ULL << idx);
+}
+
+static bool isBitSet(uword set, uword idx) {
+  return set & (1ULL << idx);
+}
+
+static bool isBitClear(uword set, uword idx) { return !isBitSet(set, idx); }
+
+static uword bitClear(uword set, uword idx) {
+  DCHECK(idx < kBitsPerWord, "idx must be less than kBitsPerWord");
+  return set & ~(1ULL << idx);
+}
+
 static void analyzeLiveVariables(Thread* thread, const Function& function,
                                  const std::vector<Edge>& forward_edges) {
   std::vector<Edge> edges = reverseEdges(forward_edges);
@@ -620,15 +636,16 @@ static void analyzeLiveVariables(Thread* thread, const Function& function,
   MutableBytes bytecode(&scope, function.rewrittenBytecode());
   word num_opcodes = rewrittenBytecodeLength(bytecode);
   word total_locals = function.totalLocals();
-  // Map of bytecode index to the locals vec representing which locals are
-  // definitely live.
-  std::vector<Locals<LiveLattice>> live_in(num_opcodes,
-                                           Locals<LiveLattice>(total_locals));
-  std::vector<Locals<LiveLattice>> live_out(num_opcodes,
-                                            Locals<LiveLattice>(total_locals));
+  // The bitset represents locals that are live. The empty set, top (0) means
+  // mothing is live. The full set, bottom (kMaxUword) means everything is
+  // live.
+  uword top{0};
+  // uword bottom{kMaxUword};
+  std::vector<uword> live_in(num_opcodes, top);
+  std::vector<uword> live_out(num_opcodes, top);
   // Run until fixpoint.
   word num_iterations =
-      runUntilFixpoint([&edges, &live_in, &bytecode, &live_out] {
+      runUntilFixpoint([&edges, &live_in, &bytecode, &live_out, &total_locals] {
         bool changed = false;
         for (const Edge& edge : edges) {
           // TODO(max): Reverse iteration is way faster.
@@ -637,19 +654,30 @@ static void analyzeLiveVariables(Thread* thread, const Function& function,
           // const Edge& edge = *it;
           Bytecode op = rewrittenBytecodeOpAt(bytecode, edge.cur_idx);
           uword arg = rewrittenBytecodeArgAt(bytecode, edge.cur_idx);
-          const Locals<LiveLattice>& live_before = live_in[edge.cur_idx];
-          Locals<LiveLattice> live_after = live_before;
+          uword live_before = live_in[edge.cur_idx];
+          uword live_after = live_before;
           switch (op) {
             case STORE_FAST:
-              live_after.set(arg, LiveLatticeValue::kDead);
+            // It's dead
+            live_after = bitClear(live_before, arg);
               break;
+            case STORE_FAST_REVERSE: {
+            // It's dead
+            live_after = bitClear(live_before, total_locals - arg - 1);
+              break;
+            }
             case DELETE_FAST:
               // ???
               // live_after.set(
               //     arg, LiveLatticeValue::kDefinitelyNotAssigned);
               break;
             case LOAD_FAST:
-              live_after.set(arg, LiveLatticeValue::kLive);
+              // It's live
+              live_after = bitSet(live_before, arg);
+              break;
+            case LOAD_FAST_REVERSE:
+              // It's live
+              live_after = bitSet(live_before, total_locals - arg - 1);
               break;
             default:
               break;
@@ -658,8 +686,8 @@ static void analyzeLiveVariables(Thread* thread, const Function& function,
             changed = true;
             live_out[edge.cur_idx] = live_after;
           }
-          Locals<LiveLattice> next_met =
-              live_in[edge.next_idx].meet(live_after);
+          auto meet = [](uword a, uword b) { return a | b; };
+          uword next_met = meet(live_in[edge.next_idx], live_after);
           if (live_in[edge.next_idx] != next_met) {
             changed = true;
             live_in[edge.next_idx] = next_met;
@@ -668,6 +696,24 @@ static void analyzeLiveVariables(Thread* thread, const Function& function,
         return changed;
       });
   DTRACE_PROBE1(python, LiveIterations, num_iterations);
+  // Rewrite all dead STORE_FAST opcodes to POP_TOP.
+  for (word i = 0; i < num_opcodes; i++) {
+    Bytecode op = rewrittenBytecodeOpAt(bytecode, i);
+    uword arg = rewrittenBytecodeArgAt(bytecode, i);
+    if (op == LOAD_FAST) {
+      DCHECK(isBitSet(live_in[i], arg), "LOAD_FAST should be live");
+      continue;
+    }
+    if (op == STORE_FAST || op == STORE_FAST_REVERSE) {
+      uword live_before = live_in[i];
+      if ((op == STORE_FAST && isBitClear(live_before, arg)) ||
+          (op == STORE_FAST_REVERSE &&
+           isBitClear(live_before, total_locals - arg - 1))) {
+        rewrittenBytecodeOpAtPut(bytecode, i, POP_TOP);
+        rewrittenBytecodeArgAtPut(bytecode, i, 0);
+      }
+    }
+  }
 }
 
 void analyzeBytecode(Thread* thread, const Function& function) {
