@@ -385,7 +385,8 @@ static bool isHardToAnalyze(Thread* thread, const Function& function) {
 static word runUntilFixpoint(std::function<bool()> f) {
   word num_iterations = 0;
   for (bool changed = true; changed;) {
-    DCHECK(num_iterations < 100, "Too many iterations... something went wrong");
+    DCHECK(num_iterations < 1000,
+           "Too many iterations... something went wrong");
     num_iterations++;
     changed = f();
   }
