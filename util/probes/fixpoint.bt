@@ -2,6 +2,10 @@ usdt:./build/bin/python:python:DefiniteAssignmentIterations {
   @definite[arg0]++;
 }
 
+usdt:./build/bin/python:python:LiveIterations {
+  @live[arg0]++;
+}
+
 usdt:./build/bin/python:python:DefiniteAssignmentBailout {
   @bailout[str(arg0)]++;
 }

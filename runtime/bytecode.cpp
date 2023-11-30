@@ -381,6 +381,14 @@ static bool isHardToAnalyze(Thread* thread, const Function& function) {
   return false;
 }
 
+static std::vector<Edge> reverseEdges(const std::vector<Edge>& edges) {
+  std::vector<Edge> result;
+  result.reserve(edges.size());
+  for (const Edge& edge : edges) {
+    result.push_back(Edge{edge.next_idx, edge.cur_idx});
+  }
+  return result;
+}
 
 static word runUntilFixpoint(std::function<bool()> f) {
   word num_iterations = 0;
@@ -575,6 +583,92 @@ static void analyzeDefiniteAssignment(Thread* thread, const Function& function,
   }
 }
 
+enum class LiveLatticeValue {
+  kBottom = 0x3,  // 0b11
+  kLive = 0x2,    // 0b10
+  kDead = 0x1,    // 0b01
+  kTop = 0x0,     // 0b00
+};
+
+class LiveLattice : public Lattice<LiveLatticeValue> {
+ public:
+  LiveLattice() : value_(LiveLatticeValue::kTop) {}
+  LiveLattice(LiveLatticeValue value) : value_(value) {}
+  LiveLattice meet(const LiveLattice& other) const {
+    return LiveLattice{static_cast<LiveLatticeValue>(
+        static_cast<uword>(value_) | static_cast<uword>(other.value_))};
+  }
+  LiveLatticeValue value() const { return value_; }
+  static LiveLattice top() { return LiveLattice{LiveLatticeValue::kTop}; }
+  static LiveLattice bottom() { return LiveLattice{LiveLatticeValue::kBottom}; }
+  bool isLive() const { return value_ == LiveLatticeValue::kLive; }
+  bool isDead() const { return value_ == LiveLatticeValue::kDead; }
+  bool operator==(const LiveLattice& other) const {
+    return value_ == other.value_;
+  }
+  bool operator!=(const LiveLattice& other) const { return !(*this == other); }
+
+ private:
+  LiveLatticeValue value_;
+};
+
+static void analyzeLiveVariables(Thread* thread, const Function& function,
+                                 const std::vector<Edge>& forward_edges) {
+  std::vector<Edge> edges = reverseEdges(forward_edges);
+  HandleScope scope(thread);
+  MutableBytes bytecode(&scope, function.rewrittenBytecode());
+  word num_opcodes = rewrittenBytecodeLength(bytecode);
+  word total_locals = function.totalLocals();
+  // Map of bytecode index to the locals vec representing which locals are
+  // definitely live.
+  std::vector<Locals<LiveLattice>> live_in(num_opcodes,
+                                           Locals<LiveLattice>(total_locals));
+  std::vector<Locals<LiveLattice>> live_out(num_opcodes,
+                                            Locals<LiveLattice>(total_locals));
+  // Run until fixpoint.
+  word num_iterations =
+      runUntilFixpoint([&edges, &live_in, &bytecode, &live_out] {
+        bool changed = false;
+        for (const Edge& edge : edges) {
+          // TODO(max): Reverse iteration is way faster.
+          // for (std::vector<Edge>::reverse_iterator it = edges.rbegin();
+          //      it != edges.rend(); ++it) {
+          // const Edge& edge = *it;
+          Bytecode op = rewrittenBytecodeOpAt(bytecode, edge.cur_idx);
+          uword arg = rewrittenBytecodeArgAt(bytecode, edge.cur_idx);
+          const Locals<LiveLattice>& live_before = live_in[edge.cur_idx];
+          Locals<LiveLattice> live_after = live_before;
+          switch (op) {
+            case STORE_FAST:
+              live_after.set(arg, LiveLatticeValue::kDead);
+              break;
+            case DELETE_FAST:
+              // ???
+              // live_after.set(
+              //     arg, LiveLatticeValue::kDefinitelyNotAssigned);
+              break;
+            case LOAD_FAST:
+              live_after.set(arg, LiveLatticeValue::kLive);
+              break;
+            default:
+              break;
+          }
+          if (live_out[edge.cur_idx] != live_after) {
+            changed = true;
+            live_out[edge.cur_idx] = live_after;
+          }
+          Locals<LiveLattice> next_met =
+              live_in[edge.next_idx].meet(live_after);
+          if (live_in[edge.next_idx] != next_met) {
+            changed = true;
+            live_in[edge.next_idx] = next_met;
+          }
+        }
+        return changed;
+      });
+  DTRACE_PROBE1(python, LiveIterations, num_iterations);
+}
+
 void analyzeBytecode(Thread* thread, const Function& function) {
   DTRACE_PROBE(python, AnalysisAttempt);
   HandleScope scope(thread);
@@ -604,6 +698,7 @@ void analyzeBytecode(Thread* thread, const Function& function) {
   }
   std::vector<Edge> edges = findEdges(bytecode);
   analyzeDefiniteAssignment(thread, function, edges);
+  analyzeLiveVariables(thread, function, edges);
   DTRACE_PROBE(python, AnalysisSuccess);
 }
 
