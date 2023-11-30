@@ -2,6 +2,7 @@
 #include "bytecode.h"
 
 #include <functional>
+#include <vector>
 
 #include "debugging.h"
 #include "event.h"
@@ -391,24 +392,140 @@ static word runUntilFixpoint(std::function<bool()> f) {
   return num_iterations;
 }
 
+template <typename T>
+class Lattice {
+ public:
+  Lattice<T> meet(const Lattice& other) const;
+  static Lattice<T> top();
+  static Lattice<T> bottom();
+
+ private:
+  T value_;
+};
+
+enum class DefiniteAssignmentLatticeValue {
+  kTop = 0x3,                    // 0b11
+  kDefinitelyAssigned = 0x2,     // 0b10
+  kDefinitelyNotAssigned = 0x1,  // 0b01
+  kBottom = 0x0,                 // 0b00
+};
+
+class DefiniteAssignmentLattice
+    : public Lattice<DefiniteAssignmentLatticeValue> {
+ public:
+  DefiniteAssignmentLattice() : value_(DefiniteAssignmentLatticeValue::kTop) {}
+  DefiniteAssignmentLattice(DefiniteAssignmentLatticeValue value)
+      : value_(value) {}
+  DefiniteAssignmentLattice meet(const DefiniteAssignmentLattice& other) const {
+    // if (*this == top()) {
+    //   return other;
+    // }
+    // if (other == top()) {
+    //   return *this;
+    // }
+    // if (*this == bottom() || other == bottom()) {
+    //   return bottom();
+    // }
+    // if (*this == other) {
+    //   return *this;
+    // }
+    // return bottom();
+    return DefiniteAssignmentLattice{
+        static_cast<DefiniteAssignmentLatticeValue>(
+            static_cast<uword>(value_) & static_cast<uword>(other.value_))};
+  }
+  DefiniteAssignmentLatticeValue value() const { return value_; }
+  static DefiniteAssignmentLattice top() {
+    return DefiniteAssignmentLattice{DefiniteAssignmentLatticeValue::kTop};
+  }
+  static DefiniteAssignmentLattice bottom() {
+    return DefiniteAssignmentLattice{DefiniteAssignmentLatticeValue::kBottom};
+  }
+  bool isDefinitelyAssigned() const {
+    return value_ == DefiniteAssignmentLatticeValue::kDefinitelyAssigned;
+  }
+  bool isDefinitelyNotAssigned() const {
+    return value_ == DefiniteAssignmentLatticeValue::kDefinitelyNotAssigned;
+  }
+  bool operator==(const DefiniteAssignmentLattice& other) const {
+    return value_ == other.value_;
+  }
+  bool operator!=(const DefiniteAssignmentLattice& other) const {
+    return !(*this == other);
+  }
+
+ private:
+  DefiniteAssignmentLatticeValue value_;
+};
+
+template <typename T>
+class Locals {
+ public:
+  Locals(word size) : size_(size) {
+    locals_.resize(size);
+    for (word i = 0; i < size_; i++) {
+      set(i, T::top());
+    }
+  }
+  Locals(const Locals<T>& other) : Locals(other.size_) {
+    for (word i = 0; i < size_; i++) {
+      set(i, other.get(i));
+    }
+  }
+  Locals<T> operator=(const Locals<T>& other) {
+    DCHECK(size_ == other.size_, "Locals must be the same size");
+    for (word i = 0; i < size_; i++) {
+      set(i, other.get(i));
+    }
+    return *this;
+  }
+  void set(word index, T value) {
+    DCHECK_INDEX(index, size_);
+    locals_[index] = value;
+  }
+  T get(word index) const {
+    DCHECK_INDEX(index, size_);
+    return locals_[index];
+  }
+  bool operator==(const Locals<T>& other) const {
+    return size_ == other.size_ && locals_ == other.locals_;
+  }
+  bool operator!=(const Locals<T>& other) const { return !(*this == other); }
+  word size() const { return size_; }
+
+ private:
+  word size_{-1};
+  std::vector<T> locals_;
+};
+
 static void analyzeDefiniteAssignment(Thread* thread, const Function& function,
                                       const Vector<Edge>& edges) {
   HandleScope scope(thread);
   MutableBytes bytecode(&scope, function.rewrittenBytecode());
   word num_opcodes = rewrittenBytecodeLength(bytecode);
+  word total_locals = function.totalLocals();
   // Lattice definition
-  uword top = kMaxUword;
-  auto meet = [](uword left, uword right) { return left & right; };
-  // Map of bytecode index to the uword representing which locals are
+  auto meet = [](const Locals<DefiniteAssignmentLattice>& left,
+                 const Locals<DefiniteAssignmentLattice>& right) {
+    DCHECK(left.size() == right.size(), "Locals must be the same size");
+    Locals<DefiniteAssignmentLattice> result{left.size()};
+    for (word i = 0; i < left.size(); i++) {
+      result.set(i, left.get(i).meet(right.get(i)));
+    }
+    return result;
+  };
+  // Map of bytecode index to the locals vec representing which locals are
   // definitely assigned.
-  Vector<uword> defined_in;
-  Vector<uword> defined_out;
-  defined_in.reserve(num_opcodes);
-  defined_out.reserve(num_opcodes);
-  defined_in.initializeWith(top);
-  defined_out.initializeWith(top);
+  std::vector<Locals<DefiniteAssignmentLattice>> defined_in;
+  std::vector<Locals<DefiniteAssignmentLattice>> defined_out;
+  for (word i = 0; i < num_opcodes; i++) {
+    defined_in.emplace_back(Locals<DefiniteAssignmentLattice>(total_locals));
+    defined_out.emplace_back(Locals<DefiniteAssignmentLattice>(total_locals));
+  }
   // We enter the function with all parameters definitely assigned.
-  defined_in[0] = setBottomNBits(function.totalArgs());
+  for (word i = 0; i < function.totalArgs(); i++) {
+    defined_in[0].set(i, DefiniteAssignmentLatticeValue::kDefinitelyAssigned);
+  }
   // Run until fixpoint.
   word num_iterations =
       runUntilFixpoint([&edges, &defined_in, &bytecode, &defined_out, &meet] {
@@ -416,28 +533,27 @@ static void analyzeDefiniteAssignment(Thread* thread, const Function& function,
         for (const Edge& edge : edges) {
           Bytecode op = rewrittenBytecodeOpAt(bytecode, edge.cur_idx);
           uword arg = rewrittenBytecodeArgAt(bytecode, edge.cur_idx);
-          uword defined_before = defined_in[edge.cur_idx];
-          uword defined_after;
+          const Locals<DefiniteAssignmentLattice>& defined_before =
+              defined_in[edge.cur_idx];
+          Locals<DefiniteAssignmentLattice> defined_after = defined_before;
           switch (op) {
-            case STORE_FAST: {
-              DCHECK_INDEX(arg, kBitsPerWord);
-              defined_after = defined_before | (uword{1} << arg);
+            case STORE_FAST:
+              defined_after.set(
+                  arg, DefiniteAssignmentLatticeValue::kDefinitelyAssigned);
               break;
-            }
-            case DELETE_FAST: {
-              DCHECK_INDEX(arg, kBitsPerWord);
-              defined_after = defined_before & ~(uword{1} << arg);
+            case DELETE_FAST:
+              defined_after.set(
+                  arg, DefiniteAssignmentLatticeValue::kDefinitelyNotAssigned);
               break;
-            }
             default:
-              defined_after = defined_before;
               break;
           }
           if (defined_out[edge.cur_idx] != defined_after) {
             changed = true;
             defined_out[edge.cur_idx] = defined_after;
           }
-          uword next_met = meet(defined_in[edge.next_idx], defined_after);
+          Locals<DefiniteAssignmentLattice> next_met =
+              meet(defined_in[edge.next_idx], defined_after);
           if (defined_in[edge.next_idx] != next_met) {
             changed = true;
             defined_in[edge.next_idx] = next_met;
@@ -448,16 +564,14 @@ static void analyzeDefiniteAssignment(Thread* thread, const Function& function,
   DTRACE_PROBE1(python, DefiniteAssignmentIterations, num_iterations);
   // Rewrite all LOAD_FAST opcodes with definitely-assigned locals to
   // LOAD_FAST_REVERSE_UNCHECKED (if the arg would fit in a byte).
-  word total_locals = function.totalLocals();
   for (word i = 0; i < num_opcodes; i++) {
     Bytecode op = rewrittenBytecodeOpAt(bytecode, i);
     if (op != LOAD_FAST) {
       continue;
     }
-    uword defined_before = defined_in[i];
+    const Locals<DefiniteAssignmentLattice>& defined_before = defined_in[i];
     uword arg = rewrittenBytecodeArgAt(bytecode, i);
-    bool definitely_assigned = defined_before & (uword{1} << arg);
-    if (!definitely_assigned) {
+    if (!defined_before.get(arg).isDefinitelyAssigned()) {
       continue;
     }
     // Check if the original opcode uses an extended arg
