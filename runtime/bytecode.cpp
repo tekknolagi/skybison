@@ -417,19 +417,6 @@ class DefiniteAssignmentLattice
   DefiniteAssignmentLattice(DefiniteAssignmentLatticeValue value)
       : value_(value) {}
   DefiniteAssignmentLattice meet(const DefiniteAssignmentLattice& other) const {
-    // if (*this == top()) {
-    //   return other;
-    // }
-    // if (other == top()) {
-    //   return *this;
-    // }
-    // if (*this == bottom() || other == bottom()) {
-    //   return bottom();
-    // }
-    // if (*this == other) {
-    //   return *this;
-    // }
-    // return bottom();
     return DefiniteAssignmentLattice{
         static_cast<DefiniteAssignmentLatticeValue>(
             static_cast<uword>(value_) & static_cast<uword>(other.value_))};
