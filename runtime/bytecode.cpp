@@ -479,6 +479,14 @@ class Locals {
   }
   bool operator!=(const Locals<T>& other) const { return !(*this == other); }
   word size() const { return size_; }
+  Locals<T> meet(const Locals<T>& other) const {
+    DCHECK(size_ == other.size_, "Locals must be the same size");
+    Locals<T> result{size_};
+    for (word i = 0; i < size_; i++) {
+      result.set(i, get(i).meet(other.get(i)));
+    }
+    return result;
+  }
 
  private:
   word size_{-1};
@@ -491,16 +499,6 @@ static void analyzeDefiniteAssignment(Thread* thread, const Function& function,
   MutableBytes bytecode(&scope, function.rewrittenBytecode());
   word num_opcodes = rewrittenBytecodeLength(bytecode);
   word total_locals = function.totalLocals();
-  // Lattice definition
-  auto meet = [](const Locals<DefiniteAssignmentLattice>& left,
-                 const Locals<DefiniteAssignmentLattice>& right) {
-    DCHECK(left.size() == right.size(), "Locals must be the same size");
-    Locals<DefiniteAssignmentLattice> result{left.size()};
-    for (word i = 0; i < left.size(); i++) {
-      result.set(i, left.get(i).meet(right.get(i)));
-    }
-    return result;
-  };
   // Map of bytecode index to the locals vec representing which locals are
   // definitely assigned.
   std::vector<Locals<DefiniteAssignmentLattice>> defined_in;
@@ -515,7 +513,7 @@ static void analyzeDefiniteAssignment(Thread* thread, const Function& function,
   }
   // Run until fixpoint.
   word num_iterations =
-      runUntilFixpoint([&edges, &defined_in, &bytecode, &defined_out, &meet] {
+      runUntilFixpoint([&edges, &defined_in, &bytecode, &defined_out] {
         bool changed = false;
         for (const Edge& edge : edges) {
           Bytecode op = rewrittenBytecodeOpAt(bytecode, edge.cur_idx);
@@ -540,7 +538,7 @@ static void analyzeDefiniteAssignment(Thread* thread, const Function& function,
             defined_out[edge.cur_idx] = defined_after;
           }
           Locals<DefiniteAssignmentLattice> next_met =
-              meet(defined_in[edge.next_idx], defined_after);
+              defined_in[edge.next_idx].meet(defined_after);
           if (defined_in[edge.next_idx] != next_met) {
             changed = true;
             defined_in[edge.next_idx] = next_met;
