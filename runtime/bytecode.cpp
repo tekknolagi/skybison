@@ -303,13 +303,13 @@ struct Edge {
   V(YIELD_VALUE)                                                               \
   V(END_ASYNC_FOR)
 
-static Vector<Edge> findEdges(const MutableBytes& bytecode) {
+static std::vector<Edge> findEdges(const MutableBytes& bytecode) {
   // TODO(max): Collapse edges for uninteresting opcodes. There shouldn't be
   // edges for POP_TOP, etc; just control flow and anything that touches
   // locals. But maybe this is analysis specific (definite assignment only
   // cares about STORE_FAST and DELETE_FAST whereas constant propagation cares
   // about LOAD_CONST and BINARY_ADD and stuff.)
-  Vector<Edge> edges;
+  std::vector<Edge> edges;
   word num_opcodes = rewrittenBytecodeLength(bytecode);
   for (word i = 0; i < num_opcodes;) {
     // Make a copy because nextBytecodeOp modifies the index in-place.
@@ -494,7 +494,7 @@ class Locals {
 };
 
 static void analyzeDefiniteAssignment(Thread* thread, const Function& function,
-                                      const Vector<Edge>& edges) {
+                                      const std::vector<Edge>& edges) {
   HandleScope scope(thread);
   MutableBytes bytecode(&scope, function.rewrittenBytecode());
   word num_opcodes = rewrittenBytecodeLength(bytecode);
@@ -601,7 +601,7 @@ void analyzeBytecode(Thread* thread, const Function& function) {
     // Some tests generate empty code objects. Bail out.
     return;
   }
-  Vector<Edge> edges = findEdges(bytecode);
+  std::vector<Edge> edges = findEdges(bytecode);
   analyzeDefiniteAssignment(thread, function, edges);
   DTRACE_PROBE(python, AnalysisSuccess);
 }
