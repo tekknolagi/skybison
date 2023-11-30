@@ -501,12 +501,10 @@ static void analyzeDefiniteAssignment(Thread* thread, const Function& function,
   word total_locals = function.totalLocals();
   // Map of bytecode index to the locals vec representing which locals are
   // definitely assigned.
-  std::vector<Locals<DefiniteAssignmentLattice>> defined_in;
-  std::vector<Locals<DefiniteAssignmentLattice>> defined_out;
-  for (word i = 0; i < num_opcodes; i++) {
-    defined_in.emplace_back(Locals<DefiniteAssignmentLattice>(total_locals));
-    defined_out.emplace_back(Locals<DefiniteAssignmentLattice>(total_locals));
-  }
+  std::vector<Locals<DefiniteAssignmentLattice>> defined_in(
+      num_opcodes, Locals<DefiniteAssignmentLattice>(total_locals));
+  std::vector<Locals<DefiniteAssignmentLattice>> defined_out(
+      num_opcodes, Locals<DefiniteAssignmentLattice>(total_locals));
   // We enter the function with all parameters definitely assigned.
   for (word i = 0; i < function.totalArgs(); i++) {
     defined_in[0].set(i, DefiniteAssignmentLatticeValue::kDefinitelyAssigned);
