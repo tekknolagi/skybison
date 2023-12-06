@@ -538,6 +538,7 @@ static void analyzeDefiniteAssignment(Thread* thread, const Function& function,
                   arg, DefiniteAssignmentLatticeValue::kDefinitelyNotAssigned);
               break;
             default:
+              // TODO(max): Return false
               break;
           }
           if (defined_out[edge.cur_idx] != defined_after) {
