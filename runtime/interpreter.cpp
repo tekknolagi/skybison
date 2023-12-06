@@ -4694,6 +4694,15 @@ HANDLER_INLINE Continue Interpreter::doCallFunctionTypeNew(Thread* thread,
   return tailcallFunction(thread, arg + 1, *ctor);
 }
 
+HANDLER_INLINE Continue Interpreter::doGuardNone(Thread* thread, word) {
+  RawObject obj = thread->stackTop();
+  if (UNLIKELY(!obj.isNoneType())) {
+    thread->raiseWithFmt(LayoutId::kTypeError, "__init__ returned non None");
+    return Continue::UNWIND;
+  }
+  return Continue::NEXT;
+}
+
 HANDLER_INLINE Continue Interpreter::doCallFunctionTypeInit(Thread* thread,
                                                             word arg) {
   HandleScope scope(thread);
@@ -4716,9 +4725,17 @@ HANDLER_INLINE Continue Interpreter::doCallFunctionTypeInit(Thread* thread,
     rewriteCurrentBytecode(frame, CALL_FUNCTION);
     return doCallFunction(thread, arg);
   }
+  DCHECK(init.isFunction(), "cached is expected to be a function");
   Type type(&scope, *receiver);
   Object instance(&scope, objectNew(thread, type));
-  DCHECK(init.isFunction(), "cached is expected to be a function");
+  DCHECK(!instance.isError(), "unexpected exception calling objectNew");
+  // Stack is [ type arg0 arg1 arg2 ... argN ]
+  // We want to make it so __init__ returns into a shim frame with the result
+  // of the __init__ function call and have the shim frame check the result is
+  // None, and then return the instance.
+  // thread->pushInitCleanupFrame();
+  return Continue::NEXT;
+
   thread->stackSetAt(callable_idx, *init);
   thread->stackInsertAt(callable_idx, *instance);
   Object result(&scope, callFunction(thread, arg + 1, *init));

@@ -430,6 +430,7 @@ class Interpreter {
   static Continue doGetAwaitable(Thread* thread, word arg);
   static Continue doGetIter(Thread* thread, word arg);
   static Continue doGetYieldFromIter(Thread* thread, word arg);
+  static Continue doGuardNone(Thread* thread, word arg);
   static Continue doImportFrom(Thread* thread, word arg);
   static Continue doImportName(Thread* thread, word arg);
   static Continue doInplaceAdd(Thread* thread, word arg);

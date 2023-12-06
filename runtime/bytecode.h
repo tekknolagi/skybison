@@ -190,7 +190,7 @@ namespace py {
   V(UNUSED_BYTECODE_170, 170, doInvalidBytecode)                               \
   V(UNUSED_BYTECODE_171, 171, doInvalidBytecode)                               \
   V(UNUSED_BYTECODE_172, 172, doInvalidBytecode)                               \
-  V(UNUSED_BYTECODE_173, 173, doInvalidBytecode)                               \
+  V(GUARD_NONE, 173, doGuardNone)                                              \
   V(LOAD_METHOD_MODULE, 174, doLoadMethodModule)                               \
   V(CALL_FUNCTION_TYPE_INIT, 175, doCallFunctionTypeInit)                      \
   V(CALL_FUNCTION_TYPE_NEW, 176, doCallFunctionTypeNew)                        \
