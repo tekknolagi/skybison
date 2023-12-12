@@ -721,8 +721,10 @@ void analyzeBytecode(Thread* thread, const Function& function) {
     return;
   }
   std::vector<Edge> edges = findEdges(bytecode);
-  analyzeDefiniteAssignment(thread, function, edges);
-  analyzeLiveVariables(thread, function, edges);
+  (void)analyzeDefiniteAssignment;
+  // analyzeDefiniteAssignment(thread, function, edges);
+  (void)analyzeLiveVariables;
+  // analyzeLiveVariables(thread, function, edges);
   DTRACE_PROBE(python, AnalysisSuccess);
 }
 

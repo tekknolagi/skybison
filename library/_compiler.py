@@ -212,6 +212,10 @@ class PyroFlowGraph(PyFlowGraph38):
     opcode = opcodepyro.opcode
 
     def optimizeLoadFast(self):
+        # TODO(max): Bail out early if gen/coro/asyncgen/itercoro?
+        # TODO(max): Bail out early if exception handling opcodes
+        # TODO(max): Make edges between all opcodes, not just basic blocks
+        # TODO(max): Profile number of iterations until fixpoint
         blocks = self.getBlocksInOrder()
         preds = tuple(set() for i in range(self.block_count))
         for block in blocks:
@@ -297,7 +301,7 @@ class PyroFlowGraph(PyFlowGraph38):
             self.entry.insts = deletes + self.entry.insts
 
     def getCode(self):
-        # self.optimizeLoadFast()
+        self.optimizeLoadFast()
         return super().getCode()
 
 
