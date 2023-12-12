@@ -502,6 +502,15 @@ class Locals {
   std::vector<T> locals_;
 };
 
+template <typename T>
+static bool update(std::vector<T>& vec, word idx, const T& value) {
+  if (vec[idx] != value) {
+    vec[idx] = value;
+    return true;
+  }
+  return false;
+}
+
 static void analyzeDefiniteAssignment(Thread* thread, const Function& function,
                                       const std::vector<Edge>& edges) {
   HandleScope scope(thread);
@@ -541,16 +550,10 @@ static void analyzeDefiniteAssignment(Thread* thread, const Function& function,
               // TODO(max): Return false
               break;
           }
-          if (defined_out[edge.cur_idx] != defined_after) {
-            changed = true;
-            defined_out[edge.cur_idx] = defined_after;
-          }
+          changed = update(defined_out, edge.cur_idx, defined_after);
           Locals<DefiniteAssignmentLattice> next_met =
               defined_in[edge.next_idx].meet(defined_after);
-          if (defined_in[edge.next_idx] != next_met) {
-            changed = true;
-            defined_in[edge.next_idx] = next_met;
-          }
+          changed |= update(defined_in, edge.next_idx, next_met);
         }
         return changed;
       });
@@ -651,16 +654,10 @@ static void analyzeLiveVariables(Thread* thread, const Function& function,
             default:
               break;
           }
-          if (live_out[edge.cur_idx] != live_after) {
-            changed = true;
-            live_out[edge.cur_idx] = live_after;
-          }
+          changed = update(live_out, edge.cur_idx, live_after);
           auto meet = [](uword a, uword b) { return a | b; };
           uword next_met = meet(live_in[edge.next_idx], live_after);
-          if (live_in[edge.next_idx] != next_met) {
-            changed = true;
-            live_in[edge.next_idx] = next_met;
-          }
+          changed |= update(live_in, edge.next_idx, next_met);
         }
         return changed;
       });
