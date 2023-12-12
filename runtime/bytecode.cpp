@@ -674,10 +674,13 @@ static void analyzeLiveVariables(Thread* thread, const Function& function,
     if (op == STORE_FAST && isBitClear(live_in[i], arg)) {
       rewrittenBytecodeOpAtPut(bytecode, i, POP_TOP);
       rewrittenBytecodeArgAtPut(bytecode, i, 0);
-    } else if (op == STORE_FAST_REVERSE &&
-               isBitClear(live_in[i], total_locals - arg - 1)) {
+      continue;
+    }
+    if (op == STORE_FAST_REVERSE &&
+        isBitClear(live_in[i], total_locals - arg - 1)) {
       rewrittenBytecodeOpAtPut(bytecode, i, POP_TOP);
       rewrittenBytecodeArgAtPut(bytecode, i, 0);
+      continue;
     }
   }
 }
