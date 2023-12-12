@@ -618,9 +618,7 @@ static uword bitSet(uword set, uword idx) {
   return set | (1ULL << idx);
 }
 
-static bool isBitSet(uword set, uword idx) {
-  return set & (1ULL << idx);
-}
+static bool isBitSet(uword set, uword idx) { return set & (1ULL << idx); }
 
 static bool isBitClear(uword set, uword idx) { return !isBitSet(set, idx); }
 
@@ -658,12 +656,12 @@ static void analyzeLiveVariables(Thread* thread, const Function& function,
           uword live_after = live_before;
           switch (op) {
             case STORE_FAST:
-            // It's dead
-            live_after = bitClear(live_before, arg);
+              // It's dead
+              live_after = bitClear(live_before, arg);
               break;
             case STORE_FAST_REVERSE: {
-            // It's dead
-            live_after = bitClear(live_before, total_locals - arg - 1);
+              // It's dead
+              live_after = bitClear(live_before, total_locals - arg - 1);
               break;
             }
             case DELETE_FAST:
