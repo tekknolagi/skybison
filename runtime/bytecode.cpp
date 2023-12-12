@@ -309,6 +309,8 @@ static std::vector<Edge> findEdges(const MutableBytes& bytecode) {
   // locals. But maybe this is analysis specific (definite assignment only
   // cares about STORE_FAST and DELETE_FAST whereas constant propagation cares
   // about LOAD_CONST and BINARY_ADD and stuff.)
+  // TODO(max): Can we do this on the original bytecode to stop faffing about
+  // with the scale factor?
   std::vector<Edge> edges;
   word num_opcodes = rewrittenBytecodeLength(bytecode);
   for (word i = 0; i < num_opcodes;) {
