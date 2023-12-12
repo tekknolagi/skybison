@@ -612,7 +612,6 @@ static void analyzeLiveVariables(Thread* thread, const Function& function,
   // mothing is live. The full set, bottom (kMaxUword) means everything is
   // live.
   uword top{0};
-  // uword bottom{kMaxUword};
   std::vector<uword> live_in(num_opcodes, top);
   std::vector<uword> live_out(num_opcodes, top);
   // Run until fixpoint.
@@ -672,9 +671,11 @@ static void analyzeLiveVariables(Thread* thread, const Function& function,
     }
     if (op == STORE_FAST || op == STORE_FAST_REVERSE) {
       uword live_before = live_in[i];
-      if ((op == STORE_FAST && isBitClear(live_before, arg)) ||
-          (op == STORE_FAST_REVERSE &&
-           isBitClear(live_before, total_locals - arg - 1))) {
+      if (op == STORE_FAST && isBitClear(live_before, arg)) {
+        rewrittenBytecodeOpAtPut(bytecode, i, POP_TOP);
+        rewrittenBytecodeArgAtPut(bytecode, i, 0);
+      } else if (op == STORE_FAST_REVERSE &&
+                 isBitClear(live_before, total_locals - arg - 1)) {
         rewrittenBytecodeOpAtPut(bytecode, i, POP_TOP);
         rewrittenBytecodeArgAtPut(bytecode, i, 0);
       }
