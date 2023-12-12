@@ -659,11 +659,10 @@ static void analyzeLiveVariables(Thread* thread, const Function& function,
               // It's dead
               live_after = bitClear(live_before, arg);
               break;
-            case STORE_FAST_REVERSE: {
+            case STORE_FAST_REVERSE:
               // It's dead
               live_after = bitClear(live_before, total_locals - arg - 1);
               break;
-            }
             case DELETE_FAST:
               // ???
               // live_after.set(
