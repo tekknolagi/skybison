@@ -584,35 +584,6 @@ static void analyzeDefiniteAssignment(Thread* thread, const Function& function,
   }
 }
 
-enum class LiveLatticeValue {
-  kBottom = 0x3,  // 0b11
-  kLive = 0x2,    // 0b10
-  kDead = 0x1,    // 0b01
-  kTop = 0x0,     // 0b00
-};
-
-class LiveLattice : public Lattice<LiveLatticeValue> {
- public:
-  LiveLattice() : value_(LiveLatticeValue::kTop) {}
-  LiveLattice(LiveLatticeValue value) : value_(value) {}
-  LiveLattice meet(const LiveLattice& other) const {
-    return LiveLattice{static_cast<LiveLatticeValue>(
-        static_cast<uword>(value_) | static_cast<uword>(other.value_))};
-  }
-  LiveLatticeValue value() const { return value_; }
-  static LiveLattice top() { return LiveLattice{LiveLatticeValue::kTop}; }
-  static LiveLattice bottom() { return LiveLattice{LiveLatticeValue::kBottom}; }
-  bool isLive() const { return value_ == LiveLatticeValue::kLive; }
-  bool isDead() const { return value_ == LiveLatticeValue::kDead; }
-  bool operator==(const LiveLattice& other) const {
-    return value_ == other.value_;
-  }
-  bool operator!=(const LiveLattice& other) const { return !(*this == other); }
-
- private:
-  LiveLatticeValue value_;
-};
-
 static uword bitSet(uword set, uword idx) {
   DCHECK(idx < kBitsPerWord, "idx must be less than kBitsPerWord");
   return set | (1ULL << idx);
