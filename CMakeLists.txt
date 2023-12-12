@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.5)
 project(python LANGUAGES C CXX VERSION 3.8.5)
 
+find_program(SYSTEM_PYTHON python3.8)
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
@@ -394,7 +396,7 @@ else()
     OUTPUT
     ${FROZEN_MODULE_OUTPUT}
     COMMAND
-    /usr/bin/python3.8 util/freeze_modules.py ${FROZEN_MODULE_OUTPUT_DIR}
+    ${SYSTEM_PYTHON} util/freeze_modules.py ${FROZEN_MODULE_OUTPUT_DIR}
       ${FROZEN_MODULE_INPUT}
     WORKING_DIRECTORY
     ${CMAKE_SOURCE_DIR}
