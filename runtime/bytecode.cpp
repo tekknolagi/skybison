@@ -664,6 +664,7 @@ static void analyzeLiveVariables(Thread* thread, const Function& function,
               live_after = bitClear(live_before, total_locals - arg - 1);
               break;
             case DELETE_FAST:
+              UNIMPLEMENTED("DELETE_FAST");
               // ???
               // live_after.set(
               //     arg, LiveLatticeValue::kDefinitelyNotAssigned);
