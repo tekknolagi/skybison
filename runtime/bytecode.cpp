@@ -670,6 +670,11 @@ static void analyzeLiveVariables(Thread* thread, const Function& function,
       DCHECK(isBitSet(live_in[i], arg), "LOAD_FAST should be live");
       continue;
     }
+    if (op == LOAD_FAST_REVERSE || op == LOAD_FAST_REVERSE_UNCHECKED) {
+      DCHECK(isBitSet(live_in[i], total_locals - arg - 1),
+             "LOAD_FAST_REVERSE(_UNCHECKED) should be live");
+      continue;
+    }
     if (op == STORE_FAST && isBitClear(live_in[i], arg)) {
       rewrittenBytecodeOpAtPut(bytecode, i, POP_TOP);
       rewrittenBytecodeArgAtPut(bytecode, i, 0);
