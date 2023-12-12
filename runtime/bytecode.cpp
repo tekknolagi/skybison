@@ -639,16 +639,15 @@ static void analyzeLiveVariables(Thread* thread, const Function& function,
               live_after = bitClear(live_before, total_locals - arg - 1);
               break;
             case DELETE_FAST:
+            case DELETE_FAST_REVERSE_UNCHECKED:
               UNIMPLEMENTED("DELETE_FAST");
-              // ???
-              // live_after.set(
-              //     arg, LiveLatticeValue::kDefinitelyNotAssigned);
               break;
             case LOAD_FAST:
               // It's live
               live_after = bitSet(live_before, arg);
               break;
             case LOAD_FAST_REVERSE:
+            case LOAD_FAST_REVERSE_UNCHECKED:
               // It's live
               live_after = bitSet(live_before, total_locals - arg - 1);
               break;
