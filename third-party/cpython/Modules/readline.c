@@ -1117,10 +1117,13 @@ setup_readline(readlinestate *mod_state)
     /* Set our completion function */
     rl_attempted_completion_function = flex_complete;
     /* Set Python word break characters */
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wincompatible-pointer-types-discards-qualifiers"
     completer_word_break_characters =
         rl_completer_word_break_characters =
         strdup(" \t\n`~!@#$%^&*()-=+[{]}\\|;:'\",<>/?");
         /* All nonalphanums except '.' */
+#pragma clang diagnostic pop
 
     mod_state->begidx = PyLong_FromLong(0L);
     mod_state->endidx = PyLong_FromLong(0L);
