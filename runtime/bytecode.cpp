@@ -560,6 +560,8 @@ static void analyzeDefiniteAssignment(Thread* thread, const Function& function,
         return changed;
       });
   DTRACE_PROBE1(python, DefiniteAssignmentIterations, num_iterations);
+  // TODO(max): Add a DELETE_FAST_REVERSE_UNCHECKED for all locals that are
+  // conditionally assigned when read.
   // Rewrite all LOAD_FAST opcodes with definitely-assigned locals to
   // LOAD_FAST_REVERSE_UNCHECKED (if the arg would fit in a byte).
   for (word i = 0; i < num_opcodes; i++) {
