@@ -21,6 +21,8 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    - name: Update package repos
+      run: sudo apt update
     - name: Install ninja
       run: sudo apt install -y ninja-build
 
@@ -58,6 +60,8 @@ jobs:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 2
+    - name: Update package repos
+      run: sudo apt update
     - name: Install tools
       run: sudo apt install -y ninja-build ccache valgrind
     - name: Quickbench
@@ -118,6 +122,8 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    - name: Update package repos
+      run: sudo apt update
     - name: Install ninja
       run: sudo apt install -y ninja-build
 
@@ -144,6 +150,8 @@ jobs:
     runs-on: ubuntu-20.04
     # TODO(max): Install and run Black on Python code
     steps:
+    - name: Update package repos
+      run: sudo apt update
     - name: Install clang-format
       run: sudo apt install -y clang-format
     - uses: actions/checkout@v3
