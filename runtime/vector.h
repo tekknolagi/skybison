@@ -104,13 +104,6 @@ class Vector {
     grow(new_capacity);
   }
 
-  void initializeWith(T elem) {
-    end_ = end_storage_;
-    for (T* i = begin_; i != end_; i++) {
-      *i = elem;
-    }
-  }
-
   void clear() { end_ = begin_; }
 
   void push_back(const T& t) {  // NOLINT
