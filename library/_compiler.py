@@ -324,13 +324,6 @@ class PyroFlowGraph(PyFlowGraph38):
             )
             for instr in all_instrs
         ):
-            print(
-                "Bailing out of",
-                self.name,
-                "in",
-                self.filename,
-                "because it has a try/except",
-            )
             return
         # TODO(max): Bail out early if gen/coro/asyncgen/itercoro?
         # TODO(max): Make edges between all opcodes, not just basic blocks
@@ -392,7 +385,6 @@ class PyroFlowGraph(PyFlowGraph38):
     def getCode(self):
         # Do this first; it can't (yet?) handle LOAD_FAST_REVERSE_UNCHECKED et
         # al.
-        print("Optimizing", self.name, "in", self.filename)
         self.optimizeDeadStores()
         self.optimizeLoadFast()
         return super().getCode()
