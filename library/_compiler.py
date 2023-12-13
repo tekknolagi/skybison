@@ -300,8 +300,136 @@ class PyroFlowGraph(PyFlowGraph38):
             ]
             self.entry.insts = deletes + self.entry.insts
 
+    def getInstructions(self):
+        for block in self.getBlocksInOrder():
+            for instr in block.getInstructions():
+                yield instr
+
+    def optimizeDeadStores(self):
+        all_instrs = self.getInstructions()
+        if any(instr.opname in (
+            "POP_BLOCK",
+            "SETUP_ASYNC_WITH",
+            "SETUP_FINALLY",
+            "SETUP_WITH",
+            "WITH_CLEANUP_START",
+            "YIELD_FROM",
+            "YIELD_VALUE",
+            "END_ASYNC_FOR",
+            ) for instr in all_instrs):
+            print("Bailing out of", self.name, "in", self.filename, "because it has a try/except")
+            return
+        # TODO(max): Bail out early if gen/coro/asyncgen/itercoro?
+        # TODO(max): Bail out early if exception handling opcodes
+        # TODO(max): Make edges between all opcodes, not just basic blocks
+        # TODO(max): Profile number of iterations until fixpoint
+        blocks = self.getBlocksInOrder()
+        preds = tuple(set() for i in range(self.block_count))
+        succs = tuple(set() for i in range(self.block_count))
+        for block in blocks:
+            for child in block.get_children():
+                if child is not None:
+                    preds[child.bid].add(block.bid)
+                    succs[block.bid].add(child.bid)
+
+        num_locals = len(self.varnames)
+        Top = 0
+        # Bottom = 2**num_locals - 1
+        # live_in = [Top] * self.block_count
+        live_out = [Top] * self.block_count
+        total_locals = num_locals + len(self.cellvars) + len(self.freevars)
+
+        def reverse_local_idx(idx):
+            return total_locals - idx - 1
+
+        def meet(args):
+            result = Top
+            for arg in args:
+                result |= arg
+            return result
+
+        def process_one_block(block, modify=False):
+            bid = block.bid
+            if len(succs[bid]) == 0:
+                live = Top
+            else:
+                live = meet(live_out[succ] for succ in succs[bid])
+            for instr in reversed(block.getInstructions()):
+                if instr.opname == "LOAD_FAST":
+                    live |= 1 << instr.ioparg
+                elif instr.opname in ("STORE_FAST", "DELETE_FAST"):
+                    if modify and not (live & (1 << instr.ioparg)):
+                        instr.opname = "POP_TOP"
+                        instr.oparg = None
+                        instr.ioparg = 0
+                    live &= ~(1 << instr.ioparg)
+            if live == live_out[bid]:
+                return False
+            live_out[bid] = live
+            return True
+
+        changed = True
+        num_iterations = 0
+        while changed:
+            changed = False
+            for block in blocks:
+                changed |= process_one_block(block)
+            num_iterations += 1
+
+        for block in blocks:
+            process_one_block(block, modify=True)
+
+    # def findEdges(self):
+    #     result = []
+    #     blocks = self.getBlocksInOrder()
+    #     preds = tuple(set() for i in range(self.block_count))
+    #     for block in blocks:
+    #         for child in block.get_children():
+    #             if child is not None:
+    #                 preds[child.bid].add(block.bid)
+    #     for block in blocks:
+    #         # bid = block.bid
+    #         # instrs = block.getInstructions()
+    #         # if not instrs:
+    #         #     continue
+    #         # preds[bid]
+    #         instrs = block.getInstructions()
+    #         for i in range(instrs):
+    #             instr = instrs[i]
+    #             if instr.opname in (
+    #                     "JUMP_IF_FALSE_OR_POP",
+    #                     "JUMP_IF_TRUE_OR_POP",
+    #                     "POP_JUMP_IF_FALSE",
+    #                     "POP_JUMP_IF_TRUE",
+    #                     ):
+    #                 result.append(Edge(instr, instr.oparg))
+    #                 result.append(Edge(instr, instrs[instr.
+
+    #         for instr in block.getInstructions():
+    #             # TODO(max): Figure out how to get the next instr so we can
+    #             # return (instr, next) pairs
+    #             # Maybe use itertools.pairwise
+    #             # def pairwise(iterable):
+    #             #     # pairwise('ABCDEFG') --> AB BC CD DE EF FG
+    #             #     a, b = tee(iterable)
+    #             #     next(b, None)
+    #             #     return zip(a, b)
+    #             if instr.opname in (
+    #                     "JUMP_IF_FALSE_OR_POP",
+    #                     "JUMP_IF_TRUE_OR_POP",
+    #                     "POP_JUMP_IF_FALSE",
+    #                     "POP_JUMP_IF_TRUE",
+    #                     ):
+    #                 result.append(Edge(instr, instr.oparg))
+    #     print("  ", result)
+
     def getCode(self):
-        self.optimizeLoadFast()
+        # self.optimizeLoadFast()
+        # if self.name.startswith("test"):
+        #     print("Finding edges for", self.name)
+        #     self.findEdges()
+        print("Optimizing", self.name, "in", self.filename)
+        self.optimizeDeadStores()
         return super().getCode()
 
 
