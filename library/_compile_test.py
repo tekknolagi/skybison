@@ -1615,6 +1615,29 @@ RETURN_VALUE
         )
         self.assertEqual(func(), None)
 
+    @unittest.skip("TODO(max): Remove the unused DELETE_FAST")
+    def test_store_before_del_and_use_removed(self):
+        source = """
+def foo():
+    x = 2
+    del x
+    return x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+DELETE_FAST_REVERSE_UNCHECKED x
+LOAD_CONST 2
+POP_TOP
+NOP
+LOAD_FAST x
+RETURN_VALUE
+""",
+        )
+        with self.assertRaises(UnboundLocalError):
+            func()
+
     @unittest.skip("TODO(max): Figure out why this test is failing")
     def test_dead_local_store_used_in_other_branch_is_removed(self):
         source = """
