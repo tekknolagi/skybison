@@ -307,20 +307,30 @@ class PyroFlowGraph(PyFlowGraph38):
 
     def optimizeDeadStores(self):
         all_instrs = self.getInstructions()
-        if any(instr.opname in (
-            "POP_BLOCK",
-            "SETUP_ASYNC_WITH",
-            "SETUP_FINALLY",
-            "SETUP_WITH",
-            "WITH_CLEANUP_START",
-            "YIELD_FROM",
-            "YIELD_VALUE",
-            "END_ASYNC_FOR",
-            ) for instr in all_instrs):
-            print("Bailing out of", self.name, "in", self.filename, "because it has a try/except")
+        if any(
+            instr.opname
+            in (
+                # Exception handling opcodes
+                "POP_BLOCK",
+                "SETUP_ASYNC_WITH",
+                "SETUP_FINALLY",
+                "SETUP_WITH",
+                "WITH_CLEANUP_START",
+                "YIELD_FROM",
+                "YIELD_VALUE",
+                "END_ASYNC_FOR",
+            )
+            for instr in all_instrs
+        ):
+            print(
+                "Bailing out of",
+                self.name,
+                "in",
+                self.filename,
+                "because it has a try/except",
+            )
             return
         # TODO(max): Bail out early if gen/coro/asyncgen/itercoro?
-        # TODO(max): Bail out early if exception handling opcodes
         # TODO(max): Make edges between all opcodes, not just basic blocks
         # TODO(max): Profile number of iterations until fixpoint
         blocks = self.getBlocksInOrder()
@@ -334,8 +344,6 @@ class PyroFlowGraph(PyFlowGraph38):
 
         num_locals = len(self.varnames)
         Top = 0
-        # Bottom = 2**num_locals - 1
-        # live_in = [Top] * self.block_count
         live_out = [Top] * self.block_count
         total_locals = num_locals + len(self.cellvars) + len(self.freevars)
 
@@ -379,55 +387,8 @@ class PyroFlowGraph(PyFlowGraph38):
         for block in blocks:
             process_one_block(block, modify=True)
 
-    # def findEdges(self):
-    #     result = []
-    #     blocks = self.getBlocksInOrder()
-    #     preds = tuple(set() for i in range(self.block_count))
-    #     for block in blocks:
-    #         for child in block.get_children():
-    #             if child is not None:
-    #                 preds[child.bid].add(block.bid)
-    #     for block in blocks:
-    #         # bid = block.bid
-    #         # instrs = block.getInstructions()
-    #         # if not instrs:
-    #         #     continue
-    #         # preds[bid]
-    #         instrs = block.getInstructions()
-    #         for i in range(instrs):
-    #             instr = instrs[i]
-    #             if instr.opname in (
-    #                     "JUMP_IF_FALSE_OR_POP",
-    #                     "JUMP_IF_TRUE_OR_POP",
-    #                     "POP_JUMP_IF_FALSE",
-    #                     "POP_JUMP_IF_TRUE",
-    #                     ):
-    #                 result.append(Edge(instr, instr.oparg))
-    #                 result.append(Edge(instr, instrs[instr.
-
-    #         for instr in block.getInstructions():
-    #             # TODO(max): Figure out how to get the next instr so we can
-    #             # return (instr, next) pairs
-    #             # Maybe use itertools.pairwise
-    #             # def pairwise(iterable):
-    #             #     # pairwise('ABCDEFG') --> AB BC CD DE EF FG
-    #             #     a, b = tee(iterable)
-    #             #     next(b, None)
-    #             #     return zip(a, b)
-    #             if instr.opname in (
-    #                     "JUMP_IF_FALSE_OR_POP",
-    #                     "JUMP_IF_TRUE_OR_POP",
-    #                     "POP_JUMP_IF_FALSE",
-    #                     "POP_JUMP_IF_TRUE",
-    #                     ):
-    #                 result.append(Edge(instr, instr.oparg))
-    #     print("  ", result)
-
     def getCode(self):
         # self.optimizeLoadFast()
-        # if self.name.startswith("test"):
-        #     print("Finding edges for", self.name)
-        #     self.findEdges()
         print("Optimizing", self.name, "in", self.filename)
         self.optimizeDeadStores()
         return super().getCode()
