@@ -398,8 +398,8 @@ class PyroFlowGraph(PyFlowGraph38):
     def getCode(self):
         # Do this first; it can't (yet?) handle LOAD_FAST_REVERSE_UNCHECKED et
         # al.
-        self.optimizeDeadStores()
-        self.optimizeLoadFast()
+        # self.optimizeDeadStores()
+        # self.optimizeLoadFast()
         return super().getCode()
 
 
