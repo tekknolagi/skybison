@@ -362,7 +362,11 @@ class PyroFlowGraph(PyFlowGraph38):
             else:
                 live = meet(live_out[succ] for succ in succs[bid])
             for instr in reversed(block.getInstructions()):
-                if instr.opname == "DELETE_FAST" and modify and not (live & (1 << instr.ioparg)):
+                if (
+                    instr.opname == "DELETE_FAST"
+                    and modify
+                    and not (live & (1 << instr.ioparg))
+                ):
                     instr.opname = "NOP"
                     instr.oparg = None
                     instr.ioparg = 0
