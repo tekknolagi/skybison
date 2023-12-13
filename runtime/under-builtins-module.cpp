@@ -647,17 +647,6 @@ RawObject FUNC(_builtins, _address)(Thread* thread, Arguments args) {
   return thread->runtime()->newInt(args.get(0).raw());
 }
 
-RawObject FUNC(_builtins, _analyze_bytecode)(Thread* thread, Arguments args) {
-  HandleScope scope(thread);
-  Object func_obj(&scope, args.get(0));
-  if (!func_obj.isFunction()) {
-    return thread->raiseRequiresType(func_obj, ID(function));
-  }
-  Function func(&scope, *func_obj);
-  analyzeBytecode(thread, func);
-  return NoneType::object();
-}
-
 RawObject FUNC(_builtins, _anyset_check)(Thread* thread, Arguments args) {
   Runtime* runtime = thread->runtime();
   RawObject arg = args.get(0);

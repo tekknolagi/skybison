@@ -26,10 +26,6 @@ def _address(c):
     _builtin()
 
 
-def _analyze_bytecode(func):
-    _builtin()
-
-
 def _anyset_check(obj):
     _builtin()
 
