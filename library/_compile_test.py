@@ -1615,8 +1615,29 @@ RETURN_VALUE
         )
         self.assertEqual(func(), None)
 
-    @unittest.skip("TODO(max): Remove the unused DELETE_FAST")
+    @unittest.skip("TODO: Figure out how to leave one DELETE_FAST")
+    def test_del_before_del_leaves_one_del(self):
+        source = """
+def foo():
+    x = 2
+    del x
+    del x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+LOAD_CONST 2
+POP_TOP
+DELETE_FAST x
+LOAD_CONST None
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(), None)
+
     def test_store_before_del_and_use_removed(self):
+        # TODO(max): Remove the unused STORE_FAST and DELETE_FAST
         source = """
 def foo():
     x = 2
@@ -1629,8 +1650,8 @@ def foo():
             """\
 DELETE_FAST_REVERSE_UNCHECKED x
 LOAD_CONST 2
-POP_TOP
-NOP
+STORE_FAST_REVERSE x
+DELETE_FAST x
 LOAD_FAST x
 RETURN_VALUE
 """,
