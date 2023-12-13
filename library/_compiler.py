@@ -325,6 +325,10 @@ class PyroFlowGraph(PyFlowGraph38):
             for instr in all_instrs
         ):
             return
+        if "locals" in self.names:
+            # This is hack to avoid optimizing away dead locals in the presence
+            # of one particular kind of call to locals().
+            return
         # TODO(max): Bail out early if gen/coro/asyncgen/itercoro?
         # TODO(max): Make edges between all opcodes, not just basic blocks
         # TODO(max): Profile number of iterations until fixpoint

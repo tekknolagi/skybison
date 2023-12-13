@@ -1667,6 +1667,24 @@ RETURN_VALUE
         )
         self.assertEqual(func(True), None)
 
+    def test_dead_store_not_removed_if_calling_locals_function(self):
+        source = """
+def foo():
+    x = 123
+    return locals()
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+LOAD_CONST 123
+STORE_FAST_REVERSE x
+LOAD_GLOBAL locals
+CALL_FUNCTION 0
+RETURN_VALUE
+""")
+        self.assertEqual(func(), {"x": 123})
+
     # TODO(max): Test loops
 
 
