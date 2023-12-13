@@ -1484,6 +1484,168 @@ RETURN_VALUE
 
     # TODO(emacs): Test with (multiple context managers)
 
+    def test_dead_local_store_is_removed(self):
+        source = """
+def foo():
+    x = 123
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+LOAD_CONST 123
+POP_TOP
+LOAD_CONST None
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(), None)
+
+    def test_dead_local_store_in_one_branch_is_removed(self):
+        source = """
+def foo(cond):
+    if cond:
+        x = 123
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+LOAD_FAST_REVERSE_UNCHECKED cond
+POP_JUMP_IF_FALSE 8
+LOAD_CONST 123
+POP_TOP
+LOAD_CONST None
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(True), None)
+
+    def test_dead_local_store_in_all_branches_is_removed(self):
+        source = """
+def foo(cond):
+    if cond:
+        x = 123
+    else:
+        x = 456
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+LOAD_FAST_REVERSE_UNCHECKED cond
+POP_JUMP_IF_FALSE 10
+LOAD_CONST 123
+POP_TOP
+JUMP_FORWARD 4
+LOAD_CONST 456
+POP_TOP
+LOAD_CONST None
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(True), None)
+
+    def test_local_store_used_in_same_branch_removed_in_other_branch(self):
+        source = """
+def foo(cond):
+    if cond:
+        x = 123
+        f(x)
+    else:
+        x = 456
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+LOAD_FAST_REVERSE_UNCHECKED cond
+POP_JUMP_IF_FALSE 18
+LOAD_CONST 123
+STORE_FAST_REVERSE x
+LOAD_GLOBAL f
+LOAD_FAST_REVERSE_UNCHECKED x
+CALL_FUNCTION 1
+POP_TOP
+JUMP_FORWARD 4
+LOAD_CONST 456
+POP_TOP
+LOAD_CONST None
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(False), None)
+
+    def test_store_before_store_removed(self):
+        source = """
+def foo():
+    x = 2
+    x = 3
+    return x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+LOAD_CONST 2
+POP_TOP
+LOAD_CONST 3
+STORE_FAST_REVERSE x
+LOAD_FAST_REVERSE_UNCHECKED x
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(), 3)
+
+    def test_store_before_del_removed(self):
+        source = """
+def foo():
+    x = 2
+    del x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+LOAD_CONST 2
+POP_TOP
+LOAD_CONST None
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(), None)
+
+    @unittest.skip("TODO(max): Figure out why this test is failing")
+    def test_dead_local_store_used_in_other_branch_is_removed(self):
+        source = """
+def foo(cond):
+    if cond:
+        x = 123
+    else:
+        f(x)
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+DELETE_FAST_REVERSE_UNCHECKED x
+LOAD_FAST_REVERSE_UNCHECKED cond
+POP_JUMP_IF_FALSE 12
+LOAD_CONST 123
+POP_TOP
+JUMP_FORWARD 8
+LOAD_GLOBAL f
+LOAD_FAST x
+CALL_FUNCTION 1
+POP_TOP
+LOAD_CONST None
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(True), None)
+
+    # TODO(max): Test loops
+
 
 if __name__ == "__main__":
     unittest.main()
