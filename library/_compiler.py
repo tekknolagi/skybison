@@ -390,9 +390,11 @@ class PyroFlowGraph(PyFlowGraph38):
             process_one_block(block, modify=True)
 
     def getCode(self):
-        # self.optimizeLoadFast()
+        # Do this first; it can't (yet?) handle LOAD_FAST_REVERSE_UNCHECKED et
+        # al.
         print("Optimizing", self.name, "in", self.filename)
         self.optimizeDeadStores()
+        self.optimizeLoadFast()
         return super().getCode()
 
 
