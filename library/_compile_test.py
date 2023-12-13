@@ -1706,6 +1706,26 @@ RETURN_VALUE
 """)
         self.assertEqual(func(), {"x": 123})
 
+    def test_store_self_removes_last_store(self):
+        # TODO(max): See if we can remove the first store too
+        source = """
+def foo():
+    x = 123
+    x = x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+LOAD_CONST 123
+STORE_FAST_REVERSE x
+LOAD_FAST_REVERSE_UNCHECKED x
+POP_TOP
+LOAD_CONST None
+RETURN_VALUE
+""")
+        self.assertEqual(func(), None)
+
     # TODO(max): Test loops
 
 
