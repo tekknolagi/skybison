@@ -281,10 +281,12 @@ class PyroFlowGraph(PyFlowGraph38):
             return True
 
         changed = True
+        num_iterations = 0
         while changed:
             changed = False
             for block in blocks:
                 changed |= process_one_block(block)
+            num_iterations += 1
 
         for block in blocks:
             process_one_block(block, modify=True)
