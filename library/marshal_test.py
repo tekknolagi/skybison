@@ -528,6 +528,26 @@ class DumpsTestV3(unittest.TestCase):
             b"{u\x05\x00\x00\x00hellou\x05\x00\x00\x00world0",
         )
 
+    @unittest.skip("TODO(max): Handle recursive objects")
+    @pyro_only
+    def test_dumps_with_recursive_dict_uses_ref(self):
+        d = {}
+        d["x"] = (d,)
+        self.assertEqual(
+            marshal.dumps(d, 3),
+            b"",
+        )
+
+    @unittest.skip("TODO(max): Handle recursive objects")
+    @pyro_only
+    def test_dumps_with_recursive_list_uses_ref(self):
+        l = []
+        l.append(l)
+        self.assertEqual(
+            marshal.dumps(l, 3),
+            b"",
+        )
+
     @pyro_only
     def test_dumps_with_set(self):
         self.assertEqual(
