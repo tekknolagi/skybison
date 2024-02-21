@@ -4944,6 +4944,32 @@ class ExceptionTests(unittest.TestCase):
         exc = SystemExit(1111)
         self.assertEqual(exc.code, 1111)
 
+    def test_set_name_attr_on_import_error_subclass_with_property_sets_attr(self):
+        class C(ModuleNotFoundError):
+            # Modeled after PackageNotFoundError in
+            # importlib_metadata/__init__.py
+            @property
+            def name(self):
+                (name,) = self.args
+                return name
+
+        c = C("a name")
+        self.assertEqual(c.name, "a name")
+        self.assertEqual(c.path, None)
+
+    def test_set_path_attr_on_import_error_subclass_with_property_sets_attr(self):
+        class C(ModuleNotFoundError):
+            # Modeled after PackageNotFoundError in
+            # importlib_metadata/__init__.py
+            @property
+            def path(self):
+                (path,) = self.args
+                return path
+
+        c = C("a path")
+        self.assertEqual(c.name, None)
+        self.assertEqual(c.path, "a path")
+
 
 class EvalTests(unittest.TestCase):
     def test_globals_none_accesses_function_globals(self):
