@@ -1031,8 +1031,8 @@ class ImportError(Exception, bootstrap=True):
         self.args = args
         if len(args) == 1:
             self.msg = args[0]
-        self.name = name
-        self.path = path
+        _instance_setattr(self, "name", name)
+        _instance_setattr(self, "path", path)
 
     def __reduce__(self):
         _unimplemented()
