@@ -4343,10 +4343,13 @@ class instance_proxy(bootstrap=True):
         _instance_guard(instance)
         return {key: _instance_getattr(instance, key) for key in _object_keys(instance)}
 
-    def update(self, d):
+    def update(self, d=_Unbound, /, **kwargs):
         instance = self._instance
         _instance_guard(instance)
-        for key, value in d.items():
+        if d is not _Unbound:
+            for key, value in d.items():
+                _instance_setattr(instance, key, value)
+        for key, value in kwargs.items():
             _instance_setattr(instance, key, value)
 
     def get(self, key, default=None):
