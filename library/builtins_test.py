@@ -6898,6 +6898,30 @@ class InstanceTests(unittest.TestCase):
         instance.__dict__ = {"hello": "world"}
         self.assertEqual(list(instance.__dict__.keys()), ["hello"])
 
+    def test_vars_update_with_no_args_does_not_raise(self):
+        class C:
+            pass
+
+        instance = C()
+        vars(instance).update()
+
+    def test_vars_update_with_only_kwargs_sets_attribute(self):
+        class C:
+            pass
+
+        instance = C()
+        vars(instance).update(hello=1)
+        self.assertEqual(instance.hello, 1)
+
+    def test_vars_update_with_args_and_kwargs_sets_attributes(self):
+        class C:
+            pass
+
+        instance = C()
+        vars(instance).update({"hello": 1}, world=2)
+        self.assertEqual(instance.hello, 1)
+        self.assertEqual(instance.world, 2)
+
 
 class IsInstanceTests(unittest.TestCase):
     def test_isinstance_with_same_types_returns_true(self):
