@@ -430,6 +430,8 @@ typedef void (*PyCapsule_Destructor)(PyObject*);
 typedef PyObject* (*Py_OpenCodeHookFunction)(PyObject*, void*);
 typedef int (*Py_tracefunc)(PyObject*, PyFrameObject*, int, PyObject*);
 
+struct timespec;
+struct timeval;
 typedef int64_t _PyTime_t;
 #define _PyTime_MIN INT64_MIN
 #define _PyTime_MAX INT64_MAX
