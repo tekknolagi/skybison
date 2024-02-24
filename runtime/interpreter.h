@@ -360,6 +360,10 @@ class Interpreter {
   static Continue doBinarySubSmallInt(Thread* thread, word arg);
   static Continue doBinaryOrSmallInt(Thread* thread, word arg);
   static Continue doBinaryOpAnamorphic(Thread* thread, word arg);
+  static Continue doBinaryAddFloat(Thread* thread, word arg);
+  static Continue doBinarySubFloat(Thread* thread, word arg);
+  static Continue doBinaryMulFloat(Thread* thread, word arg);
+  static Continue doBinaryPowerFloat(Thread* thread, word arg);
   static Continue doBinaryOr(Thread* thread, word arg);
   static Continue doBinaryPower(Thread* thread, word arg);
   static Continue doBinaryRshift(Thread* thread, word arg);
@@ -434,6 +438,7 @@ class Interpreter {
   static Continue doImportName(Thread* thread, word arg);
   static Continue doInplaceAdd(Thread* thread, word arg);
   static Continue doInplaceAddSmallInt(Thread* thread, word arg);
+  static Continue doInplaceAddFloat(Thread* thread, word arg);
   static Continue doInplaceAnd(Thread* thread, word arg);
   static Continue doInplaceFloorDivide(Thread* thread, word arg);
   static Continue doInplaceLshift(Thread* thread, word arg);
@@ -448,6 +453,7 @@ class Interpreter {
   static Continue doInplaceRshift(Thread* thread, word arg);
   static Continue doInplaceSubtract(Thread* thread, word arg);
   static Continue doInplaceSubSmallInt(Thread* thread, word arg);
+  static Continue doInplaceSubFloat(Thread* thread, word arg);
   static Continue doInplaceTrueDivide(Thread* thread, word arg);
   static Continue doInplaceXor(Thread* thread, word arg);
   static Continue doInvalidBytecode(Thread* thread, word arg);

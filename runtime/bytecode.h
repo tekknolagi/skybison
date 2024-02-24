@@ -59,12 +59,12 @@ namespace py {
   V(UNUSED_BYTECODE_39, 39, doInvalidBytecode)                                 \
   V(UNUSED_BYTECODE_40, 40, doInvalidBytecode)                                 \
   V(UNUSED_BYTECODE_41, 41, doInvalidBytecode)                                 \
-  V(UNUSED_BYTECODE_42, 42, doInvalidBytecode)                                 \
-  V(UNUSED_BYTECODE_43, 43, doInvalidBytecode)                                 \
-  V(UNUSED_BYTECODE_44, 44, doInvalidBytecode)                                 \
-  V(UNUSED_BYTECODE_45, 45, doInvalidBytecode)                                 \
-  V(UNUSED_BYTECODE_46, 46, doInvalidBytecode)                                 \
-  V(UNUSED_BYTECODE_47, 47, doInvalidBytecode)                                 \
+  V(INPLACE_ADD_FLOAT, 42, doInplaceAddFloat)                                  \
+  V(INPLACE_SUB_FLOAT, 43, doInplaceSubFloat)                                  \
+  V(BINARY_ADD_FLOAT, 44, doBinaryAddFloat)                                    \
+  V(BINARY_SUB_FLOAT, 45, doBinarySubFloat)                                    \
+  V(BINARY_MUL_FLOAT, 46, doBinaryMulFloat)                                    \
+  V(BINARY_POWER_FLOAT, 47, doBinaryPowerFloat)                                \
   V(LOAD_BOOL, 48, doLoadBool)                                                 \
   V(UNUSED_BYTECODE_49, 49, doInvalidBytecode)                                 \
   V(GET_AITER, 50, doGetAiter)                                                 \
