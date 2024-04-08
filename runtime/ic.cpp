@@ -139,6 +139,25 @@ void icUpdateMethodModule(Thread* thread, const MutableTuple& caches,
   icInsertDependentToValueCellDependencyLink(thread, dependent, value_cell);
 }
 
+void icUpdateMethodType(Thread* thread, const MutableTuple& caches, word cache,
+                        const Object& receiver, const ValueCell& value_cell,
+                        const Function& dependent) {
+  DCHECK(icIsCacheEmpty(caches, cache), "cache must be empty\n");
+  HandleScope scope(thread);
+  word index = cache * kIcPointersPerEntry;
+  Type type(&scope, *receiver);
+  caches.atPut(index + kIcEntryKeyOffset,
+               SmallInt::fromWord(static_cast<word>(type.instanceLayoutId())));
+  caches.atPut(index + kIcEntryValueOffset, *value_cell);
+  RawMutableBytes bytecode =
+      RawMutableBytes::cast(dependent.rewrittenBytecode());
+  word pc = thread->currentFrame()->virtualPC() - kCodeUnitSize;
+  DCHECK(bytecode.byteAt(pc) == LOAD_METHOD_ANAMORPHIC,
+         "current opcode must be LOAD_METHOD_ANAMORPHIC");
+  bytecode.byteAtPut(pc, LOAD_METHOD_TYPE);
+  icInsertDependentToValueCellDependencyLink(thread, dependent, value_cell);
+}
+
 void icUpdateAttrType(Thread* thread, const MutableTuple& caches, word cache,
                       const Object& receiver, const Object& selector,
                       const Object& value, const Function& dependent) {

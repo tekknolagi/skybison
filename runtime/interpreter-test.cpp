@@ -6969,6 +6969,133 @@ def invalidate():
   EXPECT_EQ(rewrittenBytecodeOpAt(bytecode, 4), LOAD_METHOD_MODULE);
 }
 
+TEST_F(InterpreterTest, LoadMethodTypeCachedModuleFunction) {
+  EXPECT_FALSE(runFromCStr(runtime_, R"(
+class C:
+  def foo(self):
+    return 123
+
+class D:
+  def foo(self):
+    return 456
+
+class E:
+  def foo(self, other):
+    return 789
+
+def test(cls, obj):
+  return cls.foo(obj)
+
+c = C()
+d = D()
+e = E()
+c_cached = C.foo
+d_cached = D.foo
+)")
+                   .isError());
+  HandleScope scope(thread_);
+  Function test_function(&scope, mainModuleAt(runtime_, "test"));
+  Function expected_c(&scope, mainModuleAt(runtime_, "c_cached"));
+  Function expected_d(&scope, mainModuleAt(runtime_, "d_cached"));
+  Type type_c(&scope, mainModuleAt(runtime_, "C"));
+  Object c(&scope, mainModuleAt(runtime_, "c"));
+  Type type_d(&scope, mainModuleAt(runtime_, "D"));
+  Object d(&scope, mainModuleAt(runtime_, "d"));
+  Object e(&scope, mainModuleAt(runtime_, "e"));
+  MutableBytes bytecode(&scope, test_function.rewrittenBytecode());
+  ASSERT_EQ(rewrittenBytecodeOpAt(bytecode, 1), LOAD_METHOD_ANAMORPHIC);
+
+  // Cache miss.
+  MutableTuple caches(&scope, test_function.caches());
+  word cache_index =
+      rewrittenBytecodeCacheAt(bytecode, 1) * kIcPointersPerEntry;
+  Object key(&scope, caches.at(cache_index + kIcEntryKeyOffset));
+  EXPECT_EQ(*key, NoneType::object());
+
+  // Call.
+  EXPECT_TRUE(isIntEqualsWord(
+      Interpreter::call2(thread_, test_function, type_c, c), 123));
+  EXPECT_EQ(rewrittenBytecodeOpAt(bytecode, 1), LOAD_METHOD_TYPE);
+
+  // Cached.
+  key = caches.at(cache_index + kIcEntryKeyOffset);
+  EXPECT_TRUE(
+      isIntEqualsWord(*key, static_cast<word>(type_c.instanceLayoutId())));
+  Object value(&scope, caches.at(cache_index + kIcEntryValueOffset));
+  ASSERT_TRUE(value.isValueCell());
+  EXPECT_EQ(ValueCell::cast(*value).value(), *expected_c);
+
+  // Call.
+  EXPECT_TRUE(isIntEqualsWord(
+      Interpreter::call2(thread_, test_function, type_d, d), 456));
+  EXPECT_EQ(rewrittenBytecodeOpAt(bytecode, 1), LOAD_METHOD_TYPE);
+
+  // Cache miss and re-cache.
+  key = caches.at(cache_index + kIcEntryKeyOffset);
+  EXPECT_TRUE(
+      isIntEqualsWord(*key, static_cast<word>(type_d.instanceLayoutId())));
+  value = caches.at(cache_index + kIcEntryValueOffset);
+  ASSERT_TRUE(value.isValueCell());
+  EXPECT_EQ(ValueCell::cast(*value).value(), *expected_d);
+
+  // Call and rewrite.
+  Object none(&scope, NoneType::object());
+  EXPECT_TRUE(isIntEqualsWord(
+      Interpreter::call2(thread_, test_function, e, none), 789));
+  EXPECT_EQ(rewrittenBytecodeOpAt(bytecode, 1), LOAD_METHOD_INSTANCE_FUNCTION);
+}
+
+TEST_F(InterpreterTest, LoadMethodTypeGetsEvicted) {
+  EXPECT_FALSE(runFromCStr(runtime_, R"(
+import sys
+
+class C:
+  def foo():
+    return 123
+
+def test(cls):
+  return cls.foo()
+
+def invalidate():
+  del C.foo
+)")
+                   .isError());
+  HandleScope scope(thread_);
+  Function test_function(&scope, mainModuleAt(runtime_, "test"));
+  Function invalidate_function(&scope, mainModuleAt(runtime_, "invalidate"));
+  Type type_c(&scope, mainModuleAt(runtime_, "C"));
+  MutableBytes bytecode(&scope, test_function.rewrittenBytecode());
+  ASSERT_EQ(rewrittenBytecodeOpAt(bytecode, 1), LOAD_METHOD_ANAMORPHIC);
+
+  // Cache miss.
+  MutableTuple caches(&scope, test_function.caches());
+  word cache_index =
+      rewrittenBytecodeCacheAt(bytecode, 1) * kIcPointersPerEntry;
+  Object key(&scope, caches.at(cache_index + kIcEntryKeyOffset));
+  EXPECT_EQ(*key, NoneType::object());
+
+  // Call.
+  EXPECT_TRUE(
+      isIntEqualsWord(Interpreter::call1(thread_, test_function, type_c), 123));
+  EXPECT_EQ(rewrittenBytecodeOpAt(bytecode, 1), LOAD_METHOD_TYPE);
+
+  // Update type.
+  ASSERT_TRUE(Interpreter::call0(thread_, invalidate_function).isNoneType());
+
+  // Cache is empty.
+  key = caches.at(cache_index + kIcEntryKeyOffset);
+  EXPECT_TRUE(key.isNoneType());
+
+  // Cache miss.
+  EXPECT_EQ(rewrittenBytecodeOpAt(bytecode, 1), LOAD_METHOD_TYPE);
+  EXPECT_TRUE(raisedWithStr(Interpreter::call1(thread_, test_function, type_c),
+                            LayoutId::kAttributeError,
+                            "type object 'C' has no attribute 'foo'"));
+
+  // Bytecode gets rewritten after next call.
+  EXPECT_EQ(rewrittenBytecodeOpAt(bytecode, 1), LOAD_METHOD_ANAMORPHIC);
+}
+
 TEST_F(InterpreterTest, LoadMethodCachedDoesNotCacheProperty) {
   HandleScope scope(thread_);
   EXPECT_FALSE(runFromCStr(runtime_, R"(

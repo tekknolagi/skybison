@@ -4011,6 +4011,8 @@ HANDLER_INLINE Continue Interpreter::doLoadAttrType(Thread* thread, word arg) {
     if (SmallInt::fromWord(id) == layout_id) {
       RawObject result = caches.at(index + kIcEntryValueOffset);
       DCHECK(result.isValueCell(), "cached value is not a value cell");
+      DCHECK(!ValueCell::cast(result).isPlaceholder(),
+             "cached value cell is empty");
       thread->stackSetTop(ValueCell::cast(result).value());
       return Continue::NEXT;
     }
@@ -5276,7 +5278,7 @@ Continue Interpreter::loadMethodUpdateCache(Thread* thread, word arg,
                             thread, receiver, name, &kind, &location));
   if (result.isErrorException()) return Continue::UNWIND;
   if (kind != LoadAttrKind::kInstanceFunction &&
-      kind != LoadAttrKind::kModule) {
+      kind != LoadAttrKind::kModule && kind != LoadAttrKind::kType) {
     thread->stackPush(*result);
     thread->stackSetAt(1, Unbound::object());
     return Continue::NEXT;
@@ -5302,12 +5304,22 @@ Continue Interpreter::loadMethodUpdateCache(Thread* thread, word arg,
         thread->stackSetAt(1, Unbound::object());
         return Continue::NEXT;
       }
+      case LoadAttrKind::kType: {
+        DCHECK(location.isValueCell(), "location must be ValueCell");
+        ValueCell value_cell(&scope, *location);
+        icUpdateMethodType(thread, caches, cache, receiver, value_cell,
+                           dependent);
+        thread->stackPush(*result);
+        thread->stackSetAt(1, Unbound::object());
+        return Continue::NEXT;
+      }
       default:
         break;
     }
   } else {
     DCHECK(currentBytecode(thread) == LOAD_METHOD_INSTANCE_FUNCTION ||
                currentBytecode(thread) == LOAD_METHOD_MODULE ||
+               currentBytecode(thread) == LOAD_METHOD_TYPE ||
                currentBytecode(thread) == LOAD_METHOD_POLYMORPHIC,
            "unexpected opcode %s", kBytecodeNames[currentBytecode(thread)]);
     switch (kind) {
@@ -5375,6 +5387,31 @@ HANDLER_INLINE Continue Interpreter::doLoadMethodModule(Thread* thread,
     return Continue::NEXT;
   }
   EVENT_CACHE(LOAD_METHOD_MODULE);
+  return retryLoadMethodCached(thread, arg, cache);
+}
+
+HANDLER_INLINE Continue Interpreter::doLoadMethodType(Thread* thread,
+                                                      word arg) {
+  Frame* frame = thread->currentFrame();
+  RawObject receiver = thread->stackTop();
+  RawMutableTuple caches = MutableTuple::cast(frame->caches());
+  word cache = currentCacheIndex(frame);
+  word index = cache * kIcPointersPerEntry;
+  RawObject layout_id = caches.at(index + kIcEntryKeyOffset);
+  Runtime* runtime = thread->runtime();
+  if (runtime->isInstanceOfType(receiver)) {
+    word id = static_cast<word>(receiver.rawCast<RawType>().instanceLayoutId());
+    if (SmallInt::fromWord(id) == layout_id) {
+      RawObject result = caches.at(index + kIcEntryValueOffset);
+      DCHECK(result.isValueCell(), "cached value is not a value cell");
+      DCHECK(!ValueCell::cast(result).isPlaceholder(),
+             "cached value cell is empty");
+      thread->stackPush(ValueCell::cast(result).value());
+      thread->stackSetAt(1, Unbound::object());
+      return Continue::NEXT;
+    }
+  }
+  EVENT_CACHE(LOAD_METHOD_TYPE);
   return retryLoadMethodCached(thread, arg, cache);
 }
 
