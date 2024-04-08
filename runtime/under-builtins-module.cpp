@@ -4643,6 +4643,21 @@ RawObject FUNC(_builtins, _slice_start_long)(Thread* thread, Arguments args) {
   return *start;
 }
 
+bool FUNC(_builtins, _slice_step_intrinsic)(Thread* thread) {
+  RawObject step_obj = thread->stackTop();
+  if (step_obj.isNoneType()) {
+    thread->stackPop();
+    thread->stackSetTop(SmallInt::fromWord(1));
+    return true;
+  }
+  if (step_obj.isSmallInt()) {
+    thread->stackPop();
+    thread->stackSetTop(step_obj);
+    return true;
+  }
+  return false;
+}
+
 RawObject FUNC(_builtins, _slice_step)(Thread* thread, Arguments args) {
   RawObject step_obj = args.get(0);
   if (step_obj.isNoneType()) return SmallInt::fromWord(1);
