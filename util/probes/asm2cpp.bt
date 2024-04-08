@@ -1,0 +1,4 @@
+usdt:./build/bin/python:python:InterpreterDeopt_* {
+  @interpreter_deopt[probe]++;
+}
+
