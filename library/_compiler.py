@@ -211,6 +211,25 @@ class AstOptimizerPyro(AstOptimizer38):
 class PyroFlowGraph(PyFlowGraph38):
     opcode = opcodepyro.opcode
 
+    def optimizeStoreFast(self):
+        if "locals" in self.varnames or "locals" in self.names:
+            # A bit of a hack: if someone is using locals(), we shouldn't mess
+            # with them.
+            return
+        used = set()
+        for block in self.getBlocksInOrder():
+            for instr in block.getInstructions():
+                if instr.opname == "LOAD_FAST" or instr.opname == "DELETE_FAST":
+                    used.add(instr.oparg)
+        # We never read from or delete the local, so we can replace all stores
+        # to it with POP_TOP.
+        for block in self.getBlocksInOrder():
+            for instr in block.getInstructions():
+                if instr.opname == "STORE_FAST" and instr.oparg not in used:
+                    instr.opname = "POP_TOP"
+                    instr.oparg = 0
+                    instr.ioparg = 0
+
     def optimizeLoadFast(self):
         blocks = self.getBlocksInOrder()
         preds = tuple(set() for i in range(self.block_count))
@@ -297,6 +316,7 @@ class PyroFlowGraph(PyFlowGraph38):
             self.entry.insts = deletes + self.entry.insts
 
     def getCode(self):
+        self.optimizeStoreFast()
         self.optimizeLoadFast()
         return super().getCode()
 

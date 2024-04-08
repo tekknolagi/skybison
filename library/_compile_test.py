@@ -1486,5 +1486,89 @@ RETURN_VALUE
     # TODO(emacs): Test with (multiple context managers)
 
 
+@pyro_only
+class OptStoreFastTests(unittest.TestCase):
+    def test_store_with_load_not_replaced(self):
+        source = """
+def foo():
+    _ = 123
+    return _
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+LOAD_CONST 123
+STORE_FAST_REVERSE _
+LOAD_FAST_REVERSE_UNCHECKED _
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(), 123)
+
+    def test_store_with_no_load_replaced_with_pop_top(self):
+        source = """
+def foo():
+    _ = 123
+    return 456
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+LOAD_CONST 123
+POP_TOP
+LOAD_CONST 456
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(), 456)
+
+    def test_store_in_loop_replaced_with_pop_top(self):
+        source = """
+def foo(x):
+    for _ in x:
+        pass
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+LOAD_FAST_REVERSE_UNCHECKED x
+GET_ITER
+FOR_ITER 4
+POP_TOP
+JUMP_ABSOLUTE 4
+LOAD_CONST None
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(()), None)
+
+    def test_multiple_store_no_read_replaced_with_pop_top(self):
+        source = """
+def foo():
+    x = 123
+    y = 456
+    z = 789
+    return x
+"""
+        func = compile_function(source, "foo")
+        self.assertEqual(
+            dis(func.__code__),
+            """\
+LOAD_CONST 123
+STORE_FAST_REVERSE x
+LOAD_CONST 456
+POP_TOP
+LOAD_CONST 789
+POP_TOP
+LOAD_FAST_REVERSE_UNCHECKED x
+RETURN_VALUE
+""",
+        )
+        self.assertEqual(func(), 123)
+
+
 if __name__ == "__main__":
     unittest.main()
