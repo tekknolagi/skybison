@@ -765,8 +765,9 @@ TEST_F(
   word argcount = 1;
   word nlocals = 3;
   const byte bytecode[] = {
-      LOAD_FAST,  2, LOAD_FAST,  1, LOAD_FAST,   0, STORE_FAST, 2,
-      STORE_FAST, 1, STORE_FAST, 0, DELETE_FAST, 0,
+      LOAD_FAST,   2, LOAD_FAST,    1, LOAD_FAST,  0,
+      STORE_FAST,  2, STORE_FAST,   1, STORE_FAST, 0,
+      DELETE_FAST, 0, RETURN_VALUE, 0,
   };
   Bytes code_code(&scope, runtime_->newBytesWithAll(bytecode));
   Object empty_tuple(&scope, runtime_->emptyTuple());
@@ -791,7 +792,7 @@ TEST_F(
       LOAD_FAST_REVERSE,  2, 0, 0, LOAD_FAST_REVERSE,  3, 0, 0,
       LOAD_FAST_REVERSE,  4, 0, 0, STORE_FAST_REVERSE, 2, 0, 0,
       STORE_FAST_REVERSE, 3, 0, 0, STORE_FAST_REVERSE, 4, 0, 0,
-      DELETE_FAST,        0, 0, 0,
+      DELETE_FAST,        0, 0, 0, RETURN_VALUE,       0, 0, 0,
   };
   Object rewritten_bytecode(&scope, function.rewrittenBytecode());
   EXPECT_TRUE(isMutableBytesEqualsBytes(rewritten_bytecode, expected));
