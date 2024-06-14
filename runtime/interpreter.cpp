@@ -3292,9 +3292,20 @@ Continue Interpreter::storeAttrUpdateCache(Thread* thread, word arg,
         icUpdateAttr(thread, caches, cache, saved_layout_id, location, name,
                      dependent);
       } else {
-        rewriteCurrentBytecode(frame, STORE_ATTR_INSTANCE_OVERFLOW);
-        icUpdateAttr(thread, caches, cache, saved_layout_id, location, name,
-                     dependent);
+        uword offset = -SmallInt::cast(*location).value() - 1;
+        Layout layout(&scope, thread->runtime()->layoutOf(*receiver));
+        uword overflow_offset = layout.overflowOffset();
+        // Save one bit for the SmallInt tag
+        uword packed_location = (offset << 32) | overflow_offset;
+        // We need to check that they fit in 32 bits each and 63 bits together.
+        if (Utils::fits<uint32_t>(offset) &&
+            Utils::fits<uint32_t>(overflow_offset) &&
+            SmallInt::isValid(packed_location)) {
+          location = SmallInt::fromWord(packed_location);
+          rewriteCurrentBytecode(frame, STORE_ATTR_INSTANCE_OVERFLOW);
+          icUpdateAttr(thread, caches, cache, saved_layout_id, location, name,
+                       dependent);
+        }
       }
     } else {
       // Layout transition.
@@ -3320,6 +3331,18 @@ Continue Interpreter::storeAttrUpdateCache(Thread* thread, word arg,
                currentBytecode(thread) == STORE_ATTR_INSTANCE_OVERFLOW ||
                currentBytecode(thread) == STORE_ATTR_POLYMORPHIC,
            "unexpected opcode");
+    if (ic_state == ICState::kMonomorphic &&
+        currentBytecode(thread) == STORE_ATTR_INSTANCE_OVERFLOW) {
+      // Fix up the packed cache; save only the index into the overflow tuple.
+      // That's what STORE_ATTR_POLYMORPHIC expects. Also, make it negative
+      // again to indicate that it's an overflow offset.
+      word index = cache * kIcPointersPerEntry;
+      RawObject cached = caches.at(index + kIcEntryValueOffset);
+      uword packed_location = SmallInt::cast(cached).value();
+      caches.atPut(index + kIcEntryValueOffset,
+                   SmallInt::fromWord(~(packed_location >> 32)));
+    }
+
     if (saved_layout_id == receiver_layout_id) {
       rewriteCurrentBytecode(frame, STORE_ATTR_POLYMORPHIC);
       icUpdateAttr(thread, caches, cache, saved_layout_id, location, name,
@@ -3388,13 +3411,12 @@ HANDLER_INLINE Continue Interpreter::doStoreAttrInstanceOverflow(Thread* thread,
     EVENT_CACHE(STORE_ATTR_INSTANCE_OVERFLOW);
     return storeAttrUpdateCache(thread, arg, cache);
   }
-  word offset = SmallInt::cast(cached).value();
-  DCHECK(offset < 0, "unexpected offset");
+  uword packed_location = SmallInt::cast(cached).value();
+  uword overflow_offset = packed_location & 0xffffffff;
+  uword offset = packed_location >> 32;
   RawInstance instance = Instance::cast(receiver);
-  RawLayout layout = Layout::cast(thread->runtime()->layoutOf(receiver));
-  RawTuple overflow =
-      Tuple::cast(instance.instanceVariableAt(layout.overflowOffset()));
-  overflow.atPut(-offset - 1, thread->stackPeek(1));
+  RawTuple overflow = Tuple::cast(instance.instanceVariableAt(overflow_offset));
+  overflow.atPut(offset, thread->stackPeek(1));
   thread->stackDrop(2);
   return Continue::NEXT;
 }
