@@ -23,8 +23,12 @@ jobs:
 
     - name: Update package repos
       run: sudo apt update
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+      with:
+        python-version: 3.8
     - name: Install ninja
-      run: sudo apt install -y python3.8 ninja-build
+      run: sudo apt install -y ninja-build
 
     - name: Configure CMake
       run: |
@@ -63,7 +67,11 @@ jobs:
     - name: Update package repos
       run: sudo apt update
     - name: Install tools
-      run: sudo apt install -y ninja-build ccache valgrind python3.8 python3.12
+      run: sudo apt install -y ninja-build ccache valgrind
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+      with:
+        python-version: 3.8
     - name: Quickbench
       working-directory: ${{github.workspace}}
       run: |
@@ -97,7 +105,7 @@ jobs:
         ./benchmarks/run.py --tool callgrind --json \
           --interpreter "$PREV_BUILD" --interpreter-name python_base --path $(pwd)/benchmarks/benchmarks \
           --interpreter "$CURR_BUILD" --interpreter-name python_new --path $(pwd)/benchmarks/benchmarks \
-          --interpreter $(which python3.13) --interpreter-name fbcode-cpython --path $(pwd)/benchmarks/benchmarks \
+          --interpreter "uv run python3.8" --interpreter-name fbcode-cpython --path $(pwd)/benchmarks/benchmarks \
           | tee benchmark-results.json
     - name: Format benchmark results
       working-directory: ${{github.workspace}}
