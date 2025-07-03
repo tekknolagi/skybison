@@ -32,7 +32,7 @@ jobs:
 
     - name: Configure CMake
       run: |
-        cmake -GNinja -B ${{github.workspace}}/build \
+        uv run cmake -GNinja -B ${{github.workspace}}/build \
         -DCMAKE_TOOLCHAIN_FILE=util/linux.cmake \
         -DCMAKE_BUILD_TYPE=${{matrix.BUILD_TYPE}} \
         -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
@@ -125,7 +125,7 @@ jobs:
           })
 
   run-cpython-tests:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
 
     steps:
     - uses: actions/checkout@v3
@@ -134,17 +134,21 @@ jobs:
       run: sudo apt update
     - name: Install ninja
       run: sudo apt install -y ninja-build
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+      with:
+        python-version: 3.8
 
     - name: Configure CMake
       run: |
-        cmake -GNinja -B ${{github.workspace}}/build \
+        uv run cmake -GNinja -B ${{github.workspace}}/build \
         -DCMAKE_TOOLCHAIN_FILE=util/linux.cmake \
         -DCMAKE_BUILD_TYPE=DebugOpt \
         -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
 
     - name: Build
       working-directory: ${{github.workspace}}/build
-      run: ninja -j4 cpython cpython-tests
+      run: uv run ninja -j4 cpython cpython-tests
 
     - name: Run C++ tests with CPython
       working-directory: ${{github.workspace}}
@@ -155,7 +159,7 @@ jobs:
       run: PYRO_BUILD_DIR="build" ./util/python_tests_cpython.sh
 
   lint:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     # TODO(max): Install and run Black on Python code
     steps:
     - name: Update package repos
