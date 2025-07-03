@@ -28,7 +28,7 @@ jobs:
       with:
         python-version: 3.8
     - name: Install ninja
-      run: sudo apt install -y ninja-build
+      run: sudo apt install -y ninja-build libbz2-dev
 
     - name: Configure CMake
       run: |
