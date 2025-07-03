@@ -24,7 +24,7 @@ jobs:
     - name: Update package repos
       run: sudo apt update
     - name: Install ninja
-      run: sudo apt install -y ninja-build
+      run: sudo apt install -y python3.8 ninja-build
 
     - name: Configure CMake
       run: |
