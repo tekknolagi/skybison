@@ -39,7 +39,7 @@ jobs:
 
     - name: Build
       working-directory: ${{github.workspace}}/build
-      run: ninja -j4
+      run: uv run ninja -j4
 
     - name: Run C++ tests with Skybison
       working-directory: ${{github.workspace}}/build
