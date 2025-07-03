@@ -63,7 +63,7 @@ jobs:
     - name: Update package repos
       run: sudo apt update
     - name: Install tools
-      run: sudo apt install -y ninja-build ccache valgrind python3.12
+      run: sudo apt install -y ninja-build ccache valgrind python3.8 python3.12
     - name: Quickbench
       working-directory: ${{github.workspace}}
       run: |
