@@ -394,7 +394,7 @@ else()
     OUTPUT
     ${FROZEN_MODULE_OUTPUT}
     COMMAND
-    /usr/bin/python3.8 util/freeze_modules.py ${FROZEN_MODULE_OUTPUT_DIR}
+    uv run python3.8 util/freeze_modules.py ${FROZEN_MODULE_OUTPUT_DIR}
       ${FROZEN_MODULE_INPUT}
     WORKING_DIRECTORY
     ${CMAKE_SOURCE_DIR}
