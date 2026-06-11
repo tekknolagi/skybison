@@ -1465,7 +1465,7 @@ static void createTypeWithSlotAndBase(const char* type_name, int slot, T pfunc,
   slots[1] = {0, nullptr};
   static PyType_Spec spec;
   static char qualname[100];
-  std::sprintf(qualname, "__main__.%s", type_name);
+  std::snprintf(qualname, sizeof(qualname), "__main__.%s", type_name);
   unsigned int flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
   spec = {
       qualname, 0, 0, flags, slots,

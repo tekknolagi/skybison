@@ -107,7 +107,11 @@ static void writeDecomposition(UnicodeDecomposition decomp,
     if (i > 0) {
       dst[i++] = ' ';
     }
-    std::sprintf(&dst[i], "%04X", decomp.code_points[j]);
+    // `out` is sized exactly for the content, with no room for a trailing NUL,
+    // so format into a scratch buffer and copy the 4 hex digits into place.
+    char hex[8];
+    std::snprintf(hex, sizeof(hex), "%04X", decomp.code_points[j]);
+    std::memcpy(&dst[i], hex, 4);
     i += 4;
   }
   DCHECK(i == out.length(), "expected %d bytes, wrote %d", out.length(), i);

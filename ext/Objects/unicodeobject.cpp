@@ -351,28 +351,28 @@ static const char* writeArg(_PyUnicodeWriter* writer, const char* f,
 
       if (*f == 'u') {
         if (longflag) {
-          len = std::sprintf(buffer, "%lu", va_arg(*vargs, unsigned long));
+          len = std::snprintf(buffer, sizeof(buffer), "%lu", va_arg(*vargs, unsigned long));
         } else if (longlongflag) {
           len =
-              std::sprintf(buffer, "%llu", va_arg(*vargs, unsigned long long));
+              std::snprintf(buffer, sizeof(buffer), "%llu", va_arg(*vargs, unsigned long long));
         } else if (size_tflag) {
-          len = std::sprintf(buffer, "%" PY_FORMAT_SIZE_T "u",
+          len = std::snprintf(buffer, sizeof(buffer), "%" PY_FORMAT_SIZE_T "u",
                              va_arg(*vargs, size_t));
         } else {
-          len = std::sprintf(buffer, "%u", va_arg(*vargs, unsigned int));
+          len = std::snprintf(buffer, sizeof(buffer), "%u", va_arg(*vargs, unsigned int));
         }
       } else if (*f == 'x') {
-        len = std::sprintf(buffer, "%x", va_arg(*vargs, int));
+        len = std::snprintf(buffer, sizeof(buffer), "%x", va_arg(*vargs, int));
       } else {
         if (longflag) {
-          len = std::sprintf(buffer, "%li", va_arg(*vargs, long));
+          len = std::snprintf(buffer, sizeof(buffer), "%li", va_arg(*vargs, long));
         } else if (longlongflag) {
-          len = std::sprintf(buffer, "%lli", va_arg(*vargs, long long));
+          len = std::snprintf(buffer, sizeof(buffer), "%lli", va_arg(*vargs, long long));
         } else if (size_tflag) {
-          len = std::sprintf(buffer, "%" PY_FORMAT_SIZE_T "i",
+          len = std::snprintf(buffer, sizeof(buffer), "%" PY_FORMAT_SIZE_T "i",
                              va_arg(*vargs, Py_ssize_t));
         } else {
-          len = std::sprintf(buffer, "%i", va_arg(*vargs, int));
+          len = std::snprintf(buffer, sizeof(buffer), "%i", va_arg(*vargs, int));
         }
       }
       DCHECK(len >= 0, "len must be >= 0");
@@ -413,7 +413,8 @@ static const char* writeArg(_PyUnicodeWriter* writer, const char* f,
     case 'p': {
       char number[kMaxLongLongChars];
 
-      Py_ssize_t len = std::sprintf(number, "%p", va_arg(*vargs, void*));
+      Py_ssize_t len =
+          std::snprintf(number, sizeof(number), "%p", va_arg(*vargs, void*));
       DCHECK(len >= 0, "len must be >= 0");
 
       // %p is ill-defined:  ensure leading 0x.

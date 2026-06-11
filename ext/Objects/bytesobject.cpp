@@ -258,31 +258,31 @@ static const char* writeArg(Thread* thread, Runtime* runtime,
     }
     case 'd':
       if (long_flag) {
-        std::sprintf(buffer, "%ld", va_arg(vargs, long));
+        std::snprintf(buffer, sizeof(buffer), "%ld", va_arg(vargs, long));
       } else if (size_t_flag) {
-        std::sprintf(buffer, "%" PY_FORMAT_SIZE_T "d",
+        std::snprintf(buffer, sizeof(buffer), "%" PY_FORMAT_SIZE_T "d",
                      va_arg(vargs, Py_ssize_t));
       } else {
-        std::sprintf(buffer, "%d", va_arg(vargs, int));
+        std::snprintf(buffer, sizeof(buffer), "%d", va_arg(vargs, int));
       }
       writeBytes(thread, runtime, writer, buffer);
       return current + 1;
     case 'u':
       if (long_flag) {
-        std::sprintf(buffer, "%lu", va_arg(vargs, unsigned long));
+        std::snprintf(buffer, sizeof(buffer), "%lu", va_arg(vargs, unsigned long));
       } else if (size_t_flag) {
-        std::sprintf(buffer, "%" PY_FORMAT_SIZE_T "u", va_arg(vargs, size_t));
+        std::snprintf(buffer, sizeof(buffer), "%" PY_FORMAT_SIZE_T "u", va_arg(vargs, size_t));
       } else {
-        std::sprintf(buffer, "%u", va_arg(vargs, unsigned int));
+        std::snprintf(buffer, sizeof(buffer), "%u", va_arg(vargs, unsigned int));
       }
       writeBytes(thread, runtime, writer, buffer);
       return current + 1;
     case 'i':
-      std::sprintf(buffer, "%i", va_arg(vargs, int));
+      std::snprintf(buffer, sizeof(buffer), "%i", va_arg(vargs, int));
       writeBytes(thread, runtime, writer, buffer);
       return current + 1;
     case 'x':
-      std::sprintf(buffer, "%x", va_arg(vargs, int));
+      std::snprintf(buffer, sizeof(buffer), "%x", va_arg(vargs, int));
       writeBytes(thread, runtime, writer, buffer);
       return current + 1;
     case 's': {
@@ -296,7 +296,7 @@ static const char* writeArg(Thread* thread, Runtime* runtime,
       return current + 1;
     }
     case 'p':
-      std::sprintf(buffer, "%p", va_arg(vargs, void*));
+      std::snprintf(buffer, sizeof(buffer), "%p", va_arg(vargs, void*));
       // %p is ill-defined, ensure leading 0x
       if (buffer[1] == 'X') {
         buffer[1] = 'x';

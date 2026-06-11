@@ -434,7 +434,8 @@ static char* formatFloatShort(double d, char format_code, int mode,
     // Now that we've done zero padding, add an exponent if needed.
     if (use_exp) {
       *p++ = float_strings[kOfsE][0];
-      int exp_len = std::sprintf(p, "%+.02d", exp);
+      int exp_len = std::snprintf(p, static_cast<size_t>(bufsize - (p - buf)),
+                                  "%+.02d", exp);
       p += exp_len;
     }
   }
