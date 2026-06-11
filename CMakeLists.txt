@@ -394,7 +394,7 @@ else()
     OUTPUT
     ${FROZEN_MODULE_OUTPUT}
     COMMAND
-    /usr/bin/python3.8 util/freeze_modules.py ${FROZEN_MODULE_OUTPUT_DIR}
+    ${PYTHON} util/freeze_modules.py ${FROZEN_MODULE_OUTPUT_DIR}
       ${FROZEN_MODULE_INPUT}
     WORKING_DIRECTORY
     ${CMAKE_SOURCE_DIR}
@@ -440,7 +440,12 @@ if ("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
     runtime/interpreter-gen-x64.cpp
   )
 else()
-  message(FATAL_ERROR "Unsupported architecture ${CMAKE_SYSTEM_PROCESSOR}")
+  # No hand-written assembly interpreter for this architecture; fall back to
+  # the portable C++ interpreter (see runtime/interpreter-gen-generic.cpp).
+  set(
+    RUNTIME_ARCH_SOURCES
+    runtime/interpreter-gen-generic.cpp
+  )
 endif()
 
 add_library(
@@ -880,6 +885,19 @@ target_compile_options(
 if (CMAKE_C_COMPILER_ID MATCHES "GNU")
   target_compile_options(extension-modules PRIVATE -Wno-cast-function-type)
 endif()
+if (CMAKE_C_COMPILER_ID MATCHES "Clang")
+  # Quiet warnings in vendored CPython 3.8 C sources that newer clang / the
+  # macOS SDK flag: method tables cast typed functions to PyCFunction, libc
+  # functions like sprintf are marked deprecated, and Homebrew's ncurses
+  # redefines NCURSES_OPAQUE.
+  target_compile_options(
+    extension-modules
+    PRIVATE
+    -Wno-cast-function-type-mismatch
+    -Wno-deprecated-declarations
+    -Wno-incompatible-pointer-types-discards-qualifiers
+    -Wno-macro-redefined)
+endif()
 target_link_libraries(
   extension-modules
   PUBLIC
@@ -1063,7 +1081,10 @@ target_link_libraries(
 # --whole-archive option, so use their flavor of the flag.
 if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   set(SET_WHOLE_ARCHIVE_FLAG -Wl,-all_load)
-  set(UNSET_WHOLE_ARCHIVE_FLAG -Wl,-noall_load)
+  # -all_load is global; the only static archives that follow it on the link
+  # line are pyruntime and its deps (which we want fully loaded), so no "off"
+  # switch is needed. Apple's modern linker no longer accepts -noall_load.
+  set(UNSET_WHOLE_ARCHIVE_FLAG)
 else()
   set(SET_WHOLE_ARCHIVE_FLAG -Wl,-whole-archive)
   set(UNSET_WHOLE_ARCHIVE_FLAG -Wl,-no-whole-archive)

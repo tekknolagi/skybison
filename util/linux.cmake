@@ -3,7 +3,7 @@
 
 set(SYSCONFIGDATA ${CMAKE_CURRENT_LIST_DIR}/linux/_sysconfigdata__linux_.py)
 
-set(PYTHON python3.8)
+set(PYTHON python3.8 CACHE STRING "Python 3.8 interpreter used to freeze modules")
 
 set(BZIP2_LIBRARIES bz2)
 set(FFI_LIBRARIES ffi)

@@ -1634,14 +1634,20 @@ void Runtime::populateEntryAsm(const Function& function) {
   function.setEntryAsm(interpreter_->entryAsm(function));
 }
 
-static const word kFixedSpaceSize = 1 * kGiB;
-
 void Runtime::initializeJITState() {
+  // The JIT and its machine-code space are x86_64-only (see
+  // runtime/interpreter-gen-x64.cpp). On other architectures the asm
+  // interpreter falls back to the C++ interpreter, machine_code_ stays null and
+  // is never used, and we must not request RWX memory (forbidden on arm64
+  // macOS).
+#if defined(__x86_64__)
+  static const word kFixedSpaceSize = 1 * kGiB;
   machine_code_ = new Space(kFixedSpaceSize);
   // TODO(T89276586): Only set X bit per-page after code is written and
   // finalized.
   OS::protectMemory(reinterpret_cast<byte*>(machine_code_->start()),
                     machine_code_->size(), OS::kReadWriteExecute);
+#endif
 }
 
 void Runtime::initializeLayouts() {
