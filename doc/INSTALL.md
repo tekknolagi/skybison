@@ -1,6 +1,7 @@
 # Installing Skybison
 
-This guide details the recommended Linux setup.
+This guide details the recommended Linux setup. A macOS (Apple Silicon) build
+is also supported; see [macOS (Apple Silicon)](#macos-apple-silicon) below.
 
 ## Preparation
 
@@ -41,6 +42,64 @@ Hello world!
 >>> import sys
 >>> sys.implementation.name
 'skybison'
+```
+
+---
+
+## macOS (Apple Silicon)
+
+Skybison builds and runs on arm64 macOS using Homebrew for the dependency
+libraries. There is no hand-written assembly interpreter or JIT on arm64, so
+the runtime always uses the portable C++ interpreter (`_builtins._jit(fn)`
+returns `False`).
+
+### Preparation
+
+Install the build tools and dependency libraries with Homebrew:
+
+```sh
+$ brew install cmake ninja \
+    bzip2 libffi ncurses openssl@3 readline sqlite xz zlib
+```
+
+Module freezing (`util/freeze_modules.py`) must run under **CPython 3.8** — it
+asserts the 3.8 marshal magic number. The host `python3` is almost certainly
+newer, so install a 3.8 with [uv](https://docs.astral.sh/uv/):
+
+```sh
+$ uv python install 3.8
+```
+
+### Build preparation (cmake)
+
+```sh
+$ git clone https://github.com/facebookexperimental/skybison
+$ cd skybison
+$ cmake -S . -B build -GNinja \
+    -DCMAKE_TOOLCHAIN_FILE=util/macos.cmake \
+    -DENABLE_CPYTHON_TESTS=OFF \
+    -DPYTHON="$(uv python find 3.8)"
+```
+
+- `-DCMAKE_TOOLCHAIN_FILE=util/macos.cmake` points the dependency libraries at
+  Homebrew's `/opt/homebrew/opt` layout.
+- `-DPYTHON=...` supplies the CPython 3.8 host used to freeze modules,
+  overriding the toolchain default.
+- `-DENABLE_CPYTHON_TESTS=OFF` keeps the CPython-3.8-from-source build (only
+  needed by the `cpython-tests` target) out of the build graph; it is not
+  required to build or run the interpreter.
+
+### Build
+
+```sh
+$ ninja -C build python
+```
+
+### Enjoy!
+
+```sh
+$ ./build/bin/python -c 'import sys; print(sys.implementation.name)'
+skybison
 ```
 
 ---
